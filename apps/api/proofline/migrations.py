@@ -359,6 +359,12 @@ def _add_model_run_repair_lineage(connection: Connection) -> None:
     )
 
 
+def _normalize_governed_memory_statuses(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        "UPDATE decisions SET status = 'obsolete' WHERE status = 'superseded'"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -370,6 +376,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (8, "resumable atomic ingestion jobs", _add_resumable_ingestion_jobs),
     (9, "generalized governed memory kinds", _generalize_governed_memory),
     (10, "bounded model output repair lineage", _add_model_run_repair_lineage),
+    (11, "normalize governed memory statuses", _normalize_governed_memory_statuses),
 )
 
 

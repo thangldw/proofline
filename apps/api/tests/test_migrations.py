@@ -16,7 +16,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert versions == list(range(1, 12))
     assert {
         "sources",
         "source_versions",
@@ -81,7 +81,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 11))
+    assert versions == list(range(1, 12))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -215,7 +215,77 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 11))
+    assert versions == list(range(1, 12))
+    engine.dispose()
+
+
+def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v10-memory-status.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:10]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+        now = "2026-07-12T00:00:00+00:00"
+        connection.execute(
+            text(
+                """INSERT INTO sources
+                   (id, title, kind, content, content_hash, status, created_at, indexed_at,
+                    current_version_id)
+                   VALUES ('source-v10', 'Legacy status ADR', 'markdown',
+                           'Decision: Retire queue', :identity, 'indexed', :now, :now,
+                           'version-v10')"""
+            ),
+            {"identity": "c" * 64, "now": now},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO source_versions
+                   (id, source_id, content_hash, content, version_number, content_length,
+                    status, parser_version, created_at)
+                   VALUES ('version-v10', 'source-v10', :content_hash,
+                           'Decision: Retire queue', 1, 22, 'indexed',
+                           'deterministic-v1', :now)"""
+            ),
+            {"content_hash": "d" * 64, "now": now},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO decisions
+                   (id, source_id, source_version_id, kind, title, statement, status, confidence,
+                    extraction_method, created_at, updated_at)
+                   VALUES ('memory-v10', 'source-v10', 'version-v10', 'decision', 'Retire queue',
+                           'Retire queue', 'superseded', 1.0, 'deterministic', :now, :now)"""
+            ),
+            {"now": now},
+        )
+
+    initialize_database(engine)
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        status = connection.execute(
+            text("SELECT status FROM decisions WHERE id = 'memory-v10'")
+        ).scalar_one()
+        versions = (
+            connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            .scalars()
+            .all()
+        )
+    assert status == "obsolete"
+    assert versions == list(range(1, 12))
     engine.dispose()
 
 
