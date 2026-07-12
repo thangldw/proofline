@@ -19,7 +19,8 @@ semantic-versioning compatibility.
   fusion, grounded answers with exact citations, context-budget exclusions, and
   retrieval diagnostics.
 - Safe model-run list, detail, and repair-lineage API endpoints. A dedicated
-  model-run web screen is not yet available.
+  metadata-only web screen provides filters, detail, and parent/current/child lineage without
+  rendering private model payloads.
 - Verified portable JSON export and SQLite backup workflows, including separate
   verification commands and documented recovery steps. Portable import remains
   unimplemented.
@@ -28,6 +29,14 @@ semantic-versioning compatibility.
   hosted CI has completed successfully.
 - Community health files, contribution guidance, a code of conduct, and private
   security-reporting guidance for the pre-alpha repository.
+- Exact-set confirmed missing-source deletion with drift/error checks and the existing complete
+  derived-data cascade.
+- Source-ID and indexed-time scopes for search and grounded answers.
+- Credential-free deterministic extraction and retrieval v2 regression gates. Retrieval v2 covers
+  26 Unicode and current/superseded-revision queries; neither gate is real-model or pilot evidence.
+- A Chromium vertical-path E2E test for provenance navigation, governed correction, deletion,
+  hostile-content inertness, and non-loopback egress detection. Its hosted workflow is configured,
+  not claimed as successfully run.
 
 ### Changed
 
@@ -35,6 +44,9 @@ semantic-versioning compatibility.
   model and provenance rules.
 - Runtime answers expose evidence and retrieval exclusions rather than silently
   dropping context that does not fit the answer budget.
+- Docker Compose publishes the unauthenticated API to loopback by default.
+- Migration coverage now includes a large legacy provenance/backfill fixture and current
+  search/deletion behavior after upgrade.
 
 ### Security
 
@@ -46,9 +58,9 @@ semantic-versioning compatibility.
 ### Known limitations
 
 - Proofline remains pre-alpha with no supported release or production support.
-- Portable import, reranking, a dedicated model-run web screen, Windows platform
-  verification, real-model quality qualification, and external pilot gates are
-  still open.
+- Portable import, scalable vector indexing, reranking, Windows verification, production support,
+  a repository security-plugin scan, hosted CI receipts, real-model quality qualification, and
+  external pilot gates are still open.
 
 When preparing the first tagged alpha, review these entries and link their pull
 requests or issues. Every entry must describe observable behavior; planned

@@ -42,35 +42,44 @@ As of 2026-07-12:
   assumptions, constraints, and alternatives, exact evidence spans, source and generalized-memory
   browsing, cascading source deletion, health/overview endpoints, and tests.
 - Implemented in `apps/web`: React/Vite local evidence console for Markdown upload, lexical
-  and optional hybrid search, source inventory, filterable generalized-memory review and
+  and optional hybrid search with source/indexed-time scopes, source inventory, filterable generalized-memory review and
   correction, reversible statuses, overview counts, evidence inspection, statement-level
   citation mapping, retrieval diagnostics, context-budget exclusions, and degraded search
-  behavior when answer generation fails.
-- Local container scaffolding and root setup/development/quality commands are present.
-- Also implemented: immutable source-version history and versioned SQLite migrations.
+  behavior when answer generation fails. A dedicated safe Model runs view filters metadata and
+  inspects parent/current/child repair lineage without rendering private model payloads.
+- Local container scaffolding and root setup/development/quality commands are present. Docker
+  Compose publishes the unauthenticated API to loopback by default.
+- Also implemented: immutable source-version history and versioned SQLite migrations, including a
+  large legacy-database fixture that exercises migration/backfill provenance and current behavior.
 - Also implemented: migration-backed retryable ingestion jobs, private staged input, atomic
   domain/job commits, startup recovery, idempotency keys, dead-letter handling, and UI retry controls.
 - Also implemented: governed updates for decisions, assumptions, constraints, and alternatives,
   with append-only before/after audit events.
 - Also implemented: provider-neutral generation gateway, fake/OpenAI-compatible adapters,
   explicit remote egress, structured-output validation, and persisted model-run diagnostics.
-  Safe list/detail and repair-lineage inspection is available through the API; there is no
-  dedicated model-run web view.
+  Safe list/detail and repair-lineage inspection is available through both the API and web view.
 - Also implemented: bounded lexical evidence packs, typed grounded statements, server-resolved
   exact citations, insufficient-evidence behavior, and fail-closed grounding validation.
-- Also implemented: a versioned synthetic retrieval corpus and repository evaluation command for
-  Recall@10, Precision@10, MRR, and nDCG@10. The workflow is configured to run it, but this
-  inventory does not claim a hosted CI run succeeded. Real pilot judgments are still required.
+- Also implemented: the versioned synthetic retrieval v2 corpus and repository evaluation command
+  for Recall@10, Precision@10, MRR, nDCG@10, and expected-empty accuracy. V2 covers 26 Unicode and
+  current/superseded-revision queries. The workflow is configured to run it, but this inventory
+  does not claim a hosted CI run succeeded. Real pilot judgments are still required.
 - Also implemented: separate OpenAI-compatible embedding provider, incremental versioned vectors,
   dense cosine retrieval, and reciprocal-rank fusion with lexical results.
 - Also implemented: schema-validated, evidence-grounded AI memory candidates for all four current
   memory kinds, linked to model runs and the human review/audit workflow.
+- Also implemented: a credential-free deterministic extraction gate for all four memory kinds,
+  exact evidence slices and hashes, English/Vietnamese markers, CJK statements after supported
+  markers, and negative prose. It is not real-model extraction evidence.
 - Also implemented: registered-root folder scanning with traversal/symlink containment, per-file
   results, immutable updates, audited unique-hash rename preservation, sorted missing-file preview,
   and exact-set confirmed deletion that fails closed on drift or scan errors.
 - Also implemented: metadata-only source deletion impact, verified cascade cleanup including
   embeddings/FTS/audits, and source-level ingestion job diagnostics in the web inventory.
-- Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
+- Also implemented: web behavior tests, a repository threat model, and CI secret scanning. A
+  credential-free Chromium E2E test covers import, governed review/correction, retrieval debug,
+  exact evidence, and deletion; hostile Markdown remains inert and non-loopback requests fail the
+  test. The workflow job is configured, but no hosted-run receipt is claimed.
 - Also implemented: deterministic local lexical benchmark reporting and a versioned environment-
   qualified observation receipt; this is not a product performance guarantee.
 - Also implemented: a credential-free synthetic grounded-QA regression gate that exercises the
@@ -82,7 +91,8 @@ As of 2026-07-12:
   covering installation, local evidence, export verification, backup verification, and the web
   build. This is configured coverage, not a claim of a successful hosted run or production support;
   Windows remains unverified.
-- Not yet implemented: portable import, scalable vector index, reranker, dedicated model-run UI,
-  real-model/pilot evaluation, desktop packaging, cloud services, or telemetry.
+- Not yet completed: portable import, a scalable vector index, reranking, real-model/pilot
+  evaluation, a repository security-plugin scan, hosted CI receipts, Windows verification,
+  production support, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.
