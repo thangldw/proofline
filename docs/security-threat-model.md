@@ -82,9 +82,10 @@ file URIs and immutable content hashes prevent a changed file from repointing hi
 Relevant attacks include cross-origin writes, accidental network exposure, oversized requests,
 FTS/query injection, unescaped imported content, and denial of service through expensive search or
 model calls. Existing controls include Pydantic bounds, parameterized SQL/FTS handling, a narrow
-default CORS origin, and React's escaped text rendering. Operators must bind the pre-alpha server
-only to loopback. Authentication, CSRF protection, rate limiting, and hostile multi-user isolation
-are not implemented.
+default CORS origin, React's escaped text rendering, and loopback defaults in both the CLI and
+Docker Compose host-port binding. Operators overriding that binding must supply their own network
+and authentication controls. Authentication, CSRF protection, rate limiting, and hostile
+multi-user isolation are not implemented.
 
 ### Persistence, provenance, and deletion
 
