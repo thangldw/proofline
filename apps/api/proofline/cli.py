@@ -9,7 +9,7 @@ import uvicorn
 from .config import get_settings
 from .database import SessionLocal, initialize_database
 from .embeddings import index_current_embeddings
-from .evaluation import evaluate_dataset
+from .evaluation import benchmark_lexical_search, evaluate_dataset
 from .ingestion import ingest_source
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .schemas import SourceCreate
@@ -38,6 +38,12 @@ def main() -> None:
     evaluate.add_argument("--k", type=int, default=10)
     evaluate.add_argument("--min-recall", type=float, default=0)
     evaluate.add_argument("--min-ndcg", type=float, default=0)
+    benchmark = subcommands.add_parser(
+        "benchmark", help="Measure local SQLite FTS5 lexical search latency"
+    )
+    benchmark.add_argument("--sources", type=int, default=1_000)
+    benchmark.add_argument("--queries", type=int, default=100)
+    benchmark.add_argument("--limit", type=int, default=10)
     subcommands.add_parser("embed", help="Incrementally embed current source chunks")
     args = parser.parse_args()
     if args.command == "serve":
@@ -49,6 +55,12 @@ def main() -> None:
         print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
         if report.recall_at_k < args.min_recall or report.ndcg_at_k < args.min_ndcg:
             raise SystemExit(1)
+    elif args.command == "benchmark":
+        try:
+            report = benchmark_lexical_search(args.sources, args.queries, args.limit)
+        except ValueError as exc:
+            parser.error(str(exc))
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
     elif args.command == "embed":
         initialize_database()
         try:
