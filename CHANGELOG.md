@@ -7,6 +7,10 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
+No changes have been recorded after `v0.1.0-alpha.5`.
+
+## [0.1.0-alpha.5] - 2026-07-13
+
 ### Added
 
 - A read-only `proofline verify-integrity` command checks live SQLite provenance invariants and
@@ -122,7 +126,8 @@ semantic-versioning compatibility between pre-releases.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.4...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.5...HEAD
+[0.1.0-alpha.5]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.5
 [0.1.0-alpha.4]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.3]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.2
