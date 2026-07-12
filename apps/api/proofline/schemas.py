@@ -19,6 +19,7 @@ class FolderScanRequest(BaseModel):
     root: str | None = Field(default=None, min_length=1, max_length=4_096)
     path: str | None = Field(default=None, max_length=4_096)
     delete_missing: bool = False
+    confirmed_missing_source_ids: list[str] | None = Field(default=None, max_length=10_000)
 
 
 class FolderScanFileResult(BaseModel):
@@ -36,7 +37,7 @@ class FolderScanResponse(BaseModel):
     root: str
     path: str
     delete_missing_requested: bool
-    deletion_mode: Literal["preview_only"] = "preview_only"
+    deletion_mode: Literal["preview_only", "confirmed_delete"] = "preview_only"
     deleted_count: int = 0
     discovered_count: int
     created_count: int
