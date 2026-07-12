@@ -58,6 +58,8 @@ As of 2026-07-12:
   runs and the existing human review/audit workflow.
 - Also implemented: registered-root folder scanning with traversal/symlink containment, per-file
   results, immutable updates, and preview-only missing-file reporting.
+- Also implemented: metadata-only source deletion impact, verified cascade cleanup including
+  embeddings/FTS/audits, and source-level ingestion job diagnostics in the web inventory.
 - Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
 - Not yet implemented: resumable/retryable job execution, scalable vector index, reranker,
   assumption/constraint extraction, repair retries, desktop packaging, cloud services, or

@@ -63,7 +63,9 @@ The runnable foundation implements Markdown/text upload, deterministic chunks, S
 search, and source/chunk provenance. Explicitly marked English/Vietnamese decisions are extracted
 without a model and linked to exact evidence. A React/Vite console supports upload, search,
 source and decision browsing, and evidence inspection. The API supports source deletion with
-derived chunks, decisions, evidence, and FTS rows removed.
+derived versions, chunks, embeddings, decisions, evidence, audit content, and FTS rows removed.
+A metadata-only preview reports the exact impact before deletion; ingestion jobs remain as safe,
+detached diagnostics.
 
 Synchronous ingestion attempts persist inspectable success/failure jobs without storing source
 content in error records. Decisions support governed status/correction actions with an append-only

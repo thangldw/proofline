@@ -108,6 +108,9 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - Source versions, versioned schema migrations, synchronous ingestion job records, and decision
   audit events are implemented; generalized derived memory and resumable job execution are
   planned schema extensions.
+- A metadata-only deletion-impact endpoint counts every source-owned version, chunk, embedding,
+  decision, evidence link, audit event, FTS row, and ingestion job that will be detached. Confirmed
+  deletion removes content-bearing derived rows and preserves only detached safe job diagnostics.
 - Versioned chunk embeddings are implemented in a local SQLite table with provider/model,
   dimensions, content hash, and immutable source-version ownership. Indexing is incremental.
   Dense search currently uses bounded in-process cosine scoring; a SQLite vector extension or
