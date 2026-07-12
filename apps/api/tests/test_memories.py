@@ -1,7 +1,32 @@
 import json
 
 import proofline.api as api_module
-from proofline.model_gateway import FakeGenerationProvider
+from proofline.model_gateway import (
+    FakeGenerationProvider,
+    GenerationResult,
+    ModelCapabilities,
+    ProviderRequestError,
+)
+
+
+class ScriptedGenerationProvider:
+    id = "scripted"
+    model = "scripted-memory-api-test"
+
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+
+    def capabilities(self):
+        return ModelCapabilities()
+
+    def health(self):
+        return True
+
+    def generate(self, _request):
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return GenerationResult(content=outcome)
 
 
 def test_memory_routes_filter_review_audit_and_delete_without_leakage(client):
@@ -60,10 +85,33 @@ def test_memory_routes_filter_review_audit_and_delete_without_leakage(client):
     assert audit[0]["before_json"]["kind"] == "assumption"
     assert audit[0]["after_json"]["status"] == "accepted"
 
+    candidate = client.patch(f"/api/v1/memories/{assumption['id']}", json={"status": "candidate"})
+    assert candidate.status_code == 200
+    assert candidate.json()["status"] == "candidate"
+    assert candidate.json()["evidence"] == assumption["evidence"]
+    active = client.patch(f"/api/v1/memories/{assumption['id']}", json={"status": "active"})
+    assert active.status_code == 200
+    assert active.json()["status"] == "active"
+    assert active.json()["evidence"] == assumption["evidence"]
+    audit = client.get(
+        "/api/v1/audit-events",
+        params={"object_type": "memory", "object_id": assumption["id"]},
+    ).json()
+    assert [event["before_json"]["status"] for event in audit] == [
+        "candidate",
+        "accepted",
+        "active",
+    ]
+    assert [event["after_json"]["status"] for event in audit] == [
+        "active",
+        "candidate",
+        "accepted",
+    ]
+
     impact = client.get(f"/api/v1/sources/{source['id']}/deletion-impact").json()
     assert impact["decisions"] == 1
     assert impact["memories"] == 2
-    assert impact["audit_events_to_delete"] == 1
+    assert impact["audit_events_to_delete"] == 3
     assert client.delete(f"/api/v1/sources/{source['id']}").status_code == 204
     assert (
         client.get(
@@ -143,3 +191,57 @@ def test_generalized_model_endpoint_and_decision_compatibility_filter(client, mo
         "assumption",
     }
     assert [item["kind"] for item in client.get("/api/v1/decisions").json()] == ["decision"]
+
+
+def test_provider_failure_run_lineage_is_inspectable_and_source_remains_searchable(
+    client, monkeypatch
+):
+    private_source_text = "SQLite is retained because local recovery must remain searchable."
+    source = client.post(
+        "/api/v1/sources",
+        json={
+            "title": "Recovery note",
+            "content": private_source_text,
+            "uri": "file:///recovery.md",
+        },
+    ).json()
+    provider = ScriptedGenerationProvider(
+        ["not valid JSON", ProviderRequestError("safe provider failure")]
+    )
+    monkeypatch.setattr(api_module, "build_generation_provider", lambda _settings: provider)
+
+    failed = client.post(f"/api/v1/sources/{source['id']}/extract-memories")
+
+    assert failed.status_code == 502
+    last_run_id = failed.headers["x-proofline-model-run-id"]
+    detail = client.get(f"/api/v1/model/runs/{last_run_id}")
+    assert detail.status_code == 200
+    run = detail.json()
+    assert run["status"] == "failed"
+    assert run["error_code"] == "provider_request_failed"
+    assert run["attempt_number"] == 2
+    assert run["repair_reason"] == "structured_output_invalid"
+    assert run["parent_run_id"]
+    assert private_source_text not in detail.text
+
+    parent = client.get(f"/api/v1/model/runs/{run['parent_run_id']}").json()
+    assert parent["status"] == "failed"
+    assert parent["error_code"] == "structured_output_invalid"
+    children = client.get(
+        "/api/v1/model/runs",
+        params={
+            "parent_run_id": parent["id"],
+            "operation": "generate",
+            "provider_id": provider.id,
+            "status": "failed",
+            "limit": 1,
+        },
+    ).json()
+    assert [child["id"] for child in children] == [last_run_id]
+    assert client.get("/api/v1/model/runs/missing-run").status_code == 404
+    assert client.get("/api/v1/model/runs", params={"limit": 201}).status_code == 422
+
+    search = client.get("/api/v1/search", params={"q": "local recovery"})
+    assert search.status_code == 200
+    assert search.json()["hits"][0]["source_id"] == source["id"]
+    assert client.get("/api/v1/memories").json() == []
