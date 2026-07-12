@@ -6,8 +6,9 @@ from pathlib import Path
 
 import uvicorn
 
+from .backup import BackupError, create_sqlite_backup, verify_sqlite_backup
 from .config import get_settings
-from .database import SessionLocal, initialize_database
+from .database import SessionLocal, engine, initialize_database
 from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
@@ -80,6 +81,11 @@ def main(argv: list[str] | None = None) -> None:
     export.add_argument("--force", action="store_true")
     verify_export = subcommands.add_parser("verify-export", help="Verify a portable JSON snapshot")
     verify_export.add_argument("path", type=Path)
+    backup = subcommands.add_parser("backup", help="Create a complete local SQLite backup")
+    backup.add_argument("--output", type=Path, required=True)
+    backup.add_argument("--force", action="store_true")
+    verify_backup = subcommands.add_parser("verify-backup", help="Verify a SQLite backup")
+    verify_backup.add_argument("path", type=Path)
     args = parser.parse_args(argv)
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
@@ -151,6 +157,21 @@ def main(argv: list[str] | None = None) -> None:
         except PortabilityError as exc:
             raise SystemExit(f"export verification failed: {exc.code}") from exc
         print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
+    elif args.command == "backup":
+        if engine.dialect.name != "sqlite":
+            raise SystemExit("backup failed: sqlite_required")
+        initialize_database()
+        try:
+            report = create_sqlite_backup(engine, args.output, force=args.force)
+        except BackupError as exc:
+            raise SystemExit(f"backup failed: {exc.code}") from exc
+        print(json.dumps({"valid": True, **report}, sort_keys=True))
+    elif args.command == "verify-backup":
+        try:
+            report = verify_sqlite_backup(args.path)
+        except BackupError as exc:
+            raise SystemExit(f"backup verification failed: {exc.code}") from exc
+        print(json.dumps({"valid": True, **report}, sort_keys=True))
 
 
 if __name__ == "__main__":
