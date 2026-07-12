@@ -77,6 +77,9 @@ Schema, size, or evidence-ID validation failures receive at most one bounded rep
 same provider, model, evidence pack, and input hashes. Each attempt has a persisted lineage record;
 invalid output and validation details are never stored or echoed into the repair prompt. Provider
 transport failures are recorded and returned without an automatic repair or provider fallback.
+Safe run metadata can be inspected through `/api/v1/model/runs` and
+`/api/v1/model/runs/{id}`; filters expose a repair run's parent/child lineage without exposing
+source text, prompts, model output, or credentials.
 
 The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span

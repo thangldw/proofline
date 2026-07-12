@@ -104,7 +104,8 @@ Before delivery work, record:
   decision-only compatibility API are implemented.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
   Schema/size and evidence-ID repair is implemented as one additional call with secret-safe
-  `ModelRun` lineage; model-run inspection and broader extraction evaluation remain open.
+  `ModelRun` lineage. Safe list/detail inspection and lineage filters are implemented; a dedicated
+  UI and broader extraction evaluation remain open.
 - Extend the implemented AI decision candidate queue and audit-backed review actions to other
   memory kinds. The filterable memory registry and review API now cover decisions, assumptions,
   constraints, and alternatives.
