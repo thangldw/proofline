@@ -76,14 +76,19 @@ Planned modules are:
 The implemented foundation ingests synchronously. A URI identifies a stable source, SHA-256
 identifies an immutable version, unchanged content is a no-op, and changed content creates a new
 version while preserving historical evidence. URI-less repeated content remains idempotent.
-Every synchronous ingestion attempt now persists a job with stage, terminal state, safe error
-code/detail, attempt count, and source/version references. Resumable execution and retries remain
-planned. In that planned pipeline, a source progresses through independently visible stages:
+Every synchronous ingestion attempt persists a job with stage, terminal state, safe error
+code/detail, attempt count, and source/version references. The request payload is staged in a
+private table that has no read API. Source/version/chunk/FTS writes, terminal success, and staged
+input deletion commit atomically. Startup recovery converts interrupted jobs to retryable failures;
+conditional retry claims prevent a stale second claimant from incrementing attempts. A source
+progresses through independently visible stages:
 
 ```text
 discovered -> parsed -> indexed -> extracted -> ready
                  |          |           |
                  +----------+-----------+-> failed(stage, reason, retryable)
+                                                |
+                                                +-> dead_letter(attempts exhausted)
 ```
 
 `ready` means all enabled stages succeeded. A source that is parsed and searchable but has a
@@ -105,9 +110,8 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
-- Source versions, versioned schema migrations, synchronous ingestion job records, and decision
-  audit events are implemented; generalized derived memory and resumable job execution are
-  planned schema extensions.
+- Source versions, versioned schema migrations, resumable ingestion jobs with private staged
+  input, and decision audit events are implemented; generalized derived memory remains planned.
 - A metadata-only deletion-impact endpoint counts every source-owned version, chunk, embedding,
   decision, evidence link, audit event, FTS row, and ingestion job that will be detached. Confirmed
   deletion removes content-bearing derived rows and preserves only detached safe job diagnostics.
@@ -202,8 +206,8 @@ then return a qualified failure rather than ungrounded prose.
 
 The names below describe the target MVP. Current SQLAlchemy models and SQLite setup in `apps/api`
 remain the source of truth for implemented records. `Source`, `Chunk`, `Decision`, and `Evidence`
-exist now; `SourceVersion`, `ModelRun`, and `AuditEvent` are also implemented. Generalized
-`MemoryObject`, `Relation`, and resumable `Job` execution remain planned.
+exist now; `SourceVersion`, `ModelRun`, `IngestionJob`, and `AuditEvent` are also implemented.
+Generalized `MemoryObject` and `Relation` remain planned.
 
 ```text
 Workspace
@@ -273,12 +277,18 @@ Implemented foundation operations:
 GET    /health
 GET    /api/v1/overview
 POST   /api/v1/sources
+POST   /api/v1/folder-scans
 GET    /api/v1/sources
 GET    /api/v1/sources/:id
+GET    /api/v1/sources/:id/deletion-impact
 DELETE /api/v1/sources/:id
+GET    /api/v1/jobs
+GET    /api/v1/jobs/:id
+POST   /api/v1/jobs/:id/retry
 GET    /api/v1/decisions
 GET    /api/v1/decisions/:id
 GET    /api/v1/search
+POST   /api/v1/answers
 ```
 
 Planned MVP operations (exact contracts remain undecided):
@@ -288,7 +298,6 @@ POST   /workspaces
 GET    /workspaces/:id/status
 POST   /workspaces/:id/sources/scan
 GET    /sources/:id/versions/:versionId/spans/:spanId
-POST   /jobs/:id/retry
 GET    /workspaces/:id/memories?status=candidate
 PATCH  /memories/:id
 POST   /workspaces/:id/search

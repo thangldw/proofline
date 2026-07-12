@@ -70,9 +70,11 @@ detached diagnostics.
 Synchronous ingestion attempts persist inspectable success/failure jobs without storing source
 content in error records. Decisions support governed status/correction actions with an append-only
 before/after audit trail. A provider-neutral gateway supports fake and OpenAI-compatible generation
-with remote egress disabled by default and secret-safe model-run diagnostics. It does **not** yet
-implement job retries, folder watching, scalable vector retrieval, generalized memory extraction,
-grounded-answer repair retries, or desktop packaging. Registered-root folder scans are available
+with remote egress disabled by default and secret-safe model-run diagnostics. Ingestion jobs use
+private integrity-checked staged input, atomic domain/job commits, bounded retry, dead-letter state,
+idempotency keys, and startup recovery. It does **not** yet implement folder watching, scalable
+vector retrieval, generalized memory extraction, grounded-answer repair retries, or desktop
+packaging. Registered-root folder scans are available
 for explicit, on-demand Markdown/text import; missing files are previewed but never silently
 deleted. The current hybrid answer path combines
 lexical and dense retrieval through RRF and enforces server-owned evidence IDs plus exact immutable

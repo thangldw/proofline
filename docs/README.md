@@ -44,7 +44,8 @@ As of 2026-07-12:
   citation mapping, and degraded search behavior when answer generation fails.
 - Local container scaffolding and root setup/development/quality commands are present.
 - Also implemented: immutable source-version history and versioned SQLite migrations.
-- Also implemented: persisted terminal status for synchronous ingestion jobs.
+- Also implemented: migration-backed retryable ingestion jobs, private staged input, atomic
+  domain/job commits, startup recovery, idempotency keys, dead-letter handling, and UI retry controls.
 - Also implemented: governed decision updates and append-only before/after audit events.
 - Also implemented: provider-neutral generation gateway, fake/OpenAI-compatible adapters,
   explicit remote egress, structured-output validation, and persisted model-run diagnostics.
@@ -61,8 +62,7 @@ As of 2026-07-12:
 - Also implemented: metadata-only source deletion impact, verified cascade cleanup including
   embeddings/FTS/audits, and source-level ingestion job diagnostics in the web inventory.
 - Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
-- Not yet implemented: resumable/retryable job execution, scalable vector index, reranker,
-  assumption/constraint extraction, repair retries, desktop packaging, cloud services, or
-  telemetry.
+- Not yet implemented: scalable vector index, reranker, assumption/constraint extraction, model
+  repair retries, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.
