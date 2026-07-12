@@ -25,8 +25,8 @@ semantic-versioning compatibility.
   verification commands and documented recovery steps. Portable import remains
   unimplemented.
 - A credential-free platform smoke script and a configured GitHub Actions matrix
-  for Ubuntu and macOS. This records the checked-in automation, not a claim that
-  hosted CI has completed successfully.
+  for Ubuntu and macOS. A versioned receipt records successful API CI and Secret
+  Scan runs for revision `0dde53f`, including both platform jobs and browser E2E.
 - Community health files, contribution guidance, a code of conduct, and private
   security-reporting guidance for the pre-alpha repository.
 - Exact-set confirmed missing-source deletion with drift/error checks and the existing complete
@@ -59,8 +59,8 @@ semantic-versioning compatibility.
 
 - Proofline remains pre-alpha with no supported release or production support.
 - Portable import, scalable vector indexing, reranking, Windows verification, production support,
-  a repository security-plugin scan, hosted CI receipts, real-model quality qualification, and
-  external pilot gates are still open.
+  a repository security-plugin scan, real-model quality qualification, and external pilot gates
+  are still open.
 
 When preparing the first tagged alpha, review these entries and link their pull
 requests or issues. Every entry must describe observable behavior; planned

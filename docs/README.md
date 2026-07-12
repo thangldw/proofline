@@ -62,8 +62,8 @@ As of 2026-07-12:
   exact citations, insufficient-evidence behavior, and fail-closed grounding validation.
 - Also implemented: the versioned synthetic retrieval v2 corpus and repository evaluation command
   for Recall@10, Precision@10, MRR, nDCG@10, and expected-empty accuracy. V2 covers 26 Unicode and
-  current/superseded-revision queries. The workflow is configured to run it, but this inventory
-  does not claim a hosted CI run succeeded. Real pilot judgments are still required.
+  current/superseded-revision queries. The recorded hosted workflow ran it successfully, but
+  synthetic scores are not pilot evidence. Real pilot judgments are still required.
 - Also implemented: separate OpenAI-compatible embedding provider, incremental versioned vectors,
   dense cosine retrieval, and reciprocal-rank fusion with lexical results.
 - Also implemented: schema-validated, evidence-grounded AI memory candidates for all four current
@@ -79,7 +79,7 @@ As of 2026-07-12:
 - Also implemented: web behavior tests, a repository threat model, and CI secret scanning. A
   credential-free Chromium E2E test covers import, governed review/correction, retrieval debug,
   exact evidence, and deletion; hostile Markdown remains inert and non-loopback requests fail the
-  test. The workflow job is configured, but no hosted-run receipt is claimed.
+  test. The recorded hosted workflow passed this job for revision `0dde53f`.
 - Also implemented: deterministic local lexical benchmark reporting and a versioned environment-
   qualified observation receipt; this is not a product performance guarantee.
 - Also implemented: a credential-free synthetic grounded-QA regression gate that exercises the
@@ -89,10 +89,11 @@ As of 2026-07-12:
   source versions, evidence spans, and hashes. Portable import is not implemented.
 - Also implemented: a credential-free platform smoke script and an Ubuntu/macOS workflow matrix
   covering installation, local evidence, export verification, backup verification, and the web
-  build. This is configured coverage, not a claim of a successful hosted run or production support;
+  build. The [versioned receipt](../evals/platform/github-actions-0dde53f.json) records successful
+  hosted API CI and Secret Scan runs, including both platform jobs. This is not production support;
   Windows remains unverified.
 - Not yet completed: portable import, a scalable vector index, reranking, real-model/pilot
-  evaluation, a repository security-plugin scan, hosted CI receipts, Windows verification,
-  production support, desktop packaging, cloud services, or telemetry.
+  evaluation, a repository security-plugin scan, Windows verification, production support,
+  desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

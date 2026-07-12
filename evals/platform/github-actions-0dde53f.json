@@ -1,0 +1,28 @@
+{
+  "schema_version": "proofline-ci-receipt-v1",
+  "observed_at": "2026-07-12T23:11:00+09:00",
+  "repository": "thangldw/proofline",
+  "branch": "main",
+  "commit": "0dde53f5924b2771b1fd977cfabffc0ed746eefe",
+  "source": "signed-in GitHub Actions run summary",
+  "api_ci": {
+    "run_id": 29195718893,
+    "url": "https://github.com/thangldw/proofline/actions/runs/29195718893",
+    "status": "success",
+    "duration_seconds": 59,
+    "jobs": [
+      {"name": "Browser E2E (Ubuntu)", "status": "success"},
+      {"name": "lint-and-test", "status": "success"},
+      {"name": "container", "status": "success"},
+      {"name": "Platform smoke (ubuntu-latest)", "status": "success"},
+      {"name": "Platform smoke (macos-14)", "status": "success"}
+    ]
+  },
+  "secret_scan": {
+    "run_id": 29195718944,
+    "url": "https://github.com/thangldw/proofline/actions/runs/29195718944",
+    "status": "success",
+    "duration_seconds": 15
+  },
+  "qualification": "This receipt proves the checked-in pre-alpha source-development workflow passed for the identified revision. It is not Windows, native packaging, production, security-audit, or pilot-quality evidence."
+}
