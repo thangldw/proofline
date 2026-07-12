@@ -1,0 +1,50 @@
+name: Scoped feature request
+description: Propose a user outcome within Proofline's current evidence-first scope.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proofline is pre-alpha and intentionally narrow. Please describe an outcome,
+        not a broad feature category. Deferred connectors, collaboration, editors,
+        agents, and cloud surfaces require a separately approved milestone.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User or operator problem
+      description: Who is blocked, in which workflow, and what evidence shows the problem matters?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable outcome
+      description: What would a user be able to do when this is complete?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope and out of scope
+      description: State the smallest vertical behavior and tempting adjacent work to defer.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Include testable success, failure, provenance, and local/offline behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: trust
+    attributes:
+      label: Trust, privacy, and lifecycle considerations
+      description: Address source identity/spans, model egress, migration, observability, export, and deletion where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What smaller workaround or existing capability was considered?

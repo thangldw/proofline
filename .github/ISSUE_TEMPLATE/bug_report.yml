@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible defect without including private source data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Proofline. Do not include credentials, private
+        vault content, model prompts, provider responses, or personal data. Report
+        suspected vulnerabilities privately as described in `SECURITY.md`.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: This report does not contain sensitive or proprietary source content.
+          required: true
+        - label: This is not a suspected security vulnerability.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use synthetic content and include the smallest repeatable sequence.
+      placeholder: |
+        1. Start Proofline with ...
+        2. Import the synthetic fixture ...
+        3. Run ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, Node.js, browser, deployment mode, and relevant configuration with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance or data-integrity impact
+      description: Note whether source versions, exact spans, citations, memory review, export, or deletion are affected.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Safe diagnostics
+      description: Include error codes, job/model-run IDs, or redacted logs only. Never paste source content or secrets.
+  - type: textarea
+    id: verification
+    attributes:
+      label: Suggested regression check
+      description: If known, describe the test that would prove the defect is fixed.
