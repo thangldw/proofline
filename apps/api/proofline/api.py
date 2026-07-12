@@ -15,6 +15,7 @@ from .ingestion import (
     IngestionExecutionError,
     delete_source,
     run_ingestion_job,
+    source_deletion_impact,
 )
 from .model_gateway import (
     EmbeddingValidationError,
@@ -50,6 +51,7 @@ from .schemas import (
     ProviderStatus,
     SearchResponse,
     SourceCreate,
+    SourceDeletionImpactRead,
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
@@ -302,6 +304,25 @@ def get_source(source_id: str, session: Session = Depends(get_session)) -> dict:
         "indexed_at": source.indexed_at,
         "current_version_id": source.current_version_id,
     }
+
+
+@router.get(
+    "/sources/{source_id}/deletion-impact",
+    response_model=SourceDeletionImpactRead,
+)
+def get_source_deletion_impact(
+    source_id: str, session: Session = Depends(get_session)
+) -> SourceDeletionImpactRead:
+    source = session.get(Source, source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    impact = source_deletion_impact(session, source)
+    return SourceDeletionImpactRead(
+        source_id=source.id,
+        title=source.title,
+        current_version_id=source.current_version_id,
+        **impact.__dict__,
+    )
 
 
 @router.get("/sources/{source_id}/versions", response_model=list[SourceVersionRead])
