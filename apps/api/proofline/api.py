@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-import re
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .database import get_session
+from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
     IngestionExecutionError,
     delete_source,
     run_ingestion_job,
 )
-from .model_gateway import ProviderConfigurationError, build_generation_provider
+from .model_gateway import (
+    ProviderConfigurationError,
+    ProviderRequestError,
+    StructuredOutputError,
+    build_generation_provider,
+)
 from .models import (
     AuditEvent,
     Chunk,
@@ -26,7 +30,10 @@ from .models import (
     SourceVersion,
     utc_now,
 )
+from .retrieval import lexical_search
 from .schemas import (
+    AnswerRequest,
+    AnswerResponse,
     AuditEventRead,
     DecisionRead,
     DecisionUpdate,
@@ -34,7 +41,6 @@ from .schemas import (
     ModelRunRead,
     Overview,
     ProviderStatus,
-    SearchHit,
     SearchResponse,
     SourceCreate,
     SourceRead,
@@ -351,40 +357,31 @@ def search(
     limit: int = Query(default=10, ge=1, le=50),
     session: Session = Depends(get_session),
 ) -> SearchResponse:
-    terms = re.findall(r"[\w\-]+", q, flags=re.UNICODE)
-    if not terms:
-        return SearchResponse(query=q, hits=[])
-    fts_query = " OR ".join(f'"{term}"' for term in terms)
-    rows = session.execute(
-        text(
-            """
-            SELECT c.id, c.source_id, c.source_version_id, s.title, c.content,
-                   c.start_offset, c.end_offset, c.start_line, c.end_line,
-                   bm25(chunk_search) AS rank
-            FROM chunk_search
-            JOIN chunks c ON c.id = chunk_search.chunk_id
-            JOIN sources s ON s.id = c.source_id
-            WHERE chunk_search MATCH :query
-              AND c.source_version_id = s.current_version_id
-            ORDER BY rank
-            LIMIT :limit
-            """
-        ),
-        {"query": fts_query, "limit": limit},
-    ).all()
-    hits = [
-        SearchHit(
-            chunk_id=row[0],
-            source_id=row[1],
-            source_version_id=row[2],
-            source_title=row[3],
-            content=row[4],
-            start_offset=row[5],
-            end_offset=row[6],
-            start_line=row[7],
-            end_line=row[8],
-            rank=row[9],
-        )
-        for row in rows
-    ]
+    hits = lexical_search(session, q, limit)
     return SearchResponse(query=q, hits=hits)
+
+
+@router.post("/answers", response_model=AnswerResponse)
+def create_answer(
+    payload: AnswerRequest,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> AnswerResponse:
+    try:
+        provider = build_generation_provider(get_settings())
+        answer = answer_question(session, payload.question, provider, payload.limit)
+    except ProviderConfigurationError as exc:
+        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
+    except (ProviderRequestError, StructuredOutputError, GroundingValidationError) as exc:
+        run_id = getattr(exc, "run_id", None)
+        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
+        raise HTTPException(
+            status_code=502,
+            detail="model output could not produce a grounded answer",
+            headers=headers,
+        ) from exc
+    except EvidenceIntegrityError as exc:
+        raise HTTPException(status_code=500, detail="evidence integrity validation failed") from exc
+    if answer.model_run_id:
+        response.headers["X-Proofline-Model-Run-ID"] = answer.model_run_id
+    return answer

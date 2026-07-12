@@ -45,8 +45,9 @@ As of 2026-07-12:
 - Also implemented: governed decision updates and append-only before/after audit events.
 - Also implemented: provider-neutral generation gateway, fake/OpenAI-compatible adapters,
   explicit remote egress, structured-output validation, and persisted model-run diagnostics.
+- Also implemented: bounded lexical evidence packs, typed grounded statements, server-resolved
+  exact citations, insufficient-evidence behavior, and fail-closed grounding validation.
 - Not yet implemented: resumable/retryable job execution, embeddings/hybrid retrieval,
-  AI-derived decision review, grounded answer
-  generation, desktop packaging, cloud services, or telemetry.
+  AI-derived decision review, repair retries, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

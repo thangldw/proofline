@@ -116,9 +116,10 @@ Before delivery work, record:
 - Add embedding storage selected by the ADR benchmark spike.
 - Implement lexical and semantic retrieval, reciprocal-rank fusion, filters, and diversity.
 - Add optional reranking behind a capability interface.
-- Build bounded evidence packs and grounded answer generation.
-- Validate cited identifiers and quoted spans deterministically.
-- Implement citation navigation and retrieval debug view.
+- Extend the implemented bounded lexical evidence packs and grounded answer generation to hybrid
+  retrieval and context diversity.
+- Harden the implemented deterministic citation identifier and quoted-span validation.
+- Extend the implemented citation navigation with a retrieval debug view.
 - Add grounded-QA golden tests and evaluation harness.
 
 ### Exit gate

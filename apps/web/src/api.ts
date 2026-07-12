@@ -1,4 +1,4 @@
-import type { Decision, Overview, SearchHit, Source } from "./types";
+import type { Decision, GroundedAnswer, Overview, SearchHit, Source } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -26,6 +26,11 @@ export const api = {
     }),
   search: async (query: string) =>
     (await request<{ hits: SearchHit[] }>(`/api/v1/search?q=${encodeURIComponent(query)}`)).hits,
+  answer: (question: string) =>
+    request<GroundedAnswer>("/api/v1/answers", {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
   importSource: (title: string, content: string, uri?: string) =>
     request<Source>("/api/v1/sources", {
       method: "POST",

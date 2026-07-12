@@ -146,3 +146,21 @@ def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypat
         "error_code": "provider_disabled",
     }
     assert client.get("/api/v1/model/runs").json() == []
+
+
+def test_answer_endpoint_fails_safe_without_provider(client, monkeypatch):
+    monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
+    client.post(
+        "/api/v1/sources",
+        json={
+            "title": "ADR",
+            "content": "Decision: Use SQLite because local setup is simple.",
+        },
+    )
+
+    response = client.post("/api/v1/answers", json={"question": "Why use SQLite?"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "provider_unavailable"
+    assert response.json()["statements"] == []
+    assert response.json()["citations"]

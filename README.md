@@ -48,6 +48,10 @@ Decisions can be accepted, rejected, corrected, or marked obsolete. Every change
 before/after audit event while retaining the original source evidence; complete source deletion
 also removes content-bearing audit records.
 
+The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
+server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
+against the immutable source version; unknown, missing, or corrupted evidence fails closed.
+
 ## Repository layout
 
 ```text

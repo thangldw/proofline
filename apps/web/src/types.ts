@@ -54,3 +54,27 @@ export type SearchHit = {
   end_line: number;
   rank: number;
 };
+
+export type AnswerCitation = {
+  evidence_id: string;
+  source_id: string;
+  source_version_id: string;
+  source_title: string;
+  content: string;
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+};
+
+export type GroundedAnswer = {
+  status: "grounded" | "insufficient_evidence" | "provider_unavailable";
+  answer: string;
+  statements: Array<{
+    text: string;
+    kind: "direct" | "synthesis" | "inference";
+    evidence_ids: string[];
+  }>;
+  citations: AnswerCitation[];
+  model_run_id: string | null;
+};

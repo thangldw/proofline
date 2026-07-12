@@ -88,6 +88,51 @@ class SearchResponse(BaseModel):
     hits: list[SearchHit]
 
 
+class AnswerRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=2_000)
+    limit: int = Field(default=8, ge=1, le=12)
+
+
+class AnswerStatement(BaseModel):
+    text: str
+    kind: Literal["direct", "synthesis", "inference"]
+    evidence_ids: list[str]
+
+
+class AnswerCitation(BaseModel):
+    evidence_id: str
+    source_id: str
+    source_version_id: str
+    source_title: str
+    content: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+
+    @classmethod
+    def from_hit(cls, hit: SearchHit) -> AnswerCitation:
+        return cls(
+            evidence_id=hit.chunk_id,
+            source_id=hit.source_id,
+            source_version_id=hit.source_version_id,
+            source_title=hit.source_title,
+            content=hit.content,
+            start_offset=hit.start_offset,
+            end_offset=hit.end_offset,
+            start_line=hit.start_line,
+            end_line=hit.end_line,
+        )
+
+
+class AnswerResponse(BaseModel):
+    status: Literal["grounded", "insufficient_evidence", "provider_unavailable"]
+    answer: str
+    statements: list[AnswerStatement]
+    citations: list[AnswerCitation]
+    model_run_id: str | None
+
+
 class Overview(BaseModel):
     sources: int
     chunks: int

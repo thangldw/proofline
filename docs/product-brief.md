@@ -70,7 +70,8 @@ content in error records. Decisions support governed status/correction actions w
 before/after audit trail. A provider-neutral gateway supports fake and OpenAI-compatible generation
 with remote egress disabled by default and secret-safe model-run diagnostics. It does **not** yet
 implement job retries, folder watching, semantic retrieval, AI-derived candidate creation,
-grounded answer generation, or desktop packaging.
+grounded-answer repair retries, or desktop packaging. The current lexical answer path already
+enforces server-owned evidence IDs and exact immutable citations.
 
 ## MVP outcome
 
