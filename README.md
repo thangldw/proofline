@@ -51,8 +51,11 @@ The deterministic core runs without an LLM or external service:
 This establishes the evidence contract used by the optional model gateway,
 hybrid retrieval, governed candidate extraction, and grounded answers.
 
-Every ingestion request also creates an inspectable job record. Terminal failures retain a safe
-error code and stage without copying source content into diagnostic fields.
+Every ingestion request also creates an inspectable job record. Source writes and terminal job
+success commit atomically. Interrupted jobs recover as retryable failures on startup; deterministic
+failures retry at most three times before entering `dead_letter`. Retry payloads are staged in a
+private table with integrity hashes and never appear in job diagnostics. Successful, permanent, and
+exhausted jobs purge the staged payload.
 
 The API can also scan explicitly registered local roots for Markdown and UTF-8 text. Folder access
 is disabled by default, path traversal and symlink escapes are rejected, and missing files are
@@ -142,6 +145,10 @@ curl -X POST http://localhost:8000/api/v1/folder-scans \
 
 Only `.md`, `.markdown`, and `.txt` files are read. Missing files are reported for review and are
 not deleted by a scan.
+
+Upload clients may send an `Idempotency-Key` header. Replaying the same key and payload returns the
+original successful job; reusing a key with different content is rejected. Failed retryable jobs
+can be resumed with `POST /api/v1/jobs/{job_id}/retry`.
 
 AI is disabled by default. A local OpenAI-compatible endpoint can be configured with
 `PROOFLINE_AI_PROVIDER=openai_compatible`, `PROOFLINE_AI_BASE_URL`, and

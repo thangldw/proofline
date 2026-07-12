@@ -64,10 +64,13 @@ Before delivery work, record:
 - Harden Markdown/text upload and safe registered-root folder scanning. On-demand scanning,
   containment checks, deterministic ordering, immutable updates, and missing-file preview are
   implemented; watching and confirmed deletion remain open.
-- Harden the implemented immutable source versioning and explicit SQLite migrations with crash,
-  concurrency, and larger legacy-database fixtures.
+- Harden the implemented immutable source versioning and explicit SQLite migrations. Atomic crash
+  rollback, v7-to-v8 backfill, startup recovery, idempotency, and stale-claim concurrency are
+  tested; a larger legacy-database fixture remains open.
 - Harden the implemented FTS5 lexical search and exact-span contract.
 - Extend the implemented persisted ingestion job status with retries and dead-letter states.
+  Bounded retry, private staged input, conditional claims, startup recovery, and UI controls are
+  implemented.
 - Extend the implemented source/decision inventory UI with stage diagnostics. Latest job state,
   stage, attempts, retryability, and safe failure fields are now visible per source.
 - Implement deletion preview and cascade behavior for derived data. Source deletion impact and
@@ -78,7 +81,8 @@ Before delivery work, record:
 - Integration tests cover create, update, rename, duplicate content, delete, retry, and crash
   recovery.
 - All golden source spans pass exact hash/offset validation.
-- Every discovered fixture reaches a visible `ready` or `failed` terminal state.
+- Every discovered fixture reaches a visible `ready`, `failed`, or `dead_letter` state; retryable
+  failures expose a retry control.
 - Lexical search p95 is measured against the documented local scale fixture; no unqualified
   performance claim is published.
 
