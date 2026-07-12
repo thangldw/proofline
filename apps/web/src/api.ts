@@ -16,6 +16,8 @@ export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
   jobs: () => request<IngestionJob[]>("/api/v1/jobs?limit=200"),
+  retryJob: (id: string) =>
+    request<IngestionJob>(`/api/v1/jobs/${id}/retry`, { method: "POST" }),
   source: (id: string) => request<Source & { content: string }>(`/api/v1/sources/${id}`),
   sourceVersion: (sourceId: string, versionId: string) =>
     request<{ content: string }>(`/api/v1/sources/${sourceId}/versions/${versionId}`),

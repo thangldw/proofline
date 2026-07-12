@@ -22,11 +22,15 @@ export type IngestionJob = {
   state: string;
   stage: string;
   attempts: number;
+  request_hash: string | null;
+  max_attempts: number;
   error_code: string | null;
   error_detail: string | null;
   retryable: boolean;
   created_at: string;
   updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 };
 
 export type Evidence = {
