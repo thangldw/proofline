@@ -21,6 +21,7 @@ from .evaluation import (
     grounded_report_meets_thresholds,
 )
 from .ingestion import ingest_source
+from .integrity import IntegrityVerificationError, verify_live_database
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .portability import (
     PortabilityError,
@@ -112,6 +113,9 @@ def main(argv: list[str] | None = None) -> None:
     backup.add_argument("--force", action="store_true")
     verify_backup = subcommands.add_parser("verify-backup", help="Verify a SQLite backup")
     verify_backup.add_argument("path", type=Path)
+    subcommands.add_parser(
+        "verify-integrity", help="Verify live SQLite provenance without changing it"
+    )
     args = parser.parse_args(argv)
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
@@ -224,6 +228,12 @@ def main(argv: list[str] | None = None) -> None:
         except BackupError as exc:
             raise SystemExit(f"backup verification failed: {exc.code}") from exc
         print(json.dumps({"valid": True, **report}, sort_keys=True))
+    elif args.command == "verify-integrity":
+        try:
+            report = verify_live_database(engine)
+        except IntegrityVerificationError as exc:
+            raise SystemExit(f"integrity verification failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
 
 
 if __name__ == "__main__":

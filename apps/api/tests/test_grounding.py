@@ -418,6 +418,37 @@ def test_missing_direct_citation_is_repaired_once(session):
     assert runs[1].repair_reason == "grounding_missing_citation"
 
 
+def test_missing_inference_citation_is_repaired_once(session):
+    _source, hit = indexed_evidence(session)
+    missing = json.dumps(
+        {
+            "statements": [
+                {"text": "NATS may reduce complexity.", "kind": "inference", "evidence_ids": []}
+            ]
+        }
+    )
+    valid = json.dumps(
+        {
+            "statements": [
+                {
+                    "text": "NATS may reduce complexity.",
+                    "kind": "inference",
+                    "evidence_ids": [hit.chunk_id],
+                }
+            ]
+        }
+    )
+    provider = ScriptedGenerationProvider([missing, valid])
+
+    answer = answer_question(session, "What can we infer about NATS?", provider)
+
+    runs = list(session.scalars(select(ModelRun).order_by(ModelRun.attempt_number)).all())
+    assert answer.citations[0].evidence_id == hit.chunk_id
+    assert runs[0].error_code == "grounding_missing_citation"
+    assert runs[1].parent_run_id == runs[0].id
+    assert runs[1].repair_reason == "grounding_missing_citation"
+
+
 def test_two_invalid_outputs_stop_at_the_bounded_limit(session):
     indexed_evidence(session)
     provider = ScriptedGenerationProvider(["not json one", "not json two"])

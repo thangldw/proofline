@@ -185,8 +185,9 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 - Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
   local SQLite:** portable export/verification, empty-database transactional import with exact
   provenance and deterministic FTS reconstruction, persistent import receipts, online full
-  backup/read-only verification, recovery provenance exercises, documented retention limits, and
-  cascade deletion coverage. Merge/overwrite import remains outside the implemented contract.
+  backup/read-only verification, live semantic provenance verification, recovery provenance
+  exercises, documented retention limits, and cascade deletion coverage. Merge/overwrite import
+  remains outside the implemented contract.
 - Run a repository security-plugin scan. The checked-in threat model, secret scan, loopback Docker
   binding, web asset egress check, and hostile-content browser regression are implemented, but they
   do not substitute for that open review or production qualification.

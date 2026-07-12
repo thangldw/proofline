@@ -87,11 +87,15 @@ jobs:
           PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-source.db \
             /tmp/proofline-release-smoke/bin/proofline seed
           PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-source.db \
+            /tmp/proofline-release-smoke/bin/proofline verify-integrity
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-source.db \
             /tmp/proofline-release-smoke/bin/proofline export \
             --output /tmp/proofline-release-portable.json
           PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-restored.db \
             /tmp/proofline-release-smoke/bin/proofline import \
             /tmp/proofline-release-portable.json
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-restored.db \
+            /tmp/proofline-release-smoke/bin/proofline verify-integrity
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

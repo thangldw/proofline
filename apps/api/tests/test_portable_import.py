@@ -13,6 +13,7 @@ from proofline.ingestion import (
     ingest_source,
     retry_ingestion_job,
 )
+from proofline.integrity import verify_live_database
 from proofline.models import (
     AuditEvent,
     Chunk,
@@ -122,6 +123,7 @@ def test_import_round_trip_preserves_provenance_and_rebuilds_only_indexes(sessio
 
     assert report["payload_sha256"] == document["manifest"]["payload_sha256"]
     assert report["embeddings_rebuilt"] is False
+    assert verify_live_database(engine)["valid"] is True
     with factory() as target:
         rebuilt = build_portable_export(target)
         assert rebuilt["payload"] == document["payload"]
