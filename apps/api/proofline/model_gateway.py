@@ -467,6 +467,10 @@ def run_embedding(
         and dimensions > 0
         and all(len(vector) == dimensions for vector in result.vectors)
         and all(math.isfinite(value) for vector in result.vectors for value in vector)
+        and all(
+            math.isfinite(math.hypot(*vector)) and math.hypot(*vector) > 0
+            for vector in result.vectors
+        )
     )
     completed = session.get(ModelRun, run.id)
     completed.latency_ms = round((time.monotonic() - started) * 1000)

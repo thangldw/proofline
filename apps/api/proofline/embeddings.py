@@ -90,14 +90,24 @@ def index_current_embeddings(
     return EmbeddingIndexReport(len(pending), skipped, run_ids)
 
 
-def cosine_similarity(left: list[float], right: list[float]) -> float:
+def cosine_similarity(left: list[float], right: list[float]) -> float | None:
     if len(left) != len(right) or not left:
-        return -1.0
-    left_norm = math.sqrt(sum(value * value for value in left))
-    right_norm = math.sqrt(sum(value * value for value in right))
-    if left_norm == 0 or right_norm == 0:
-        return -1.0
-    return sum(a * b for a, b in zip(left, right, strict=True)) / (left_norm * right_norm)
+        return None
+    if not all(math.isfinite(value) for value in [*left, *right]):
+        return None
+    left_norm = math.hypot(*left)
+    right_norm = math.hypot(*right)
+    if (
+        left_norm == 0
+        or right_norm == 0
+        or not math.isfinite(left_norm)
+        or not math.isfinite(right_norm)
+    ):
+        return None
+    score = sum((a / left_norm) * (b / right_norm) for a, b in zip(left, right, strict=True))
+    if not math.isfinite(score):
+        return None
+    return max(-1.0, min(1.0, score))
 
 
 def semantic_search(
@@ -105,7 +115,10 @@ def semantic_search(
     query: str,
     provider: EmbeddingProvider,
     limit: int = 10,
+    min_semantic_score: float = 0.0,
 ) -> list[SearchHit]:
+    if not math.isfinite(min_semantic_score) or not 0 <= min_semantic_score <= 1:
+        raise ValueError("min_semantic_score must be finite and between 0 and 1")
     rows = session.execute(
         select(ChunkEmbedding, Chunk, Source.title)
         .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
@@ -127,11 +140,13 @@ def semantic_search(
         ),
     )
     query_vector = result.vectors[0]
+    candidates = []
+    for embedding, chunk, title in rows:
+        score = cosine_similarity(query_vector, embedding.vector_json)
+        if score is not None and score >= min_semantic_score:
+            candidates.append((score, chunk, title))
     scored = sorted(
-        (
-            (cosine_similarity(query_vector, embedding.vector_json), chunk, title)
-            for embedding, chunk, title in rows
-        ),
+        candidates,
         key=lambda item: (-item[0], item[1].id),
     )[:limit]
     return [
@@ -161,13 +176,24 @@ def hybrid_search(
     limit: int = 10,
     rrf_constant: int = 60,
     max_per_source: int = 2,
+    min_semantic_score: float = 0.0,
 ) -> list[SearchHit]:
     lexical = lexical_search(session, query, max(limit * 3, limit))
     lexical = [
         hit.model_copy(update={"lexical_rank": index, "retrieval_channels": ["lexical"]})
         for index, hit in enumerate(lexical, start=1)
     ]
-    semantic = semantic_search(session, query, provider, max(limit * 3, limit)) if provider else []
+    semantic = (
+        semantic_search(
+            session,
+            query,
+            provider,
+            max(limit * 3, limit),
+            min_semantic_score,
+        )
+        if provider
+        else []
+    )
     hits_by_id = {hit.chunk_id: hit for hit in [*lexical, *semantic]}
     scores: dict[str, float] = {}
     lexical_ranks = {hit.chunk_id: index for index, hit in enumerate(lexical, start=1)}

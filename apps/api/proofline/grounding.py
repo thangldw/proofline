@@ -136,6 +136,7 @@ def answer_question(
     embedding_provider: EmbeddingProvider | None = None,
     limit: int = 8,
     max_per_source: int = 2,
+    min_semantic_score: float = 0.0,
 ) -> AnswerResponse:
     hits = hybrid_search(
         session,
@@ -143,6 +144,7 @@ def answer_question(
         embedding_provider,
         limit,
         max_per_source=max_per_source,
+        min_semantic_score=min_semantic_score,
     )
     if not hits:
         return AnswerResponse(

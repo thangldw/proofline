@@ -153,6 +153,24 @@ def test_retrieval_diversity_parameters_are_bounded(client):
     )
 
 
+def test_semantic_score_floor_is_finite_and_bounded(client):
+    for invalid in ["-0.1", "1.1", "nan", "inf", "-inf"]:
+        assert (
+            client.get(
+                "/api/v1/search",
+                params={"q": "queues", "min_semantic_score": invalid},
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                "/api/v1/answers",
+                json={"question": "Why queues?", "min_semantic_score": invalid},
+            ).status_code
+            == 422
+        )
+
+
 def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypatch):
     monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
     monkeypatch.setenv("PROOFLINE_ALLOW_REMOTE_AI", "false")

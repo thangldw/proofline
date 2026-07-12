@@ -133,6 +133,22 @@ def test_invalid_embedding_dimensions_fail_and_persist_diagnostics(session):
     assert run.error_code == "embedding_output_invalid"
 
 
+def test_zero_norm_embedding_fails_and_persists_diagnostics(session):
+    provider = FakeEmbeddingProvider({"zero": [0.0, 0.0]})
+
+    with pytest.raises(EmbeddingValidationError) as raised:
+        run_embedding(
+            session,
+            provider,
+            EmbeddingRequest(texts=["zero"], input_hashes=["zero-hash"]),
+        )
+
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.status == "failed"
+    assert run.validation_status == "invalid"
+    assert run.error_code == "embedding_output_invalid"
+
+
 def test_openai_compatible_embedding_adapter_preserves_input_order():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/embeddings"

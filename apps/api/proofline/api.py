@@ -666,6 +666,12 @@ def search(
     q: str = Query(min_length=2, max_length=500),
     limit: int = Query(default=10, ge=1, le=50),
     max_per_source: int = Query(default=2, ge=1, le=50),
+    min_semantic_score: float = Query(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+    ),
     hybrid: bool = True,
     session: Session = Depends(get_session),
 ) -> SearchResponse:
@@ -682,6 +688,7 @@ def search(
             embedding_provider,
             limit,
             max_per_source=max_per_source,
+            min_semantic_score=min_semantic_score,
         )
     except (ProviderRequestError, EmbeddingValidationError) as exc:
         raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
@@ -705,6 +712,7 @@ def create_answer(
             embedding_provider,
             payload.limit,
             payload.max_per_source,
+            payload.min_semantic_score,
         )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc

@@ -159,6 +159,12 @@ class AnswerRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2_000)
     limit: int = Field(default=8, ge=1, le=12)
     max_per_source: int = Field(default=2, ge=1, le=12)
+    min_semantic_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+    )
 
 
 class AnswerStatement(BaseModel):

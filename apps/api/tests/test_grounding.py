@@ -2,6 +2,7 @@ import json
 
 import proofline.grounding as grounding_module
 import pytest
+from proofline.embeddings import index_current_embeddings
 from proofline.grounding import (
     MAX_EVIDENCE_ITEM_BYTES,
     MAX_EVIDENCE_PACK_BYTES,
@@ -11,6 +12,7 @@ from proofline.grounding import (
 )
 from proofline.ingestion import ingest_source
 from proofline.model_gateway import (
+    FakeEmbeddingProvider,
     FakeGenerationProvider,
     GenerationResult,
     ProviderRequestError,
@@ -161,6 +163,48 @@ def test_no_retrieval_match_returns_insufficient_evidence_without_model_call(ses
     assert answer.status == "insufficient_evidence"
     assert answer.citations == []
     assert session.scalar(select(ModelRun)) is None
+
+
+def test_negative_semantic_only_match_is_insufficient_without_generation(session):
+    source, _hit = indexed_evidence(session)
+    chunk = session.scalar(select(Chunk).where(Chunk.source_id == source.id))
+    embedding_provider = FakeEmbeddingProvider(
+        {chunk.content: [1.0, 0.0], "unrelated semantic lookup": [-1.0, 0.0]}
+    )
+    index_current_embeddings(session, embedding_provider)
+    generation_provider = ScriptedGenerationProvider(["must not run"])
+
+    answer = answer_question(
+        session,
+        "unrelated semantic lookup",
+        generation_provider,
+        embedding_provider,
+    )
+
+    assert answer.status == "insufficient_evidence"
+    assert generation_provider.requests == []
+    assert all(run.operation == "embed" for run in session.scalars(select(ModelRun)).all())
+
+
+def test_answer_threads_explicit_semantic_score_floor(session):
+    source, _hit = indexed_evidence(session)
+    chunk = session.scalar(select(Chunk).where(Chunk.source_id == source.id))
+    embedding_provider = FakeEmbeddingProvider(
+        {chunk.content: [0.6, 0.8], "semantic-only lookup": [1.0, 0.0]}
+    )
+    index_current_embeddings(session, embedding_provider)
+    generation_provider = ScriptedGenerationProvider(["must not run"])
+
+    answer = answer_question(
+        session,
+        "semantic-only lookup",
+        generation_provider,
+        embedding_provider,
+        min_semantic_score=0.7,
+    )
+
+    assert answer.status == "insufficient_evidence"
+    assert generation_provider.requests == []
 
 
 def test_corrupted_chunk_span_is_rejected_before_generation(session):
