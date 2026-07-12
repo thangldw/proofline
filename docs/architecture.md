@@ -202,7 +202,10 @@ per-source diversity cap before ranked backfill. New paragraphs are split into a
 points with exact offsets; the answer runtime additionally caps serialized UTF-8 evidence at 64 KiB
 total and 8 KiB per item for legacy safety. Budget exclusions expose only evidence ID plus reason,
 and an all-excluded pack returns insufficient evidence without model execution. Cross-encoder
-reranking and semantic entailment checks remain planned. Grounded drafts are capped at 32 statements
+reranking and semantic entailment checks remain planned. Semantic cosine defaults to a mathematical
+floor of zero: invalid/non-finite/zero-norm vectors and negative similarity are excluded before
+ranking, while lexical matches remain independent. The `0..1` floor is caller-configurable but is
+not considered relevance-calibrated without model-specific evaluation. Grounded drafts are capped at 32 statements
 and receive at most one repair for invalid structured output or missing/unknown citations. The target
 full path is:
 

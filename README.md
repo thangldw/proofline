@@ -99,6 +99,11 @@ pack and can cite only server-issued evidence IDs. Retrieval applies determinist
 RRF ordering and a soft per-source diversity cap; “Why this result?” exposes channel,
 rank, score, source-version, line, and offset metadata.
 
+Semantic retrieval uses a default cosine safety floor of `0.0`: invalid, zero-norm,
+non-finite, and negative-similarity vectors cannot suppress `insufficient_evidence`.
+Search and Answer accept `min_semantic_score` in the range `0..1`, but this is an
+embedding-model-specific control—not a calibrated relevance guarantee.
+
 ![Proofline search showing bounded evidence and inspectable retrieval ranking metadata](docs/images/proofline-screen-search-current.png)
 
 ### Governed memory registry
