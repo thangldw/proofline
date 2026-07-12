@@ -177,17 +177,25 @@ def extract_memories(content: str) -> list[dict]:
         rationale = None
         status = "active"
         lookahead_cursor = cursor + len(raw)
+        found_metadata = False
 
-        for next_index in range(index + 1, min(index + 5, len(lines))):
+        for next_index in range(index + 1, min(index + 7, len(lines))):
             candidate = lines[next_index].strip()
-            if not candidate or candidate.startswith("#") or _match_memory_marker(candidate):
+            if not candidate:
+                lookahead_cursor += len(lines[next_index])
+                if found_metadata:
+                    break
+                continue
+            if candidate.startswith("#") or _match_memory_marker(candidate):
                 break
             rationale_match = RATIONALE_PREFIX.match(candidate)
             status_match = STATUS_PREFIX.match(candidate)
             if rationale_match:
+                found_metadata = True
                 rationale = rationale_match.group(1).strip()
                 end = lookahead_cursor + len(lines[next_index].rstrip("\r\n"))
-            if status_match:
+            elif status_match:
+                found_metadata = True
                 normalized = status_match.group(1).strip().lower()
                 status = (
                     "superseded"
@@ -195,6 +203,8 @@ def extract_memories(content: str) -> list[dict]:
                     else normalized
                 )
                 end = lookahead_cursor + len(lines[next_index].rstrip("\r\n"))
+            else:
+                break
             lookahead_cursor += len(lines[next_index])
 
         quote = content[start:end]
