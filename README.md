@@ -5,9 +5,9 @@
 Proofline is an open-source system that helps engineering teams recover why
 software was built the way it was. It connects source material such as ADRs,
 design notes, issues, pull requests, commits, and meeting transcripts to
-searchable evidence. The long-term product models decisions, assumptions,
-alternatives, and supersession explicitly instead of treating a knowledge base
-as an unstructured collection of vector chunks.
+searchable evidence. The implemented memory registry models decisions,
+assumptions, constraints, and alternatives explicitly instead of treating a
+knowledge base as an unstructured collection of vector chunks.
 
 > Project status: pre-alpha. The first runnable vertical slice is implemented,
 > but it is not ready for production data.
@@ -44,7 +44,8 @@ The deterministic core runs without an LLM or external service:
 2. preserve its content hash and source locations;
 3. preserve immutable versions when the same source URI changes;
 4. split it into deterministic, addressable evidence chunks;
-5. extract explicitly marked English/Vietnamese decisions without an AI model;
+5. extract explicitly marked English/Vietnamese decisions, assumptions,
+   constraints, and alternatives without an AI model;
 6. index the current version locally with SQLite FTS5;
 7. search, browse decisions, and inspect exact historical evidence in the web UI.
 
@@ -63,13 +64,13 @@ reported for review rather than deleted automatically. A uniquely matched same-c
 keeps the original source identity, immutable version history, chunks, and evidence; ambiguous
 matches are never guessed.
 
-Decisions can be accepted, rejected, corrected, or marked obsolete. Every change records a
+Memories can be accepted, rejected, corrected, or marked obsolete. Every change records a
 before/after audit event while retaining the original source evidence; complete source deletion
 also removes content-bearing audit records. `GET /api/v1/sources/{id}/deletion-impact` reports the
-versions, chunks, embeddings, decisions, evidence, jobs, audit events, and FTS rows affected before
+versions, chunks, embeddings, memories, decisions, evidence, jobs, audit events, and FTS rows affected before
 a caller confirms deletion. The Sources UI loads this preview and requires explicit confirmation.
 
-Configured generation providers can extract additional decision candidates from a source. Model
+Configured generation providers can extract additional governed memory candidates from a source. Model
 output is schema-validated, must cite server-issued chunk IDs, remains `candidate` until human
 review, records its model run, and is idempotent within an immutable source version.
 
@@ -87,18 +88,18 @@ pack and can cite only server-issued evidence IDs.
 
 ![Proofline search showing an evidence-backed answer and exact retrieval matches](docs/images/proofline-screen-search.jpg)
 
-### Decision registry
+### Governed memory registry
 
-Deterministically extracted and AI-proposed decisions share one review surface.
-Each decision exposes its confidence, extraction method, lifecycle controls, and
-the exact lines that support it.
+Deterministically extracted and AI-proposed decisions, assumptions, constraints,
+and alternatives share one filterable review surface. Each memory exposes its
+kind, confidence, extraction method, lifecycle controls, and exact supporting lines.
 
-![Proofline decision registry with candidate, accepted, and active technical decisions](docs/images/proofline-screen-decisions.jpg)
+![Proofline governed memory registry with reviewable engineering context and exact proof links](docs/images/proofline-screen-memories.png)
 
 ### Source inventory
 
 The source inventory makes indexing observable: detected sources, searchable
-chunks, extracted decisions, source type, latest job stage/attempt, safe failures,
+chunks, extracted memories, source type, latest job stage/attempt, safe failures,
 and per-source actions remain visible.
 
 ![Proofline source inventory showing indexing coverage and extracted objects](docs/images/proofline-screen-sources.jpg)
