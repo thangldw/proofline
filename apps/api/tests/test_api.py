@@ -24,6 +24,21 @@ def test_complete_workflow(client):
     assert decisions[0]["statement"] == "Use SQLite for the local job queue"
     evidence = decisions[0]["evidence"][0]
     assert content[evidence["start_offset"] : evidence["end_offset"]] == evidence["quote"]
+    reviewed = client.patch(
+        f"/api/v1/decisions/{decisions[0]['id']}",
+        json={"status": "accepted", "rationale": "Confirmed by the architecture group."},
+    )
+    assert reviewed.status_code == 200
+    assert reviewed.json()["status"] == "accepted"
+    assert reviewed.json()["evidence"] == decisions[0]["evidence"]
+    audit = client.get(
+        "/api/v1/audit-events",
+        params={"object_type": "decision", "object_id": decisions[0]["id"]},
+    ).json()
+    assert len(audit) == 1
+    assert audit[0]["before_json"]["status"] == "active"
+    assert audit[0]["after_json"]["status"] == "accepted"
+    assert client.patch(f"/api/v1/decisions/{decisions[0]['id']}", json={}).status_code == 422
 
     source_detail = client.get(f"/api/v1/sources/{source['id']}").json()
     assert source_detail["content"] == content
@@ -36,6 +51,7 @@ def test_complete_workflow(client):
     assert deleted.status_code == 204
     assert client.get("/api/v1/search", params={"q": "transactional recovery"}).json()["hits"] == []
     assert client.get("/api/v1/decisions").json() == []
+    assert client.get("/api/v1/audit-events").json() == []
 
 
 def test_duplicate_import_returns_existing_source(client):

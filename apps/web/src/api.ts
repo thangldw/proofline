@@ -19,6 +19,11 @@ export const api = {
   sourceVersion: (sourceId: string, versionId: string) =>
     request<{ content: string }>(`/api/v1/sources/${sourceId}/versions/${versionId}`),
   decisions: () => request<Decision[]>("/api/v1/decisions"),
+  updateDecision: (id: string, changes: { status?: "candidate" | "active" | "accepted" | "rejected" | "obsolete"; statement?: string; rationale?: string | null }) =>
+    request<Decision>(`/api/v1/decisions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    }),
   search: async (query: string) =>
     (await request<{ hits: SearchHit[] }>(`/api/v1/search?q=${encodeURIComponent(query)}`)).hits,
   importSource: (title: string, content: string, uri?: string) =>

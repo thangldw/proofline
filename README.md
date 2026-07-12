@@ -44,6 +44,10 @@ retrieval, and grounded answers will build on.
 Every ingestion request also creates an inspectable job record. Terminal failures retain a safe
 error code and stage without copying source content into diagnostic fields.
 
+Decisions can be accepted, rejected, corrected, or marked obsolete. Every change records a
+before/after audit event while retaining the original source evidence; complete source deletion
+also removes content-bearing audit records.
+
 ## Repository layout
 
 ```text

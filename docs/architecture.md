@@ -51,8 +51,9 @@ the executable evidence contract on which later extraction and answering will bu
 
 `apps/web` is a React/Vite evidence console. It currently supports browser-side Markdown/text
 upload to the API, lexical search, source inventory, decision browsing, overview counts, and an
-evidence drawer. It is a pre-alpha inspection surface, not a rich editor. Memory correction,
-provider settings and grounded questions/answers remain planned. Evidence navigation already
+evidence drawer plus accept/reject/obsolete decision actions. It is a pre-alpha inspection
+surface, not a rich editor. The API also supports decision corrections with a before/after audit
+trail. Provider settings and grounded questions/answers remain planned. Evidence navigation
 loads the immutable referenced source version. Desktop packaging is deferred.
 
 ### 3. Future application modules
@@ -99,9 +100,9 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
-- Source versions, versioned schema migrations, and synchronous ingestion job records are
-  implemented; generalized derived memory, resumable job execution, and audit events are planned
-  schema extensions.
+- Source versions, versioned schema migrations, synchronous ingestion job records, and decision
+  audit events are implemented; generalized derived memory and resumable job execution are
+  planned schema extensions.
 - Embeddings are stored behind a repository interface. The first implementation may use a
   SQLite-compatible vector extension or a simple local vector table if dataset limits are
   documented and tested.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,7 +59,15 @@ class DecisionRead(BaseModel):
     valid_from: datetime | None
     valid_to: datetime | None
     created_at: datetime
+    updated_at: datetime
     evidence: list[EvidenceRead] = []
+
+
+class DecisionUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    statement: str | None = Field(default=None, min_length=1)
+    rationale: str | None = None
+    status: Literal["candidate", "active", "accepted", "rejected", "obsolete"] | None = None
 
 
 class SearchHit(BaseModel):
@@ -118,3 +127,16 @@ class IngestionJobRead(BaseModel):
     retryable: bool
     created_at: datetime
     updated_at: datetime
+
+
+class AuditEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    actor: str
+    action: str
+    object_type: str
+    object_id: str
+    before_json: dict
+    after_json: dict
+    created_at: datetime

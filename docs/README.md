@@ -42,6 +42,7 @@ As of 2026-07-12:
 - Local container scaffolding and root setup/development/quality commands are present.
 - Also implemented: immutable source-version history and versioned SQLite migrations.
 - Also implemented: persisted terminal status for synchronous ingestion jobs.
+- Also implemented: governed decision updates and append-only before/after audit events.
 - Not yet implemented: resumable/retryable job execution, model
   providers, embeddings/hybrid retrieval, AI-derived decision review, grounded answer
   generation, desktop packaging, cloud services, or telemetry.

@@ -90,7 +90,8 @@ Before delivery work, record:
 - Add explicit remote-egress configuration and secret-safe diagnostics.
 - Version extraction prompts and output schemas.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
-- Build the candidate review queue and append-only audit trail.
+- Extend the implemented decision review actions and append-only audit trail into an
+  AI-generated candidate queue.
 - Run extraction evaluation across at least one remote and one local/cheap model if available.
 
 ### Exit gate
