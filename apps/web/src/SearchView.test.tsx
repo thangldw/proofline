@@ -25,7 +25,7 @@ const hits: SearchHit[] = [{
   lexical_rank: 1,
   semantic_rank: null,
   semantic_score: null,
-  fused_score: null,
+  fused_score: 0.0164,
 }];
 
 const groundedAnswer: GroundedAnswer = {
@@ -149,7 +149,7 @@ describe("SearchView provenance", () => {
     expect(within(details!).getByText("Lines 3–4 · offsets 10:77")).toBeInTheDocument();
     expect(within(details!).queryByText("Semantic rank")).not.toBeInTheDocument();
     expect(within(details!).queryByText("Semantic score")).not.toBeInTheDocument();
-    expect(within(details!).queryByText("Fused RRF score")).not.toBeInTheDocument();
+    expect(within(details!).getByText("RRF score").nextElementSibling).toHaveTextContent("0.0164");
   });
 
   it("shows available hybrid ranks and scores without fabricating metadata", async () => {
@@ -177,7 +177,7 @@ describe("SearchView provenance", () => {
     expect(within(details).getByText("Lexical rank").nextElementSibling).toHaveTextContent("#2");
     expect(within(details).getByText("Semantic rank").nextElementSibling).toHaveTextContent("#1");
     expect(within(details).getByText("Semantic score").nextElementSibling).toHaveTextContent("0.8765");
-    expect(within(details).getByText("Fused RRF score").nextElementSibling).toHaveTextContent("0.0321");
+    expect(within(details).getByText("RRF score").nextElementSibling).toHaveTextContent("0.0321");
     expect(within(details).getByText("version-")).toHaveAttribute("title", "version-hybrid-1234");
   });
 
@@ -203,5 +203,40 @@ describe("SearchView provenance", () => {
       }),
       "ADR-001",
     );
+  });
+
+  it("shows a non-error context-budget notice for excluded evidence", async () => {
+    apiMock.search.mockResolvedValue(hits);
+    apiMock.answer.mockResolvedValue({
+      status: "insufficient_evidence",
+      answer: "The retained context is insufficient for a grounded answer.",
+      statements: [],
+      citations: [],
+      model_run_id: null,
+      exclusions: [
+        { evidence_id: "abc12345-full-id", reason: "context_budget" },
+        { evidence_id: "def67890-full-id", reason: "context_budget" },
+      ],
+    });
+    render(<SearchView onEvidence={vi.fn()}/>);
+
+    submitSearch();
+
+    const notice = await screen.findByRole("status", { name: "Context budget notice" });
+    expect(notice).toHaveTextContent("2 retrieved spans were excluded by the context budget");
+    expect(within(notice).getByText("abc12345")).toHaveAttribute("title", "abc12345-full-id");
+    expect(within(notice).getByText("def67890")).toHaveAttribute("title", "def67890-full-id");
+    expect(notice).not.toHaveClass("error-banner");
+  });
+
+  it("remains compatible with answers that omit exclusions", async () => {
+    apiMock.search.mockResolvedValue(hits);
+    apiMock.answer.mockResolvedValue(groundedAnswer);
+    render(<SearchView onEvidence={vi.fn()}/>);
+
+    submitSearch();
+
+    await screen.findByRole("heading", { name: "Evidence-backed answer" });
+    expect(screen.queryByRole("status", { name: "Context budget notice" })).not.toBeInTheDocument();
   });
 });
