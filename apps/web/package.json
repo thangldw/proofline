@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "test": "tsc -b && vitest run"
+    "build": "tsc -b && vite build && npm run check:egress",
+    "check:egress": "node scripts/check-egress.mjs",
+    "test": "tsc -b && node --test scripts/check-egress.test.mjs && vitest run src"
   },
   "dependencies": {
     "react": "^18.3.1",
