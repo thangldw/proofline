@@ -3,9 +3,9 @@
 **Evidence-backed engineering memory.**
 
 Proofline is an open-source system that helps engineering teams recover why
-software was built the way it was. It connects source material such as ADRs,
-design notes, issues, pull requests, commits, and meeting transcripts to
-searchable evidence. The implemented memory registry models decisions,
+software was built the way it was. The current local slice ingests Markdown and
+UTF-8 text such as ADRs and design notes into searchable evidence; issue, pull
+request, commit, and meeting connectors remain planned. The implemented memory registry models decisions,
 assumptions, constraints, and alternatives explicitly instead of treating a
 knowledge base as an unstructured collection of vector chunks.
 
@@ -47,7 +47,7 @@ The deterministic core runs without an LLM or external service:
 5. extract explicitly marked English/Vietnamese decisions, assumptions,
    constraints, and alternatives without an AI model;
 6. index the current version locally with SQLite FTS5;
-7. search, browse decisions, and inspect exact historical evidence in the web UI.
+7. search, browse governed memories, and inspect exact historical evidence in the web UI.
 
 This establishes the evidence contract used by the optional model gateway,
 hybrid retrieval, governed candidate extraction, and grounded answers.
@@ -80,6 +80,7 @@ transport failures are recorded and returned without an automatic repair or prov
 Safe run metadata can be inspected through `/api/v1/model/runs` and
 `/api/v1/model/runs/{id}`; filters expose a repair run's parent/child lineage without exposing
 source text, prompts, model output, or credentials.
+These diagnostics are API-only today; a dedicated model-run web view is not implemented.
 
 The answer endpoint builds a bounded hybrid evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
@@ -154,13 +155,13 @@ make check
 make eval
 ```
 
-The pre-alpha CI matrix is configured to run source-development smoke checks
-on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. It validates
+The pre-alpha workflow is configured to run source-development smoke checks
+on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. Its checked-in script covers
 installation, local SQLite ingestion/search, exact evidence, portable export,
-raw backup verification, and the web production build without model
-credentials or external runtime services. This matrix does not claim native
-desktop packaging, production
-deployment support, or verified Windows support.
+raw backup verification, and an optimized web build without model
+credentials or external runtime services. This describes repository configuration and local
+test coverage, not evidence that a hosted CI run succeeded. It does not claim native desktop
+packaging, production deployment support, or verified Windows support.
 
 ### Data portability and recovery
 

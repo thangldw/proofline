@@ -2,8 +2,10 @@
 
 **Document status:** Proposed  
 **Start assumption:** Day 1 begins with the foundation repository  
-**Implementation status:** The internal Phase 2 engineering gates are implemented; Phase 1 pilot
-corpus evidence remains open, and Phase 3 governed extraction is in progress
+**Implementation status:** The internal local vertical-slice work through Phase 4 is substantially
+implemented. Phase 1 real-question/pilot evidence, real-model comparison, reranking, hosted CI-run
+evidence, and the Phase 5 external go/no-go gates remain open. Phase 5 portability, OSS governance,
+and credential-free platform-smoke workflow foundations are implemented.
 
 The roadmap is organized around validated outcomes. Dates may move; quality gates should not be
 silently weakened to preserve a date.
@@ -25,7 +27,7 @@ Before delivery work, record:
 
 - A runnable Python/FastAPI + SQLAlchemy service and React/Vite evidence console with tests and
   build checks. This scaffold and the first deterministic vertical slice are implemented.
-- Reproducible local setup and CI that needs no provider credentials.
+- Reproducible local setup and a configured CI workflow that needs no provider credentials.
 - A versioned evaluation corpus derived from real questions.
 - A threat sketch for local files, local API, provider egress, and model output. The baseline
   repository threat model and CI secret scan are implemented.
@@ -46,7 +48,8 @@ Before delivery work, record:
 ### Exit gate
 
 - A clean checkout can run `make setup`, then `make test` and `make check`.
-- CI is green without network model access.
+- The checked-in workflow needs no network model access; a successful hosted CI run remains an
+  external verification item rather than a documentation claim.
 - At least 25 questions have source evidence and relevance judgments; 10 should exercise a
   decision changing over time.
 - Offset encoding and deletion semantics are explicitly decided and tested.
@@ -92,8 +95,9 @@ Before delivery work, record:
 ### Outcomes
 
 - A provider can be configured and health-checked without changing domain code.
-- Candidate decisions and assumptions are derived with exact evidence and schema validation.
-- Users can accept, correct, reject, and obsolete candidates.
+- Candidate decisions, assumptions, constraints, and alternatives are derived with exact evidence
+  and schema validation.
+- Users can accept, correct, reject, obsolete, and reverse the review state of candidates.
 
 ### Planned work
 
@@ -104,10 +108,10 @@ Before delivery work, record:
   decision-only compatibility API are implemented.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
   Schema/size and evidence-ID repair is implemented as one additional call with secret-safe
-  `ModelRun` lineage. Safe list/detail inspection and lineage filters are implemented; a dedicated
-  UI and broader extraction evaluation remain open.
-- Extend the implemented AI decision candidate queue and audit-backed review actions to other
-  memory kinds. The filterable memory registry and review API now cover decisions, assumptions,
+  `ModelRun` lineage. Safe list/detail API inspection and lineage filters are implemented; a
+  dedicated model-run web UI and broader extraction evaluation remain open.
+- Continue hardening the implemented generalized memory candidate queue and audit-backed review
+  actions. The filterable memory registry and review API already cover decisions, assumptions,
   constraints, and alternatives.
 - Run extraction evaluation across at least one remote and one local/cheap model if available.
 
@@ -142,7 +146,7 @@ Before delivery work, record:
 - Extend the implemented citation navigation with a retrieval debug view. Raw results now expose
   channel/rank/score, immutable source version, and exact line/offset diagnostics.
 - Maintain the implemented credential-free synthetic grounded-QA golden harness. It exercises the
-  production answer/citation path, but real pilot judgments remain required for quality claims.
+  runtime answer/citation path, but real pilot judgments remain required for quality claims.
 
 ### Exit gate
 
@@ -165,7 +169,11 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 
 ### Planned work
 
-- Complete end-to-end tests and supported-platform smoke tests.
+- Complete end-to-end tests and supported-platform smoke tests. A credential-free script and
+  Ubuntu/macOS workflow matrix are implemented for source installation, local evidence,
+  export/backup verification, and web build. This is configured coverage, not a claim that a
+  hosted run succeeded; packaged end-to-end testing, Windows verification, and production support
+  remain open.
 - Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
   local SQLite:** portable export/verification, online full backup/read-only verification, recovery
   provenance exercise, documented retention limits, and cascade deletion coverage. Portable import
@@ -173,11 +181,15 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 - Run a lightweight security review of local API, path handling, dependency surface, egress,
   logging, and imported content rendering.
 - Add contributor templates, code of conduct decision, security reporting process, and release
-  notes.
+  notes. The repository now includes issue/PR templates, a Code of Conduct, private reporting
+  guidance, and an Unreleased changelog; no supported release has been cut.
 - Pilot weekly with up to five teams; collect task completion time and structured feedback.
 - Triage only defects that block the defined vertical slice; defer feature expansion.
 
 ### Go/no-go gate
+
+All metrics below require external pilot or release evidence and remain open; credential-free
+synthetic regression results do not satisfy them.
 
 Continue toward a public beta when:
 

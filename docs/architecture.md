@@ -1,7 +1,8 @@
 # Proposed MVP Architecture
 
 **Document status:** Evolving  
-**Implementation status:** Foundation API/web vertical slice implemented; later stages planned  
+**Implementation status:** Pre-alpha local vertical slice implemented through governed generalized
+memory and evidence-backed answers; external pilot gates and later product stages remain open
 **Decision record:** [ADR-0001](./adr/0001-scope-and-stack.md)
 
 ## Architecture goal
@@ -25,7 +26,8 @@ Discover -> parse -> version -> chunk -> index -> extract candidates
         |                                      |
         +------------------+-------------------+
                            v
-                 retrieve -> rerank -> answer
+                 retrieve -> answer
+                      \-> optional rerank (planned)
                            |
                            v
                 exact citations + labels
@@ -34,13 +36,13 @@ Discover -> parse -> version -> chunk -> index -> extract candidates
 A slice is complete only when a fixture source can move through this flow, a user can inspect
 its processing state, and an answer citation resolves to the original source version and span.
 
-## Planned components
+## Components and implementation status
 
 ### 1. Local API service — implemented foundation
 
 `apps/api` is a Python 3.11+ FastAPI service using Pydantic, SQLAlchemy, and SQLite. It currently
-owns configuration, Markdown chunking, content ingestion, source/decision/evidence persistence,
-deterministic marked-decision extraction, immutable source versions, committed schema migrations,
+owns configuration, Markdown chunking, content ingestion, source/memory/evidence persistence,
+deterministic marked-memory extraction, immutable source versions, committed schema migrations,
 source retrieval and deletion, FTS5 search, overview counts, and health reporting. Local
 development runs through Uvicorn.
 
@@ -50,26 +52,28 @@ generation and embedding providers use the same immutable evidence contract.
 ### 2. Local web application — implemented foundation
 
 `apps/web` is a React/Vite evidence console. It currently supports browser-side Markdown/text
-upload to the API, lexical search, source inventory, decision browsing, overview counts, and an
-evidence drawer plus accept/reject/obsolete decision actions. Grounded answer statements retain
-their statement-level citation mapping, and an answer-provider failure does not discard lexical
-results. It is a pre-alpha inspection surface, not a rich editor. The API also supports decision
-corrections with a before/after audit trail. Provider configuration remains environment-based;
-there is no settings UI. Evidence navigation loads the immutable referenced source version.
-Desktop packaging is deferred.
+upload to the API, lexical and configured hybrid search, source/job inventory, filterable review
+and correction for decisions, assumptions, constraints, and alternatives, reversible statuses,
+overview counts, source-deletion impact confirmation, and exact evidence navigation. Grounded
+answer statements retain their statement-level citation mapping; retrieval ranking and context-
+budget exclusions are inspectable; and an answer-provider failure does not discard lexical results.
+It is a pre-alpha inspection surface, not a rich editor. Provider configuration remains
+environment-based; there is no settings UI or dedicated model-run UI. Safe model-run status and
+repair lineage are currently inspected through API endpoints. Desktop packaging is deferred.
 
-### 3. Future application modules
+### 3. Application boundaries and remaining modules
 
 The service will grow through internal interfaces rather than provider-specific product logic.
-Planned modules are:
+Current and target boundaries are:
 
-- workspace and source catalog;
-- ingestion coordinator;
-- retrieval and answer service;
-- memory review service;
-- provider gateway;
-- job status and diagnostics; and
-- deletion and export service.
+- workspace abstraction — planned; the current implementation is one local workspace;
+- source catalog and ingestion coordinator — implemented for upload and registered roots;
+- retrieval and answer service — implemented without reranking;
+- governed memory review service — implemented for four memory kinds;
+- provider gateway and safe model-run API diagnostics — implemented, with web settings/run UI planned;
+- job status, retry, and source diagnostics — implemented; and
+- deletion impact/cascade plus portable export and SQLite backup services — implemented locally,
+  while portable import remains planned.
 
 ### 4. Ingestion pipeline
 
@@ -107,13 +111,14 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - The API can scan explicitly registered local roots for Markdown and UTF-8 text. It resolves
   every selected path before reading, rejects traversal and symlink escape, and never accepts an
   arbitrary unregistered root. Folder watching and automatic deletion remain unimplemented.
-- SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
+- SQLite currently stores sources, raw Markdown/text, chunks, generalized governed memories, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
 - Source versions, versioned schema migrations, resumable ingestion jobs with private staged
-  input, and decision audit events are implemented; generalized derived memory remains planned.
+  input, generalized memory kinds, and memory audit events are implemented.
 - A metadata-only deletion-impact endpoint counts every source-owned version, chunk, embedding,
-  decision, evidence link, audit event, FTS row, and ingestion job that will be detached. Confirmed
+  governed memory (including the decision subset), evidence link, audit event, FTS row, and
+  ingestion job that will be detached. Confirmed
   deletion removes content-bearing derived rows and preserves only detached safe job diagnostics.
 - Versioned chunk embeddings are implemented in a local SQLite table with provider/model,
   dimensions, content hash, and immutable source-version ownership. Indexing is incremental.
@@ -143,8 +148,11 @@ When one new file and one missing source have the same current content hash, the
 change as a rename: it preserves the source/version/evidence identity and records a metadata-only
 `source.renamed` audit event. Multiple old or new matches are ambiguous and never auto-linked.
 
-The response reports every processed file and any source IDs whose files are missing. Missing-file
-deletion is preview-only even when `delete_missing=true`; no source is removed by a folder scan.
+The response reports every processed file and a sorted `missing_source_ids` set. Scans remain
+preview-only unless a subsequent request sends `delete_missing=true` and the exact previewed set as
+`confirmed_missing_source_ids`. Deletion fails closed if the current missing set changed, any ID is
+outside the selected registered-root scan, or any file/ingestion result failed. Confirmed deletion
+uses the same complete source cascade as the source deletion endpoint; it is never implicit.
 
 ### 6. Model gateway — implemented foundation
 
@@ -183,7 +191,8 @@ temperature zero. Initial and repair calls remain separate `ModelRun` records li
 repair prompt. Transport retries and model-run dead-letter handling remain planned. Provider errors
 must not corrupt existing source or memory records. Safe list/detail endpoints expose run status,
 operation, provider, validation metadata, and parent/child repair lineage; they never expose source
-content, prompt messages, model output, or credentials.
+content, prompt messages, model output, or credentials. These diagnostics are API-only; a dedicated
+model-run web view is not implemented.
 
 Model-assisted governed memory extraction is implemented as a separate source action for decisions,
 assumptions, constraints, and alternatives. Candidates must cite known chunks from the current
@@ -303,15 +312,29 @@ POST   /api/v1/folder-scans
 GET    /api/v1/sources
 GET    /api/v1/sources/:id
 GET    /api/v1/sources/:id/deletion-impact
+GET    /api/v1/sources/:id/versions
+GET    /api/v1/sources/:id/versions/:versionId
+POST   /api/v1/sources/:id/extract-memories
 DELETE /api/v1/sources/:id
 GET    /api/v1/jobs
 GET    /api/v1/jobs/:id
 POST   /api/v1/jobs/:id/retry
+GET    /api/v1/memories
+GET    /api/v1/memories/:id
+PATCH  /api/v1/memories/:id
 GET    /api/v1/decisions
 GET    /api/v1/decisions/:id
+GET    /api/v1/model/provider
+GET    /api/v1/model/embedding-provider
+GET    /api/v1/model/runs
+GET    /api/v1/model/runs/:id
+POST   /api/v1/model/embeddings/index
 GET    /api/v1/search
 POST   /api/v1/answers
 ```
+
+Portable JSON export/verification and complete SQLite backup/verification are implemented as local
+CLI operations. Portable import is not implemented.
 
 Planned MVP operations (exact contracts remain undecided):
 
@@ -320,12 +343,9 @@ POST   /workspaces
 GET    /workspaces/:id/status
 POST   /workspaces/:id/sources/scan
 GET    /sources/:id/versions/:versionId/spans/:spanId
-GET    /workspaces/:id/memories?status=candidate
-PATCH  /memories/:id
 POST   /workspaces/:id/search
 POST   /workspaces/:id/answers
-DELETE /sources/:id
-POST   /workspaces/:id/export
+POST   /workspaces/:id/import
 ```
 
 Write operations should accept an idempotency key. Errors should have stable machine-readable
@@ -367,7 +387,7 @@ These are engineering targets to validate, not current performance claims:
 | --- | --- |
 | Recoverability | Interrupted ingestion can resume without duplicate domain objects |
 | Provenance | 100% of answer citations pass deterministic span validation |
-| Portability | Workspace export uses documented, non-provider-specific records |
+| Portability | Verified provider-neutral JSON export is implemented; portable import remains open |
 | Offline behavior | Search and reviewed-memory browsing work without a network |
 | Provider failure | Existing indexed sources remain usable when a model is unavailable |
 | Scale envelope | 10,000 Markdown files / 1 GB text on a developer laptop; benchmark required |
@@ -400,7 +420,9 @@ contract and must not reproduce backend extraction rules.
 - Integration tests use a temporary workspace and real SQLite migrations.
 - Golden fixtures include ADRs with CJK, emoji, CRLF, changed versions, contradictions, and
   superseding decisions.
-- End-to-end tests cover import -> inspect -> review -> ask -> open citation -> delete.
+- API integration and web component tests cover the constituent
+  ingest -> inspect -> review -> ask -> open citation -> delete behaviors. A packaged end-to-end
+  test and production deployment qualification remain open.
 - Evaluation results are versioned with dataset version, provider/model configuration, and code
   revision. Benchmark numbers without this context must not be published.
 - The implemented `seed-v1` retrieval gate runs real migrations, ingestion, and FTS5 retrieval for
