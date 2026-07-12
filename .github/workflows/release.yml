@@ -84,8 +84,14 @@ jobs:
           python -m venv /tmp/proofline-release-smoke
           /tmp/proofline-release-smoke/bin/pip install release-dist/*.whl
           /tmp/proofline-release-smoke/bin/proofline --version
-          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-smoke.db \
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-source.db \
             /tmp/proofline-release-smoke/bin/proofline seed
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-source.db \
+            /tmp/proofline-release-smoke/bin/proofline export \
+            --output /tmp/proofline-release-portable.json
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-restored.db \
+            /tmp/proofline-release-smoke/bin/proofline import \
+            /tmp/proofline-release-portable.json
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

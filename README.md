@@ -191,13 +191,13 @@ production qualification. They do not block an explicitly experimental pre-alpha
 
 ## Releases
 
-`v0.1.0-alpha.2` is the latest experimental pre-release. It hardens the release path after the
-initial `v0.1.0-alpha.1` cut; application capabilities and limitations remain pre-alpha. Assets
-include the local API/CLI wheel and source distribution plus an optimized, unhosted web archive for
-integrators. The web archive is not a standalone server: deploy it behind a same-origin reverse
-proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the proven
-two-process development workflow above. See the
-[release notes](docs/releases/v0.1.0-alpha.2.md) and verify `SHA256SUMS` before installation.
+`v0.1.0-alpha.3` is the latest experimental pre-release. It adds strict transactional portable
+import and a clearly labeled synthetic pilot simulation; application limitations remain pre-alpha.
+Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
+archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
+reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
+proven two-process development workflow above. See the
+[release notes](docs/releases/v0.1.0-alpha.3.md) and verify `SHA256SUMS` before installation.
 
 ### Data portability and recovery
 

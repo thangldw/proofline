@@ -7,6 +7,10 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
+No changes have been recorded after `v0.1.0-alpha.3`.
+
+## [0.1.0-alpha.3] - 2026-07-13
+
 ### Added
 
 - A strict schema-v1 portable JSON import command restores exported domain records into an empty
@@ -96,6 +100,7 @@ semantic-versioning compatibility between pre-releases.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.2...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.3...HEAD
+[0.1.0-alpha.3]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.1
