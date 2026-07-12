@@ -175,14 +175,19 @@ prompt/template version, input content hashes, latency, token counts when availa
 validation outcome. Secrets must never be written to logs or model-run records.
 
 Structured results are parsed as untrusted data and validated against versioned schemas. Invalid
-results persist a failed model run without creating memory. Retry and dead-letter execution remain
-planned. Provider errors must not corrupt existing source or memory records.
+results persist a failed model run without creating memory. Structured output is capped at 128 KiB;
+memory batches are capped at 64 candidates. Repairable schema, size, kind, and evidence-ID failures
+receive at most one repair call with the same provider, model, evidence pack, input hashes, and
+temperature zero. Initial and repair calls remain separate `ModelRun` records linked by
+`parent_run_id`; invalid output and validation details are neither persisted nor copied into the
+repair prompt. Transport retries and model-run dead-letter handling remain planned. Provider errors
+must not corrupt existing source or memory records.
 
-Model-assisted decision extraction is implemented as a separate source action. Candidates must
-cite known chunks from the current immutable source version, are deduplicated per version, retain
-the generating `ModelRun`, and always enter the governed review flow as `candidate`. Unknown
-evidence fails the run before any memory object is persisted. Assumption/constraint extraction and
-repair retries remain planned.
+Model-assisted governed memory extraction is implemented as a separate source action for decisions,
+assumptions, constraints, and alternatives. Candidates must cite known chunks from the current
+immutable source version, are deduplicated per version and kind, retain the generating `ModelRun`,
+and always enter the governed review flow as `candidate`. Unknown evidence fails or repairs before
+any memory object is persisted. The legacy decision endpoint is decision-only before persistence.
 
 ### 7. Retrieval and answering
 
@@ -191,7 +196,8 @@ are implemented. The current path builds a bounded evidence pack, requests typed
 evidence IDs, rejects unknown/missing IDs, resolves citations server-side, and revalidates exact
 spans against immutable source versions. When no provider is configured, it returns verified
 evidence without synthesizing claims. Cross-encoder reranking, diversity control, and automated
-repair retries remain planned. The target full path is:
+semantic entailment checks remain planned. Grounded drafts are capped at 32 statements and receive
+at most one repair for invalid structured output or missing/unknown citations. The target full path is:
 
 1. normalize the question and optional filters;
 2. run lexical and semantic retrieval independently;
@@ -203,15 +209,16 @@ repair retries remain planned. The target full path is:
 8. validate that every cited identifier exists and its quoted span matches stored content;
 9. label statements as direct, synthesis, inference, or insufficient evidence.
 
-If answer validation fails, the service should retry with a repair prompt within a fixed limit,
-then return a qualified failure rather than ungrounded prose.
+If repairable answer validation fails, the service retries once with a replacement-only repair
+prompt, then returns a qualified failure rather than ungrounded prose.
 
 ## Domain model
 
 The names below describe the target MVP. Current SQLAlchemy models and SQLite setup in `apps/api`
-remain the source of truth for implemented records. `Source`, `Chunk`, `Decision`, and `Evidence`
-exist now; `SourceVersion`, `ModelRun`, `IngestionJob`, and `AuditEvent` are also implemented.
-Generalized `MemoryObject` and `Relation` remain planned.
+remain the source of truth for implemented records. `Source`, `Chunk`, `Evidence`, `SourceVersion`,
+`ModelRun`, `IngestionJob`, and `AuditEvent` are implemented. Governed memories currently use the
+compatibility `decisions` table plus a required kind; a renamed `MemoryObject` table and `Relation`
+remain planned.
 
 ```text
 Workspace
@@ -239,7 +246,8 @@ Relation
 
 ModelRun
   id, provider_id, model_id, operation, template_version,
-  input_hashes, validation_status, started_at, finished_at
+  input_hashes, parent_run_id, attempt_number, repair_reason,
+  validation_status, created_at, finished_at
 
 Job
   id, kind, state, stage, attempts, error_code, error_detail, timestamps
@@ -248,9 +256,9 @@ AuditEvent
   id, actor, action, object_type, object_id, before_json, after_json, created_at
 ```
 
-Allowed MVP memory kinds are `claim`, `decision`, `assumption`, `constraint`, and
-`alternative`. Allowed statuses are `candidate`, `accepted`, `rejected`, `obsolete`, and
-`deleted`. Candidate model output never becomes accepted solely because a model emitted it.
+Implemented memory kinds are `decision`, `assumption`, `constraint`, and `alternative`.
+Reviewable statuses are `candidate`, `active`, `accepted`, `rejected`, and `obsolete`.
+Candidate model output never becomes accepted solely because a model emitted it.
 
 Important relation kinds are `supports`, `contradicts`, `depends_on`, `considered`,
 `implemented_by`, and `supersedes`. Temporal validity belongs to the memory object, while the

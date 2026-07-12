@@ -73,6 +73,10 @@ a caller confirms deletion. The Sources UI loads this preview and requires expli
 Configured generation providers can extract additional governed memory candidates from a source. Model
 output is schema-validated, must cite server-issued chunk IDs, remains `candidate` until human
 review, records its model run, and is idempotent within an immutable source version.
+Schema, size, or evidence-ID validation failures receive at most one bounded repair call using the
+same provider, model, evidence pack, and input hashes. Each attempt has a persisted lineage record;
+invalid output and validation details are never stored or echoed into the repair prompt. Provider
+transport failures are recorded and returned without an automatic repair or provider fallback.
 
 The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
