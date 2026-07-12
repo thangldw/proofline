@@ -14,6 +14,20 @@ export type Source = {
   decision_count: number;
 };
 
+export type SourceDeletionImpact = {
+  source_id: string;
+  title: string;
+  current_version_id: string | null;
+  versions: number;
+  chunks: number;
+  embeddings: number;
+  decisions: number;
+  evidence: number;
+  ingestion_jobs_to_detach: number;
+  audit_events_to_delete: number;
+  fts_rows: number;
+};
+
 export type IngestionJob = {
   id: string;
   source_id: string | null;
