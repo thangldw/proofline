@@ -25,6 +25,10 @@ test:
 	npm run test:web
 
 eval:
+	.venv/bin/proofline eval-extraction --dataset evals/extraction/seed-v1.json \
+		--min-precision 1.0 --min-recall 1.0 --min-f1 1.0 \
+		--min-evidence-resolution 1.0 --min-expected-evidence-accuracy 1.0 \
+		--min-negative-source-accuracy 1.0
 	.venv/bin/proofline eval --dataset evals/retrieval/seed-v1.json --min-recall 0.80 --min-ndcg 0.80
 	.venv/bin/proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json \
 		--min-citation-resolution 1.0 --min-citation-precision 1.0 \

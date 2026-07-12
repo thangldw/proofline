@@ -13,7 +13,9 @@ from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
     evaluate_dataset,
+    evaluate_extraction_dataset,
     evaluate_grounded_dataset,
+    extraction_report_meets_thresholds,
     grounded_report_meets_thresholds,
 )
 from .ingestion import ingest_source
@@ -69,6 +71,16 @@ def main(argv: list[str] | None = None) -> None:
     grounded.add_argument("--min-citation-precision", type=unit_interval, default=0)
     grounded.add_argument("--min-grounded-success", type=unit_interval, default=0)
     grounded.add_argument("--min-status-accuracy", type=unit_interval, default=0)
+    extraction = subcommands.add_parser(
+        "eval-extraction", help="Run a versioned deterministic extraction evaluation"
+    )
+    extraction.add_argument("--dataset", type=Path, required=True)
+    extraction.add_argument("--min-precision", type=unit_interval, default=0)
+    extraction.add_argument("--min-recall", type=unit_interval, default=0)
+    extraction.add_argument("--min-f1", type=unit_interval, default=0)
+    extraction.add_argument("--min-evidence-resolution", type=unit_interval, default=0)
+    extraction.add_argument("--min-expected-evidence-accuracy", type=unit_interval, default=0)
+    extraction.add_argument("--min-negative-source-accuracy", type=unit_interval, default=0)
     benchmark = subcommands.add_parser(
         "benchmark", help="Measure local SQLite FTS5 lexical search latency"
     )
@@ -105,6 +117,19 @@ def main(argv: list[str] | None = None) -> None:
             min_citation_precision=args.min_citation_precision,
             min_grounded_success=args.min_grounded_success,
             min_status_accuracy=args.min_status_accuracy,
+        ):
+            raise SystemExit(1)
+    elif args.command == "eval-extraction":
+        report = evaluate_extraction_dataset(args.dataset)
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        if not extraction_report_meets_thresholds(
+            report,
+            min_precision=args.min_precision,
+            min_recall=args.min_recall,
+            min_f1=args.min_f1,
+            min_evidence_resolution=args.min_evidence_resolution,
+            min_expected_evidence_accuracy=args.min_expected_evidence_accuracy,
+            min_negative_source_accuracy=args.min_negative_source_accuracy,
         ):
             raise SystemExit(1)
     elif args.command == "benchmark":

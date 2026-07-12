@@ -21,6 +21,36 @@ The synthetic corpus does not satisfy the roadmap requirement for at least 25 re
 That dataset must be collected with permission, sanitized, labeled with source evidence, and marked
 with non-synthetic provenance before it can support product-quality or go/no-go claims.
 
+## Deterministic extraction regression gate
+
+`extraction/seed-v1.json` is a synthetic credential-free corpus for the production deterministic
+ingestion/extraction path. It covers decisions, assumptions, constraints, and alternatives; exact
+status and statement matching; exact evidence slices and SHA-256 quote hashes; supported
+English/Vietnamese markers; CJK statements after supported markers; headings; and negative prose
+that must not be extracted.
+
+Run the gate with:
+
+```bash
+proofline eval-extraction --dataset evals/extraction/seed-v1.json \
+  --min-precision 1.0 --min-recall 1.0 --min-f1 1.0 \
+  --min-evidence-resolution 1.0 --min-expected-evidence-accuracy 1.0 \
+  --min-negative-source-accuracy 1.0
+```
+
+An extracted object matches an expectation only when source URI, memory kind, statement, and status
+all match. The report uses micro object-level precision, recall, and F1. `evidence_resolution` is the
+share of all extracted objects whose single persisted evidence record resolves to the same immutable
+source/version, exact non-empty code-point span, quote, and quote hash.
+`expected_evidence_accuracy` is the share of matched expected objects whose exact persisted quote
+also matches the dataset expectation. `negative_source_accuracy` is the share of sources with no
+expected memories that produced none. The report also records `model_run_count`; the gate requires
+zero because this corpus exercises deterministic production extraction only.
+
+These fixtures contain explicit synthetic markers and expected strings. A perfect score proves a
+deterministic parser/provenance regression contract only; it is not evidence of real-model
+extraction quality, semantic understanding, pilot precision/recall, or coverage of unmarked prose.
+
 ## Grounded-QA regression gate
 
 `grounded-qa/seed-v1.json` is a synthetic, scripted regression corpus for the complete local answer
