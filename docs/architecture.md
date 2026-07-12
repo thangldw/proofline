@@ -44,17 +44,19 @@ deterministic marked-decision extraction, immutable source versions, committed s
 source retrieval and deletion, FTS5 search, overview counts, and health reporting. Local
 development runs through Uvicorn.
 
-The current implementation is synchronous and intentionally has no model dependency. This is
-the executable evidence contract on which later extraction and answering will build.
+The deterministic ingestion path is synchronous and has no required model dependency. Optional
+generation and embedding providers use the same immutable evidence contract.
 
 ### 2. Local web application — implemented foundation
 
 `apps/web` is a React/Vite evidence console. It currently supports browser-side Markdown/text
 upload to the API, lexical search, source inventory, decision browsing, overview counts, and an
-evidence drawer plus accept/reject/obsolete decision actions. It is a pre-alpha inspection
-surface, not a rich editor. The API also supports decision corrections with a before/after audit
-trail. Provider settings and grounded questions/answers remain planned. Evidence navigation
-loads the immutable referenced source version. Desktop packaging is deferred.
+evidence drawer plus accept/reject/obsolete decision actions. Grounded answer statements retain
+their statement-level citation mapping, and an answer-provider failure does not discard lexical
+results. It is a pre-alpha inspection surface, not a rich editor. The API also supports decision
+corrections with a before/after audit trail. Provider configuration remains environment-based;
+there is no settings UI. Evidence navigation loads the immutable referenced source version.
+Desktop packaging is deferred.
 
 ### 3. Future application modules
 
@@ -96,7 +98,10 @@ old evidence remains resolvable until retention or deletion removes it.
 The foundation uses SQLite plus content uploaded from the browser or API:
 
 - Browser-selected files remain in their original location; the web client reads their text and
-  sends the content to the local API. Direct folder scanning is not implemented.
+  sends the content to the local API.
+- The API can scan explicitly registered local roots for Markdown and UTF-8 text. It resolves
+  every selected path before reading, rejects traversal and symlink escape, and never accepts an
+  arbitrary unregistered root. Folder watching and automatic deletion remain unimplemented.
 - SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
@@ -110,6 +115,25 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 
 No graph database is planned for the MVP. Typed relations are represented as adjacency rows
 and queried through the domain repository.
+
+### Registered-root folder scanning
+
+Folder access is disabled by default. Register one or more roots with the operating-system path
+separator (`:` on Unix-like systems, `;` on Windows):
+
+```bash
+export PROOFLINE_IMPORT_ROOTS="/absolute/team-docs:/absolute/project-adrs"
+```
+
+`POST /api/v1/folder-scans` accepts an optional registered `root`, an optional relative `path`,
+and `delete_missing` (default `false`). When exactly one root is registered, `root` may be omitted.
+The scanner recursively processes `.md`, `.markdown`, and `.txt` files in deterministic path
+order, rejects files larger than 5 MB, and feeds valid UTF-8 content through the same observable
+ingestion jobs as uploads. Unchanged files retain their current immutable version; changed files
+create a new version under the stable resolved `file://` URI.
+
+The response reports every processed file and any source IDs whose files are missing. Missing-file
+deletion is preview-only even when `delete_missing=true`; no source is removed by a folder scan.
 
 ### 6. Model gateway — implemented foundation
 

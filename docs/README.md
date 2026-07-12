@@ -16,6 +16,7 @@ way and trace every answer back to exact source evidence.
 | [MVP architecture](./architecture.md) | Current vertical slice, planned boundaries, data model, and quality attributes | Evolving |
 | [ADR-0001](./adr/0001-scope-and-stack.md) | First scope and technology decision | Accepted |
 | [90-day roadmap](./roadmap-90-days.md) | Validation and delivery plan with measurable gates | Proposed |
+| [Security threat model](./security-threat-model.md) | Assets, trust boundaries, attacker stories, and severity calibration | Baseline |
 | [Contributing workflow](./contributing.md) | Human contribution and review rules | Baseline |
 | [Agent implementation spec](./agent-spec.md) | Operating contract for Codex, Claude, and other coding agents | Baseline |
 
@@ -34,11 +35,13 @@ way and trace every answer back to exact source evidence.
 As of 2026-07-12:
 
 - Implemented in `apps/api`: Python/FastAPI + SQLAlchemy local API, SQLite schema,
-  deterministic Markdown chunking, content ingestion, FTS5 lexical search, deterministic
+  deterministic Markdown chunking, upload and registered-root folder ingestion, FTS5 lexical
+  search, deterministic
   extraction of explicitly marked English/Vietnamese decisions, exact evidence spans, source
   and decision browsing, cascading source deletion, health/overview endpoints, and tests.
 - Implemented in `apps/web`: React/Vite local evidence console for Markdown upload, lexical
-  search, source/decision browsing, overview counts, and evidence inspection.
+  search, source/decision browsing, overview counts, evidence inspection, statement-level
+  citation mapping, and degraded search behavior when answer generation fails.
 - Local container scaffolding and root setup/development/quality commands are present.
 - Also implemented: immutable source-version history and versioned SQLite migrations.
 - Also implemented: persisted terminal status for synchronous ingestion jobs.
@@ -53,6 +56,9 @@ As of 2026-07-12:
   dense cosine retrieval, and reciprocal-rank fusion with lexical results.
 - Also implemented: schema-validated, evidence-grounded AI decision candidates linked to model
   runs and the existing human review/audit workflow.
+- Also implemented: registered-root folder scanning with traversal/symlink containment, per-file
+  results, immutable updates, and preview-only missing-file reporting.
+- Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
 - Not yet implemented: resumable/retryable job execution, scalable vector index, reranker,
   assumption/constraint extraction, repair retries, desktop packaging, cloud services, or
   telemetry.
