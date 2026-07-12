@@ -50,5 +50,5 @@ format:
 	.venv/bin/ruff format .
 
 release-check:
-	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.1.0-alpha.3"; exit 2)
+	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.1.0-alpha.4"; exit 2)
 	.venv/bin/python scripts/release_check.py --tag "$(TAG)"

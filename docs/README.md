@@ -19,6 +19,7 @@ way and trace every answer back to exact source evidence.
 | [External pilot protocol](./pilot-protocol.md) | Consent-safe evidence collection, metric formulas, and go/no-go rules | Ready for collection |
 | [Security threat model](./security-threat-model.md) | Assets, trust boundaries, attacker stories, and severity calibration | Baseline |
 | [Backup and recovery](./backup-recovery.md) | Portable export, complete SQLite backup, verification, restore drill, and retention limits | Implemented |
+| [v0.1.0-alpha.4 notes](./releases/v0.1.0-alpha.4.md) | Safe registered-folder polling and stable-read ingestion | Pre-alpha |
 | [v0.1.0-alpha.3 notes](./releases/v0.1.0-alpha.3.md) | Transactional portable import and synthetic pilot simulation | Pre-alpha |
 | [v0.1.0-alpha.2 notes](./releases/v0.1.0-alpha.2.md) | Release automation hardening and immutable-tag recovery | Pre-alpha |
 | [v0.1.0-alpha.1 notes](./releases/v0.1.0-alpha.1.md) | First experimental pre-release scope, assets, and limitations | Pre-alpha |

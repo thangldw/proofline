@@ -191,13 +191,14 @@ production qualification. They do not block an explicitly experimental pre-alpha
 
 ## Releases
 
-`v0.1.0-alpha.3` is the latest experimental pre-release. It adds strict transactional portable
-import and a clearly labeled synthetic pilot simulation; application limitations remain pre-alpha.
+`v0.1.0-alpha.4` is the latest experimental pre-release. It adds coordinated polling for
+registered folders, rejects files observed changing during reads, and avoids ingestion-job churn
+for unchanged files; application limitations remain pre-alpha.
 Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
 archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
 reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
 proven two-process development workflow above. See the
-[release notes](docs/releases/v0.1.0-alpha.3.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.1.0-alpha.4.md) and verify `SHA256SUMS` before installation.
 
 ### Data portability and recovery
 
