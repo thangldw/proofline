@@ -2,8 +2,8 @@
 
 **Document status:** Proposed  
 **Start assumption:** Day 1 begins with the foundation repository  
-**Implementation status:** Phase 1 is partially complete; the first deterministic vertical slice
-is implemented, and Phase 2 hardening remains in progress
+**Implementation status:** The internal Phase 2 engineering gates are implemented; Phase 1 pilot
+corpus evidence remains open, and Phase 3 governed extraction is in progress
 
 The roadmap is organized around validated outcomes. Dates may move; quality gates should not be
 silently weakened to preserve a date.
@@ -99,11 +99,13 @@ Before delivery work, record:
 
 - Harden the implemented fake/OpenAI-compatible gateway across selected remote and local runtimes.
 - Extend the implemented explicit remote-egress configuration and secret-safe diagnostics.
-- Extend the implemented versioned decision-extraction prompt/schema to assumptions and
-  constraints.
+- Extend the implemented versioned decision-extraction prompt/schema to assumptions, constraints,
+  and alternatives. The generalized schema, deterministic extraction, exact evidence, and
+  decision-only compatibility API are implemented.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
 - Extend the implemented AI decision candidate queue and audit-backed review actions to other
-  memory kinds.
+  memory kinds. The filterable memory registry and review API now cover decisions, assumptions,
+  constraints, and alternatives.
 - Run extraction evaluation across at least one remote and one local/cheap model if available.
 
 ### Exit gate
