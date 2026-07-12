@@ -17,6 +17,7 @@ way and trace every answer back to exact source evidence.
 | [ADR-0001](./adr/0001-scope-and-stack.md) | First scope and technology decision | Accepted |
 | [90-day roadmap](./roadmap-90-days.md) | Validation and delivery plan with measurable gates | Proposed |
 | [Security threat model](./security-threat-model.md) | Assets, trust boundaries, attacker stories, and severity calibration | Baseline |
+| [Backup and recovery](./backup-recovery.md) | Portable export, complete SQLite backup, verification, restore drill, and retention limits | Implemented |
 | [Contributing workflow](./contributing.md) | Human contribution and review rules | Baseline |
 | [Agent implementation spec](./agent-spec.md) | Operating contract for Codex, Claude, and other coding agents | Baseline |
 
@@ -67,6 +68,9 @@ As of 2026-07-12:
   qualified observation receipt; this is not a product performance guarantee.
 - Also implemented: a credential-free synthetic grounded-QA regression gate that exercises the
   production answer and fail-closed citation path; it is not pilot or real-model quality evidence.
+- Also implemented: verified portable JSON export and complete online SQLite backup commands,
+  strict read-only backup verification, and an automated recovery exercise that revalidates exact
+  source versions, evidence spans, and hashes. Portable import is not implemented.
 - Not yet implemented: scalable vector index, reranker, real-model/pilot evaluation, desktop
   packaging, cloud services, or telemetry.
 
