@@ -4,8 +4,8 @@
   "scripts": {
     "dev:web": "npm --workspace @proofline/web run dev",
     "build:web": "npm --workspace @proofline/web run build",
+    "test:e2e": "npm --workspace @proofline/web run test:e2e",
     "test:web": "npm --workspace @proofline/web run test"
   },
   "workspaces": ["apps/web"]
 }
-

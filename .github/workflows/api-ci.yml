@@ -35,6 +35,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser-e2e:
+    name: Browser E2E (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install local API
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run credential-free browser vertical slice
+        env:
+          PROOFLINE_AI_PROVIDER: disabled
+          PROOFLINE_EMBEDDING_PROVIDER: disabled
+          PROOFLINE_ALLOW_REMOTE_AI: "false"
+        run: npm run test:e2e
+
   lint-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -67,6 +107,10 @@ jobs:
 
       - name: Credential-free evaluation gates
         run: |
+          proofline eval-extraction --dataset evals/extraction/seed-v1.json \
+            --min-precision 1.0 --min-recall 1.0 --min-f1 1.0 \
+            --min-evidence-resolution 1.0 --min-expected-evidence-accuracy 1.0 \
+            --min-negative-source-accuracy 1.0
           proofline eval --dataset evals/retrieval/seed-v1.json \
             --min-recall 0.80 --min-ndcg 0.80
           proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json \
