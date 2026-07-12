@@ -59,7 +59,7 @@ export function App() {
         />
       )}
       {view === "sources" && (
-        <SourcesView sources={sources}/>
+        <SourcesView sources={sources} onChanged={refresh}/>
       )}
     </main>
     {evidence && <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)}/>} 
@@ -117,8 +117,9 @@ function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]
   </section>;
 }
 
-function SourcesView({sources}: {sources: Source[]}) {
-  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div><div className="source-table"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span></div>{sources.map(source => <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className="ready"><i/>Ready</span></div>)}</div></section>;
+function SourcesView({sources, onChanged}: {sources: Source[]; onChanged: () => Promise<void>}) {
+  async function extract(sourceId: string) { await api.extractDecisions(sourceId); await onChanged(); }
+  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div><div className="source-table"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span></div>{sources.map(source => <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className="ready"><button onClick={() => void extract(source.id)}>Extract AI candidates</button></span></div>)}</div></section>;
 }
 
 function Metric({value,label}: {value: number; label: string}) { return <div className="metric"><strong>{value}</strong><span>{label}</span></div>; }
