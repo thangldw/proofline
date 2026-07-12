@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from .config import get_settings
 from .database import get_session
 from .embeddings import hybrid_search, index_current_embeddings
+from .extraction import CandidateExtractionError, extract_decision_candidates
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
@@ -294,6 +295,34 @@ def list_source_versions(
             .order_by(SourceVersion.created_at.desc())
         ).all()
     )
+
+
+@router.post("/sources/{source_id}/extract-decisions", response_model=list[DecisionRead])
+def extract_source_decisions(
+    source_id: str,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> list[DecisionRead]:
+    source = session.get(Source, source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        provider = build_generation_provider(get_settings())
+        if provider is None:
+            raise HTTPException(status_code=409, detail="AI provider is disabled")
+        decisions, run = extract_decision_candidates(session, source, provider)
+    except ProviderConfigurationError as exc:
+        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
+    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
+        run_id = getattr(exc, "run_id", None)
+        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
+        raise HTTPException(
+            status_code=502,
+            detail="model output could not produce grounded decision candidates",
+            headers=headers,
+        ) from exc
+    response.headers["X-Proofline-Model-Run-ID"] = run.id
+    return [decision_to_read(decision, source.title) for decision in decisions]
 
 
 @router.get(
