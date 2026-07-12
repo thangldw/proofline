@@ -1,0 +1,37 @@
+{
+  "schema_version": "pilot-manifest-v1",
+  "artifact_status": "blank_template",
+  "protocol_version": "1.0",
+  "dataset_version": null,
+  "study_started_at": null,
+  "study_ended_at": null,
+  "timeout_seconds": 1800,
+  "declared_currency": null,
+  "pricing_date": null,
+  "owners": {
+    "pilot_owner": null,
+    "evaluation_owner": null,
+    "security_owner": null,
+    "product_decision_owner": null
+  },
+  "consent": {
+    "written_consent_complete": null,
+    "approved_source_families": [],
+    "approved_remote_providers": [],
+    "local_only_team_ids": [],
+    "sanitized_question_data_may_be_shared": null,
+    "aggregate_metrics_may_be_shared": null,
+    "withdrawal_contact": null
+  },
+  "data_handling": {
+    "private_workspace_owner": null,
+    "identity_map_location": null,
+    "raw_data_location": null,
+    "retention_ends_at": null,
+    "deletion_verification_owner": null,
+    "public_artifacts_must_be_aggregate_only": true
+  },
+  "declared_platform_matrix": [],
+  "proofline_revision": null,
+  "artifact_sha256": {}
+}

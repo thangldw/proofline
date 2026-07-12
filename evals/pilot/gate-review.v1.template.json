@@ -1,0 +1,33 @@
+{
+  "schema_version": "pilot-gate-review-v1",
+  "artifact_status": "blank_template",
+  "protocol_version": "1.0",
+  "dataset_version": null,
+  "artifact_sha256": {},
+  "calculated_at": null,
+  "metrics": {
+    "eligible_real_questions": {"value": null, "threshold": 25, "operator": ">=", "status": "open"},
+    "eligible_temporal_questions": {"value": null, "threshold": 10, "operator": ">=", "status": "open"},
+    "citation_precision": {"numerator": null, "denominator": null, "value": null, "formula": "supported_citations / all_emitted_citations", "threshold": 0.9, "operator": ">=", "status": "open"},
+    "useful_answer_rate": {"numerator": null, "denominator": null, "value": null, "formula": "useful_eligible_attempts / all_eligible_judged_attempts", "threshold": 0.65, "operator": ">=", "status": "open"},
+    "median_time_improvement": {"baseline_median_seconds": null, "proofline_median_seconds": null, "value": null, "formula": "1 - proofline_median_seconds / baseline_median_seconds", "threshold": 0.5, "operator": ">=", "status": "open"},
+    "weekly_active_teams": {"value": null, "total_participating_teams": null, "formula": "teams_with_qualifying_use_in_at_least_3_of_final_4_weeks", "threshold": 3, "operator": ">=", "status": "open"},
+    "concrete_wtp_teams": {"value": null, "formula": "distinct_teams_with_defined_capability_and_budget_or_price_and_dated_next_step", "threshold": 2, "operator": ">=", "status": "open"}
+  },
+  "hard_gates": {
+    "all_emitted_citations_judged_and_resolved": "open",
+    "no_unresolved_critical_security_or_deletion_defect": "open",
+    "declared_platform_matrix_has_successful_receipts": "open"
+  },
+  "missing_data_summary": null,
+  "protocol_deviations": [],
+  "decision": null,
+  "failed_hypotheses": [],
+  "decision_rationale": null,
+  "owners": {
+    "evaluation_owner": null,
+    "security_owner": null,
+    "product_decision_owner": null
+  },
+  "signed_at": null
+}

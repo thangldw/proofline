@@ -16,6 +16,7 @@ way and trace every answer back to exact source evidence.
 | [MVP architecture](./architecture.md) | Current vertical slice, planned boundaries, data model, and quality attributes | Evolving |
 | [ADR-0001](./adr/0001-scope-and-stack.md) | First scope and technology decision | Accepted |
 | [90-day roadmap](./roadmap-90-days.md) | Validation and delivery plan with measurable gates | Proposed |
+| [External pilot protocol](./pilot-protocol.md) | Consent-safe evidence collection, metric formulas, and go/no-go rules | Ready for collection |
 | [Security threat model](./security-threat-model.md) | Assets, trust boundaries, attacker stories, and severity calibration | Baseline |
 | [Backup and recovery](./backup-recovery.md) | Portable export, complete SQLite backup, verification, restore drill, and retention limits | Implemented |
 | [Contributing workflow](./contributing.md) | Human contribution and review rules | Baseline |
