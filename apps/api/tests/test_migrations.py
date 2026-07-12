@@ -496,6 +496,7 @@ def test_large_foundation_fixture_migrates_with_exact_provenance_and_recovery(tm
         )
 
     initialize_database(engine)
+    initialize_database(engine)
 
     with Session(engine) as session:
         counts = {
