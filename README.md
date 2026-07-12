@@ -59,13 +59,15 @@ exhausted jobs purge the staged payload.
 
 The API can also scan explicitly registered local roots for Markdown and UTF-8 text. Folder access
 is disabled by default, path traversal and symlink escapes are rejected, and missing files are
-reported for review rather than deleted automatically.
+reported for review rather than deleted automatically. A uniquely matched same-content file rename
+keeps the original source identity, immutable version history, chunks, and evidence; ambiguous
+matches are never guessed.
 
 Decisions can be accepted, rejected, corrected, or marked obsolete. Every change records a
 before/after audit event while retaining the original source evidence; complete source deletion
 also removes content-bearing audit records. `GET /api/v1/sources/{id}/deletion-impact` reports the
 versions, chunks, embeddings, decisions, evidence, jobs, audit events, and FTS rows affected before
-a caller confirms deletion.
+a caller confirms deletion. The Sources UI loads this preview and requires explicit confirmation.
 
 Configured generation providers can extract additional decision candidates from a source. Model
 output is schema-validated, must cite server-issued chunk IDs, remains `candidate` until human
