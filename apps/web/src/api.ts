@@ -1,4 +1,4 @@
-import type { Decision, GroundedAnswer, Overview, SearchHit, Source } from "./types";
+import type { Decision, GroundedAnswer, IngestionJob, Overview, SearchHit, Source } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -15,6 +15,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
+  jobs: () => request<IngestionJob[]>("/api/v1/jobs?limit=200"),
   source: (id: string) => request<Source & { content: string }>(`/api/v1/sources/${id}`),
   sourceVersion: (sourceId: string, versionId: string) =>
     request<{ content: string }>(`/api/v1/sources/${sourceId}/versions/${versionId}`),

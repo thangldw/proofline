@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Decision, Evidence, GroundedAnswer, Overview, SearchHit, Source } from "./types";
+import type { Decision, Evidence, GroundedAnswer, IngestionJob, Overview, SearchHit, Source } from "./types";
 
 type View = "search" | "decisions" | "sources";
 
@@ -10,16 +10,17 @@ export function App() {
   const [overview, setOverview] = useState<Overview>({ sources: 0, chunks: 0, decisions: 0, evidence: 0 });
   const [sources, setSources] = useState<Source[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [evidence, setEvidence] = useState<{ item: Evidence; sourceTitle: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextDecisions] = await Promise.all([
-        api.overview(), api.sources(), api.decisions(),
+      const [nextOverview, nextSources, nextDecisions, nextJobs] = await Promise.all([
+        api.overview(), api.sources(), api.decisions(), api.jobs(),
       ]);
-      setOverview(nextOverview); setSources(nextSources); setDecisions(nextDecisions); setError("");
+      setOverview(nextOverview); setSources(nextSources); setDecisions(nextDecisions); setJobs(nextJobs); setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Cannot reach Proofline API"); }
   }, []);
 
@@ -32,6 +33,8 @@ export function App() {
     finally { setImporting(false); }
   }
 
+  const indexDegraded = latestJobs(jobs).some(job => job.state === "failed");
+
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">P</span><span>Proofline</span></div>
@@ -41,7 +44,7 @@ export function App() {
         <Nav icon={<GitBranch size={18}/>} active={view === "decisions"} onClick={() => setView("decisions")} count={overview.decisions}>Decisions</Nav>
         <Nav icon={<BookOpen size={18}/>} active={view === "sources"} onClick={() => setView("sources")} count={overview.sources}>Sources</Nav>
       </nav>
-      <div className="system-status"><span className={error ? "dot error-dot" : "dot"}/><div><strong>{error ? "API unavailable" : "Index ready"}</strong><span>{overview.chunks} searchable chunks</span></div></div>
+      <div className="system-status"><span className={error || indexDegraded ? "dot error-dot" : "dot"}/><div><strong>{error ? "API unavailable" : indexDegraded ? "Index degraded" : "Index ready"}</strong><span>{overview.chunks} searchable chunks</span></div></div>
     </aside>
     <main>
       {error && <div className="error-banner">{error}</div>}
@@ -59,7 +62,7 @@ export function App() {
         />
       )}
       {view === "sources" && (
-        <SourcesView sources={sources} onChanged={refresh}/>
+        <SourcesView sources={sources} jobs={jobs} onChanged={refresh}/>
       )}
     </main>
     {evidence && <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)}/>} 
@@ -155,6 +158,20 @@ function errorMessage(reason: unknown, fallback: string): string {
   return reason instanceof Error && reason.message ? reason.message : fallback;
 }
 
+function latestJobs(jobs: IngestionJob[]): IngestionJob[] {
+  const ordered = [...jobs].sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+  const bySource = new Map<string, IngestionJob>();
+  let orphan: IngestionJob | null = null;
+  for (const job of ordered) {
+    if (job.source_id) {
+      if (!bySource.has(job.source_id)) bySource.set(job.source_id, job);
+    } else if (!orphan) {
+      orphan = job;
+    }
+  }
+  return orphan ? [...bySource.values(), orphan] : [...bySource.values()];
+}
+
 function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
   async function setStatus(id: string, status: "accepted" | "rejected" | "obsolete") { await api.updateDecision(id, {status}); await onChanged(); }
   return <section className="content"><div className="section-heading"><div><span className="eyebrow">DECISION REGISTRY</span><h2>Recorded technical choices</h2></div><span className="mode-badge">{decisions.length} extracted</span></div>
@@ -162,9 +179,32 @@ function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]
   </section>;
 }
 
-function SourcesView({sources, onChanged}: {sources: Source[]; onChanged: () => Promise<void>}) {
-  async function extract(sourceId: string) { await api.extractDecisions(sourceId); await onChanged(); }
-  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div><div className="source-table"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span></div>{sources.map(source => <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className="ready"><button onClick={() => void extract(source.id)}>Extract AI candidates</button></span></div>)}</div></section>;
+export function SourcesView({sources, jobs, onChanged}: {sources: Source[]; jobs: IngestionJob[]; onChanged: () => Promise<void>}) {
+  const [extractingSourceId, setExtractingSourceId] = useState<string | null>(null);
+  const [extractionErrors, setExtractionErrors] = useState<Record<string, string>>({});
+  const jobsBySource = new Map(
+    latestJobs(jobs).flatMap(job => job.source_id ? [[job.source_id, job] as const] : []),
+  );
+  async function extract(sourceId: string) {
+    setExtractingSourceId(sourceId);
+    setExtractionErrors(current => ({ ...current, [sourceId]: "" }));
+    try {
+      await api.extractDecisions(sourceId);
+      await onChanged();
+    } catch (reason) {
+      setExtractionErrors(current => ({
+        ...current,
+        [sourceId]: errorMessage(reason, "AI extraction failed"),
+      }));
+    } finally {
+      setExtractingSourceId(null);
+    }
+  }
+  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div><div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
+    const job = jobsBySource.get(source.id);
+    const extractionError = extractionErrors[source.id];
+    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions"><button disabled={extractingSourceId === source.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button>{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
+  })}</div></section>;
 }
 
 function Metric({value,label}: {value: number; label: string}) { return <div className="metric"><strong>{value}</strong><span>{label}</span></div>; }

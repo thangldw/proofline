@@ -14,6 +14,21 @@ export type Source = {
   decision_count: number;
 };
 
+export type IngestionJob = {
+  id: string;
+  source_id: string | null;
+  source_version_id: string | null;
+  kind: string;
+  state: string;
+  stage: string;
+  attempts: number;
+  error_code: string | null;
+  error_detail: string | null;
+  retryable: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Evidence = {
   id: string;
   source_id: string;
