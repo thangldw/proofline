@@ -1,0 +1,48 @@
+export type Overview = { sources: number; chunks: number; decisions: number; evidence: number };
+
+export type Source = {
+  id: string;
+  title: string;
+  kind: string;
+  uri: string | null;
+  status: string;
+  created_at: string;
+  indexed_at: string;
+  chunk_count: number;
+  decision_count: number;
+};
+
+export type Evidence = {
+  id: string;
+  source_id: string;
+  quote: string;
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+};
+
+export type Decision = {
+  id: string;
+  source_id: string;
+  source_title: string;
+  title: string;
+  statement: string;
+  rationale: string | null;
+  status: string;
+  confidence: number;
+  extraction_method: string;
+  evidence: Evidence[];
+};
+
+export type SearchHit = {
+  chunk_id: string;
+  source_id: string;
+  source_title: string;
+  content: string;
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+  rank: number;
+};
