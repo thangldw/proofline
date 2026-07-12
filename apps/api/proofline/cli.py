@@ -17,6 +17,12 @@ from .evaluation import (
 )
 from .ingestion import ingest_source
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
+from .portability import (
+    PortabilityError,
+    atomic_write_export,
+    build_portable_export,
+    load_and_verify_export,
+)
 from .schemas import SourceCreate
 
 
@@ -69,6 +75,11 @@ def main(argv: list[str] | None = None) -> None:
     benchmark.add_argument("--queries", type=int, default=100)
     benchmark.add_argument("--limit", type=int, default=10)
     subcommands.add_parser("embed", help="Incrementally embed current source chunks")
+    export = subcommands.add_parser("export", help="Write a verified portable JSON snapshot")
+    export.add_argument("--output", type=Path, required=True)
+    export.add_argument("--force", action="store_true")
+    verify_export = subcommands.add_parser("verify-export", help="Verify a portable JSON snapshot")
+    verify_export.add_argument("path", type=Path)
     args = parser.parse_args(argv)
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
@@ -116,6 +127,30 @@ def main(argv: list[str] | None = None) -> None:
                 indent=2,
             )
         )
+    elif args.command == "export":
+        initialize_database()
+        try:
+            with SessionLocal() as session, session.begin():
+                document = build_portable_export(session)
+            atomic_write_export(args.output, document, force=args.force)
+        except PortabilityError as exc:
+            raise SystemExit(f"export failed: {exc.code}") from exc
+        print(
+            json.dumps(
+                {
+                    "schema": document["manifest"]["schema"],
+                    "payload_sha256": document["manifest"]["payload_sha256"],
+                    "counts": document["manifest"]["counts"],
+                },
+                sort_keys=True,
+            )
+        )
+    elif args.command == "verify-export":
+        try:
+            counts = load_and_verify_export(args.path)
+        except PortabilityError as exc:
+            raise SystemExit(f"export verification failed: {exc.code}") from exc
+        print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
 
 
 if __name__ == "__main__":
