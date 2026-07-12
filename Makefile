@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval check format
+.PHONY: setup dev dev-api dev-web seed embed test eval check format release-check
 
 setup:
 	python3 -m venv .venv
@@ -44,3 +44,7 @@ check:
 format:
 	.venv/bin/ruff check --fix .
 	.venv/bin/ruff format .
+
+release-check:
+	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.1.0-alpha.1"; exit 2)
+	.venv/bin/python scripts/release_check.py --tag "$(TAG)"

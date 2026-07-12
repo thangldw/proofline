@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from importlib.resources import files
 from pathlib import Path
 
 import uvicorn
 
+from . import __version__
 from .backup import BackupError, create_sqlite_backup, verify_sqlite_backup
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
@@ -41,17 +43,23 @@ def unit_interval(value: str) -> float:
 
 def seed_demo() -> None:
     initialize_database()
-    demo = Path(__file__).resolve().parents[3] / "examples" / "architecture-decision.md"
+    demo_name = "architecture-decision.md"
+    content = files("proofline").joinpath("data", demo_name).read_text(encoding="utf-8")
     with SessionLocal() as session:
         source, created = ingest_source(
             session,
-            SourceCreate(title=demo.name, content=demo.read_text(), uri=str(demo)),
+            SourceCreate(
+                title=demo_name,
+                content=content,
+                uri=f"proofline://examples/{demo_name}",
+            ),
         )
     print(f"{'Indexed' if created else 'Already indexed'}: {source.title} ({source.id})")
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="proofline")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
     serve = subcommands.add_parser("serve", help="Run the local API")
     serve.add_argument("--host", default="127.0.0.1")
