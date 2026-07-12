@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import tempfile
 import time
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Literal
 
@@ -20,9 +22,9 @@ from .model_gateway import (
     ProviderRequestError,
     StructuredOutputError,
 )
-from .models import ModelRun
+from .models import Decision, ModelRun, SourceVersion
 from .retrieval import lexical_search
-from .schemas import SourceCreate
+from .schemas import MemoryKind, SourceCreate
 
 
 class EvaluationSource(BaseModel):
@@ -163,6 +165,80 @@ class GroundedEvaluationReport(BaseModel):
     expected_status_accuracy: float
     statement_kind_accuracy: float
     queries: list[GroundedQueryResult]
+
+
+class ExtractionExpectedMemory(BaseModel):
+    kind: MemoryKind
+    statement: str = Field(min_length=1)
+    status: str = Field(min_length=1, max_length=30)
+    evidence_quote: str = Field(min_length=1)
+
+
+class ExtractionEvaluationSource(EvaluationSource):
+    expected_memories: list[ExtractionExpectedMemory] = Field(default_factory=list)
+
+
+class ExtractionEvaluationDataset(BaseModel):
+    version: str
+    provenance: str
+    description: str
+    sources: list[ExtractionEvaluationSource] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_unique_expectations(self) -> ExtractionEvaluationDataset:
+        uris = [source.uri for source in self.sources]
+        if len(set(uris)) != len(uris):
+            raise ValueError("extraction evaluation source URIs must be unique")
+        keys = [
+            (source.uri, item.kind, item.statement, item.status)
+            for source in self.sources
+            for item in source.expected_memories
+        ]
+        if len(set(keys)) != len(keys):
+            raise ValueError("extraction evaluation expectations must be unique")
+        return self
+
+
+class ExtractionKindMetrics(BaseModel):
+    kind: MemoryKind
+    expected_count: int
+    extracted_count: int
+    matched_count: int
+    precision: float
+    recall: float
+    f1: float
+
+
+class ExtractionSourceResult(BaseModel):
+    source_uri: str
+    expected_count: int
+    extracted_count: int
+    matched_count: int
+    false_positive_count: int
+    false_negative_count: int
+    evidence_valid_count: int
+
+
+class ExtractionEvaluationReport(BaseModel):
+    dataset_version: str
+    dataset_provenance: str
+    dataset_description: str
+    source_count: int
+    negative_source_count: int
+    model_run_count: int
+    expected_count: int
+    extracted_count: int
+    matched_count: int
+    false_positive_count: int
+    false_negative_count: int
+    precision: float
+    recall: float
+    f1: float
+    evidence_resolution: float
+    expected_evidence_accuracy: float
+    negative_source_accuracy: float
+    kinds: list[ExtractionKindMetrics]
+    sources: list[ExtractionSourceResult]
 
 
 class DatasetScriptedGenerationProvider:
@@ -379,6 +455,208 @@ def grounded_report_meets_thresholds(
         and report.citation_precision >= min_citation_precision
         and report.grounded_success >= min_grounded_success
         and report.expected_status_accuracy >= min_status_accuracy
+    )
+
+
+def _classification_metrics(
+    expected: int, extracted: int, matched: int
+) -> tuple[float, float, float]:
+    precision = matched / extracted if extracted else (1.0 if expected == 0 else 0.0)
+    recall = matched / expected if expected else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return precision, recall, f1
+
+
+def _memory_key(source_uri: str, memory: Decision) -> tuple[str, str, str, str]:
+    return source_uri, memory.kind, memory.statement, memory.status
+
+
+def _expected_key(source_uri: str, expected: ExtractionExpectedMemory) -> tuple[str, str, str, str]:
+    return source_uri, expected.kind, expected.statement, expected.status
+
+
+def _memory_evidence_is_exact(session: Session, memory: Decision) -> bool:
+    if len(memory.evidence) != 1:
+        return False
+    evidence = memory.evidence[0]
+    version = session.get(SourceVersion, evidence.source_version_id)
+    if (
+        version is None
+        or evidence.source_id != memory.source_id
+        or evidence.source_version_id != memory.source_version_id
+        or version.source_id != memory.source_id
+        or evidence.end_offset <= evidence.start_offset
+        or version.content[evidence.start_offset : evidence.end_offset] != evidence.quote
+        or evidence.start_line != version.content.count("\n", 0, evidence.start_offset) + 1
+        or evidence.end_line != version.content.count("\n", 0, evidence.end_offset - 1) + 1
+    ):
+        return False
+    return hashlib.sha256(evidence.quote.encode("utf-8")).hexdigest() == evidence.quote_hash
+
+
+def evaluate_extraction_dataset(dataset_path: Path) -> ExtractionEvaluationReport:
+    """Evaluate deterministic marked-memory extraction through real ingestion and persistence."""
+    dataset = ExtractionEvaluationDataset.model_validate_json(
+        dataset_path.read_text(encoding="utf-8")
+    )
+    with tempfile.TemporaryDirectory(prefix="proofline-extraction-eval-") as temporary_directory:
+        engine = make_engine(f"sqlite:///{Path(temporary_directory) / 'evaluation.db'}")
+        initialize_database(engine)
+        factory = sessionmaker(bind=engine, expire_on_commit=False)
+        try:
+            with factory() as session:
+                source_uri_by_id: dict[str, str] = {}
+                expected_by_key: dict[tuple[str, str, str, str], ExtractionExpectedMemory] = {}
+                for item in dataset.sources:
+                    source, _created = ingest_source(
+                        session,
+                        SourceCreate(title=item.title, uri=item.uri, content=item.content),
+                    )
+                    source_uri_by_id[source.id] = item.uri
+                    for expected in item.expected_memories:
+                        expected_by_key[_expected_key(item.uri, expected)] = expected
+
+                memories = list(session.scalars(select(Decision).order_by(Decision.id)).all())
+                model_run_count = session.scalar(select(func.count()).select_from(ModelRun)) or 0
+                actual_by_key: dict[tuple[str, str, str, str], list[Decision]] = defaultdict(list)
+                evidence_valid_by_memory_id: dict[str, bool] = {}
+                for memory in memories:
+                    key = _memory_key(source_uri_by_id[memory.source_id], memory)
+                    actual_by_key[key].append(memory)
+                    evidence_valid_by_memory_id[memory.id] = _memory_evidence_is_exact(
+                        session, memory
+                    )
+
+                expected_counter = Counter(expected_by_key.keys())
+                actual_counter = Counter(
+                    {key: len(values) for key, values in actual_by_key.items()}
+                )
+                matched_counter = expected_counter & actual_counter
+                expected_count = sum(expected_counter.values())
+                extracted_count = sum(actual_counter.values())
+                matched_count = sum(matched_counter.values())
+                precision, recall, f1 = _classification_metrics(
+                    expected_count, extracted_count, matched_count
+                )
+                evidence_valid_count = sum(evidence_valid_by_memory_id.values())
+                expected_evidence_matches = 0
+                for key, matched in matched_counter.items():
+                    expected = expected_by_key[key]
+                    candidates = actual_by_key[key]
+                    expected_evidence_matches += min(
+                        matched,
+                        sum(
+                            evidence_valid_by_memory_id[memory.id]
+                            and memory.evidence[0].quote == expected.evidence_quote
+                            for memory in candidates
+                        ),
+                    )
+
+                kinds: list[ExtractionKindMetrics] = []
+                for kind in ("decision", "assumption", "constraint", "alternative"):
+                    kind_expected = sum(
+                        count for key, count in expected_counter.items() if key[1] == kind
+                    )
+                    kind_extracted = sum(
+                        count for key, count in actual_counter.items() if key[1] == kind
+                    )
+                    kind_matched = sum(
+                        count for key, count in matched_counter.items() if key[1] == kind
+                    )
+                    kind_precision, kind_recall, kind_f1 = _classification_metrics(
+                        kind_expected, kind_extracted, kind_matched
+                    )
+                    kinds.append(
+                        ExtractionKindMetrics(
+                            kind=kind,
+                            expected_count=kind_expected,
+                            extracted_count=kind_extracted,
+                            matched_count=kind_matched,
+                            precision=kind_precision,
+                            recall=kind_recall,
+                            f1=kind_f1,
+                        )
+                    )
+
+                sources: list[ExtractionSourceResult] = []
+                negative_correct = 0
+                negative_count = 0
+                for item in dataset.sources:
+                    expected_for_source = sum(
+                        count for key, count in expected_counter.items() if key[0] == item.uri
+                    )
+                    extracted_for_source = sum(
+                        count for key, count in actual_counter.items() if key[0] == item.uri
+                    )
+                    matched_for_source = sum(
+                        count for key, count in matched_counter.items() if key[0] == item.uri
+                    )
+                    evidence_for_source = sum(
+                        evidence_valid_by_memory_id[memory.id]
+                        for key, source_memories in actual_by_key.items()
+                        if key[0] == item.uri
+                        for memory in source_memories
+                    )
+                    if expected_for_source == 0:
+                        negative_count += 1
+                        negative_correct += extracted_for_source == 0
+                    sources.append(
+                        ExtractionSourceResult(
+                            source_uri=item.uri,
+                            expected_count=expected_for_source,
+                            extracted_count=extracted_for_source,
+                            matched_count=matched_for_source,
+                            false_positive_count=extracted_for_source - matched_for_source,
+                            false_negative_count=expected_for_source - matched_for_source,
+                            evidence_valid_count=evidence_for_source,
+                        )
+                    )
+        finally:
+            engine.dispose()
+
+    return ExtractionEvaluationReport(
+        dataset_version=dataset.version,
+        dataset_provenance=dataset.provenance,
+        dataset_description=dataset.description,
+        source_count=len(dataset.sources),
+        negative_source_count=negative_count,
+        model_run_count=model_run_count,
+        expected_count=expected_count,
+        extracted_count=extracted_count,
+        matched_count=matched_count,
+        false_positive_count=extracted_count - matched_count,
+        false_negative_count=expected_count - matched_count,
+        precision=precision,
+        recall=recall,
+        f1=f1,
+        evidence_resolution=evidence_valid_count / extracted_count if extracted_count else 1.0,
+        expected_evidence_accuracy=(
+            expected_evidence_matches / matched_count if matched_count else 1.0
+        ),
+        negative_source_accuracy=negative_correct / negative_count if negative_count else 1.0,
+        kinds=kinds,
+        sources=sources,
+    )
+
+
+def extraction_report_meets_thresholds(
+    report: ExtractionEvaluationReport,
+    *,
+    min_precision: float = 0,
+    min_recall: float = 0,
+    min_f1: float = 0,
+    min_evidence_resolution: float = 0,
+    min_expected_evidence_accuracy: float = 0,
+    min_negative_source_accuracy: float = 0,
+) -> bool:
+    return (
+        report.model_run_count == 0
+        and report.precision >= min_precision
+        and report.recall >= min_recall
+        and report.f1 >= min_f1
+        and report.evidence_resolution >= min_evidence_resolution
+        and report.expected_evidence_accuracy >= min_expected_evidence_accuracy
+        and report.negative_source_accuracy >= min_negative_source_accuracy
     )
 
 

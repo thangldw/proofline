@@ -1,0 +1,113 @@
+{
+  "version": "extraction-seed-v1",
+  "provenance": "synthetic-marked-memory",
+  "description": "Synthetic credential-free regression fixtures for deterministic marked-memory extraction and exact evidence contracts; not real-model or pilot quality evidence.",
+  "sources": [
+    {
+      "title": "English marked memories",
+      "uri": "extraction://english/all-kinds",
+      "content": "# English architecture note\n\nDecision: Use SQLite for local metadata\nReason: It avoids another required service.\nStatus: accepted\n\nAssumption: A single writer owns the local database.\n\nConstraint: Source content must remain on the local machine.\n\nAlternative: Use PostgreSQL for a hosted team deployment.\nStatus: rejected",
+      "expected_memories": [
+        {
+          "kind": "decision",
+          "statement": "Use SQLite for local metadata",
+          "status": "accepted",
+          "evidence_quote": "Decision: Use SQLite for local metadata\nReason: It avoids another required service.\nStatus: accepted"
+        },
+        {
+          "kind": "assumption",
+          "statement": "A single writer owns the local database.",
+          "status": "active",
+          "evidence_quote": "Assumption: A single writer owns the local database."
+        },
+        {
+          "kind": "constraint",
+          "statement": "Source content must remain on the local machine.",
+          "status": "active",
+          "evidence_quote": "Constraint: Source content must remain on the local machine."
+        },
+        {
+          "kind": "alternative",
+          "statement": "Use PostgreSQL for a hosted team deployment.",
+          "status": "rejected",
+          "evidence_quote": "Alternative: Use PostgreSQL for a hosted team deployment.\nStatus: rejected"
+        }
+      ]
+    },
+    {
+      "title": "Vietnamese marked memories",
+      "uri": "extraction://vietnamese/all-kinds",
+      "content": "# Ghi chú kiến trúc\n\nQuyết định: Dùng SQLite cho dữ liệu cục bộ\nLý do: Không cần thêm dịch vụ ngoài.\nTrạng thái: accepted\n\nGiả định: Chỉ có một tiến trình ghi dữ liệu.\n\nRàng buộc: Dữ liệu không được rời khỏi máy.\n\nPhương án: Dùng PostgreSQL khi triển khai cho nhóm.",
+      "expected_memories": [
+        {
+          "kind": "decision",
+          "statement": "Dùng SQLite cho dữ liệu cục bộ",
+          "status": "accepted",
+          "evidence_quote": "Quyết định: Dùng SQLite cho dữ liệu cục bộ\nLý do: Không cần thêm dịch vụ ngoài.\nTrạng thái: accepted"
+        },
+        {
+          "kind": "assumption",
+          "statement": "Chỉ có một tiến trình ghi dữ liệu.",
+          "status": "active",
+          "evidence_quote": "Giả định: Chỉ có một tiến trình ghi dữ liệu."
+        },
+        {
+          "kind": "constraint",
+          "statement": "Dữ liệu không được rời khỏi máy.",
+          "status": "active",
+          "evidence_quote": "Ràng buộc: Dữ liệu không được rời khỏi máy."
+        },
+        {
+          "kind": "alternative",
+          "statement": "Dùng PostgreSQL khi triển khai cho nhóm.",
+          "status": "active",
+          "evidence_quote": "Phương án: Dùng PostgreSQL khi triển khai cho nhóm."
+        }
+      ]
+    },
+    {
+      "title": "CJK statements with supported markers",
+      "uri": "extraction://cjk/supported-markers",
+      "content": "# 本地架构\n\nDecision: 使用 SQLite 保存本地元数据\nReason: 不需要额外服务。\n\nConstraint: 源数据不得离开本机。",
+      "expected_memories": [
+        {
+          "kind": "decision",
+          "statement": "使用 SQLite 保存本地元数据",
+          "status": "active",
+          "evidence_quote": "Decision: 使用 SQLite 保存本地元数据\nReason: 不需要额外服务。"
+        },
+        {
+          "kind": "constraint",
+          "statement": "源数据不得离开本机。",
+          "status": "active",
+          "evidence_quote": "Constraint: 源数据不得离开本机。"
+        }
+      ]
+    },
+    {
+      "title": "Supported heading markers",
+      "uri": "extraction://headings/marked",
+      "content": "## Decision: Prefer local files\n\n## Alternative: Use object storage later\nReason: Hosted scale has not been measured.\nStatus: obsolete",
+      "expected_memories": [
+        {
+          "kind": "decision",
+          "statement": "Prefer local files",
+          "status": "active",
+          "evidence_quote": "## Decision: Prefer local files"
+        },
+        {
+          "kind": "alternative",
+          "statement": "Use object storage later",
+          "status": "obsolete",
+          "evidence_quote": "## Alternative: Use object storage later\nReason: Hosted scale has not been measured.\nStatus: obsolete"
+        }
+      ]
+    },
+    {
+      "title": "Negative non-marker prose",
+      "uri": "extraction://negative/non-markers",
+      "content": "# Discussion only\n\nThe team discussed SQLite and PostgreSQL but made no commitment.\n\nA recommendation may be written after measurements.\n\n约束条件仍在讨论中。",
+      "expected_memories": []
+    }
+  ]
+}
