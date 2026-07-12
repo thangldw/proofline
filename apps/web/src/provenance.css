@@ -17,6 +17,32 @@
   color: #69591b;
 }
 
+.context-budget-notice {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px 14px;
+  margin: 14px 0;
+  border: 1px solid #c8d8df;
+  border-radius: 8px;
+  background: #edf6f8;
+  color: #355660;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+
+.context-budget-notice span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.context-budget-notice code {
+  border-radius: 4px;
+  background: #dcebed;
+  padding: 1px 4px;
+}
+
 .integrity-error {
   background: #fff0ed;
   border-color: #ffc2b7;

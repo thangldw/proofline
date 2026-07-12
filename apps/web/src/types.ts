@@ -125,4 +125,8 @@ export type GroundedAnswer = {
   }>;
   citations: AnswerCitation[];
   model_run_id: string | null;
+  exclusions?: Array<{
+    evidence_id: string;
+    reason: "context_budget";
+  }>;
 };
