@@ -22,7 +22,8 @@ class FolderScanRequest(BaseModel):
 class FolderScanFileResult(BaseModel):
     relative_path: str
     uri: str | None = None
-    status: Literal["created", "updated", "unchanged", "failed"]
+    previous_uri: str | None = None
+    status: Literal["created", "updated", "unchanged", "renamed", "failed"]
     source_id: str | None = None
     source_version_id: str | None = None
     job_id: str | None = None
@@ -39,6 +40,7 @@ class FolderScanResponse(BaseModel):
     created_count: int
     updated_count: int
     unchanged_count: int
+    renamed_count: int
     failed_count: int
     missing_count: int
     missing_source_ids: list[str]

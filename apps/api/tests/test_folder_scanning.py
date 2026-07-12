@@ -4,6 +4,8 @@ import proofline.folder_scanning as folder_scanning
 import pytest
 from proofline.config import get_settings
 from proofline.ingestion import IngestionConflict
+from proofline.models import Chunk, Evidence, IngestionJob, Source
+from sqlalchemy import func, select
 
 
 def register_roots(monkeypatch, *roots):
@@ -94,6 +96,155 @@ def test_folder_scan_creates_skips_and_versions_unicode_source(client, monkeypat
     assert len(client.get(f"/api/v1/sources/{source_id}/versions").json()) == 2
     assert client.get("/api/v1/search", params={"q": "SQLite"}).json()["hits"] == []
     assert client.get("/api/v1/search", params={"q": "DuckDB"}).json()["hits"]
+
+
+def test_folder_scan_rename_preserves_source_identity_history_and_evidence(
+    client, session, monkeypatch, tmp_path
+):
+    root = tmp_path / "vault"
+    root.mkdir()
+    old_path = root / "old-name.md"
+    old_path.write_text("Decision: Use Kafka\nReason: initial throughput", encoding="utf-8")
+    register_roots(monkeypatch, root)
+    first = client.post("/api/v1/folder-scans", json={}).json()
+    source_id = first["files"][0]["source_id"]
+
+    old_path.write_text(
+        "Decision: Use NATS\nReason: operational simplicity",
+        encoding="utf-8",
+    )
+    updated = client.post("/api/v1/folder-scans", json={}).json()
+    current_version_id = updated["files"][0]["source_version_id"]
+    previous_uri = old_path.resolve().as_uri()
+    before = session.get(Source, source_id)
+    indexed_at_before_rename = before.indexed_at
+    chunks_before = session.scalar(
+        select(func.count()).select_from(Chunk).where(Chunk.source_id == source_id)
+    )
+    evidence_before = session.scalar(
+        select(func.count()).select_from(Evidence).where(Evidence.source_id == source_id)
+    )
+    jobs_before = session.scalar(select(func.count()).select_from(IngestionJob))
+
+    new_path = root / "renamed-architecture.txt"
+    old_path.rename(new_path)
+    report = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert report["created_count"] == 0
+    assert report["updated_count"] == 0
+    assert report["renamed_count"] == 1
+    assert report["missing_count"] == 0
+    result = report["files"][0]
+    assert result["status"] == "renamed"
+    assert result["source_id"] == source_id
+    assert result["source_version_id"] == current_version_id
+    assert result["uri"] == new_path.resolve().as_uri()
+    assert result["previous_uri"] == previous_uri
+    assert result["job_id"] is None
+
+    source = client.get(f"/api/v1/sources/{source_id}").json()
+    assert source["title"] == "renamed-architecture.txt"
+    assert source["kind"] == "text"
+    assert source["uri"] == new_path.resolve().as_uri()
+    assert source["current_version_id"] == current_version_id
+    assert len(client.get(f"/api/v1/sources/{source_id}/versions").json()) == 2
+    session.expire_all()
+    persisted = session.get(Source, source_id)
+    assert persisted.indexed_at > indexed_at_before_rename
+    assert (
+        session.scalar(select(func.count()).select_from(Chunk).where(Chunk.source_id == source_id))
+        == chunks_before
+    )
+    assert (
+        session.scalar(
+            select(func.count()).select_from(Evidence).where(Evidence.source_id == source_id)
+        )
+        == evidence_before
+    )
+    assert session.scalar(select(func.count()).select_from(IngestionJob)) == jobs_before
+    hits = client.get("/api/v1/search", params={"q": "operational simplicity"}).json()["hits"]
+    assert hits[0]["source_id"] == source_id
+    assert hits[0]["source_title"] == "renamed-architecture.txt"
+    audit = client.get(
+        "/api/v1/audit-events",
+        params={"object_type": "source", "object_id": source_id},
+    ).json()
+    assert len(audit) == 1
+    assert audit[0]["action"] == "source.renamed"
+    assert audit[0]["before_json"] == {
+        "uri": previous_uri,
+        "title": "old-name.md",
+        "kind": "markdown",
+        "current_version_id": current_version_id,
+    }
+    assert audit[0]["after_json"] == {
+        "uri": new_path.resolve().as_uri(),
+        "title": "renamed-architecture.txt",
+        "kind": "text",
+        "current_version_id": current_version_id,
+    }
+    impact = client.get(f"/api/v1/sources/{source_id}/deletion-impact").json()
+    assert impact["audit_events_to_delete"] == 1
+    assert client.delete(f"/api/v1/sources/{source_id}").status_code == 204
+    assert (
+        client.get(
+            "/api/v1/audit-events",
+            params={"object_type": "source", "object_id": source_id},
+        ).json()
+        == []
+    )
+
+
+def test_folder_scan_does_not_guess_ambiguous_identical_renames(client, monkeypatch, tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    content = "Decision: Keep identical content distinct"
+    first_path = root / "first.md"
+    second_path = root / "second.md"
+    first_path.write_text(content, encoding="utf-8")
+    second_path.write_text(content, encoding="utf-8")
+    register_roots(monkeypatch, root)
+    first_scan = client.post("/api/v1/folder-scans", json={}).json()
+    original_ids = {item["source_id"] for item in first_scan["files"]}
+    assert len(original_ids) == 2
+
+    first_path.unlink()
+    second_path.unlink()
+    replacement = root / "replacement.md"
+    replacement.write_text(content, encoding="utf-8")
+    report = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert report["renamed_count"] == 0
+    assert report["created_count"] == 1
+    assert report["missing_count"] == 2
+    assert set(report["missing_source_ids"]) == original_ids
+    assert report["files"][0]["status"] == "created"
+    assert report["files"][0]["previous_uri"] is None
+    assert report["files"][0]["source_id"] not in original_ids
+    assert len(client.get("/api/v1/sources").json()) == 3
+
+
+def test_folder_scan_does_not_choose_between_two_identical_new_paths(client, monkeypatch, tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    content = "Decision: Avoid guessing a rename target"
+    original = root / "original.md"
+    original.write_text(content, encoding="utf-8")
+    register_roots(monkeypatch, root)
+    original_scan = client.post("/api/v1/folder-scans", json={}).json()
+    original_id = original_scan["files"][0]["source_id"]
+
+    original.unlink()
+    (root / "candidate-a.md").write_text(content, encoding="utf-8")
+    (root / "candidate-b.md").write_text(content, encoding="utf-8")
+    report = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert report["renamed_count"] == 0
+    assert report["created_count"] == 2
+    assert report["missing_source_ids"] == [original_id]
+    assert all(item["status"] == "created" for item in report["files"])
+    assert all(item["previous_uri"] is None for item in report["files"])
+    assert len(client.get("/api/v1/sources").json()) == 3
 
 
 def test_folder_scan_continues_after_safe_per_file_failures(client, monkeypatch, tmp_path):
