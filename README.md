@@ -38,7 +38,7 @@ spans, and generated output can only cite evidence IDs issued by the server.
 
 ## First vertical slice
 
-The initial executable slice deliberately excludes LLM generation:
+The deterministic core runs without an LLM or external service:
 
 1. ingest a Markdown source;
 2. preserve its content hash and source locations;
@@ -48,11 +48,15 @@ The initial executable slice deliberately excludes LLM generation:
 6. index the current version locally with SQLite FTS5;
 7. search, browse decisions, and inspect exact historical evidence in the web UI.
 
-This establishes the evidence contract that decision extraction, hybrid
-retrieval, and grounded answers will build on.
+This establishes the evidence contract used by the optional model gateway,
+hybrid retrieval, governed candidate extraction, and grounded answers.
 
 Every ingestion request also creates an inspectable job record. Terminal failures retain a safe
 error code and stage without copying source content into diagnostic fields.
+
+The API can also scan explicitly registered local roots for Markdown and UTF-8 text. Folder access
+is disabled by default, path traversal and symlink escapes are rejected, and missing files are
+reported for review rather than deleted automatically.
 
 Decisions can be accepted, rejected, corrected, or marked obsolete. Every change records a
 before/after audit event while retaining the original source evidence; complete source deletion
@@ -122,6 +126,19 @@ make test
 make check
 make eval
 ```
+
+Folder access is disabled unless roots are explicitly registered. Use the operating-system path
+separator (`:` on Unix-like systems, `;` on Windows), restart the API, then request a scan:
+
+```bash
+export PROOFLINE_IMPORT_ROOTS="/absolute/path/to/engineering-docs"
+curl -X POST http://localhost:8000/api/v1/folder-scans \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Only `.md`, `.markdown`, and `.txt` files are read. Missing files are reported for review and are
+not deleted by a scan.
 
 AI is disabled by default. A local OpenAI-compatible endpoint can be configured with
 `PROOFLINE_AI_PROVIDER=openai_compatible`, `PROOFLINE_AI_BASE_URL`, and

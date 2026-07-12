@@ -27,13 +27,15 @@ Before delivery work, record:
   build checks. This scaffold and the first deterministic vertical slice are implemented.
 - Reproducible local setup and CI that needs no provider credentials.
 - A versioned evaluation corpus derived from real questions.
-- A threat sketch for local files, local API, provider egress, and model output.
+- A threat sketch for local files, local API, provider egress, and model output. The baseline
+  repository threat model and CI secret scan are implemented.
 
 ### Planned work
 
 - Keep ADR-0001 aligned with implementation.
-- Maintain Python formatting/linting/tests and the web TypeScript production build; add migration
-  tests, web behavior tests, and secret scanning.
+- Maintain Python formatting/linting/tests, web behavior tests, the TypeScript production build,
+  migration tests, and secret scanning. These automated foundations are implemented; corpus and
+  pilot evidence remain open.
 - Establish contracts for source identity, source versions, spans, jobs, and model runs.
 - Extend the implemented synthetic ADR retrieval corpus with CJK, revision cases, and a
   permissioned real-question dataset.
@@ -59,8 +61,9 @@ Before delivery work, record:
 
 ### Planned work
 
-- Harden Markdown/text upload and add safe registered-root folder scanning only if required by
-  the active milestone.
+- Harden Markdown/text upload and safe registered-root folder scanning. On-demand scanning,
+  containment checks, deterministic ordering, immutable updates, and missing-file preview are
+  implemented; watching and confirmed deletion remain open.
 - Harden the implemented immutable source versioning and explicit SQLite migrations with crash,
   concurrency, and larger legacy-database fixtures.
 - Harden the implemented FTS5 lexical search and exact-span contract.

@@ -69,8 +69,10 @@ Synchronous ingestion attempts persist inspectable success/failure jobs without 
 content in error records. Decisions support governed status/correction actions with an append-only
 before/after audit trail. A provider-neutral gateway supports fake and OpenAI-compatible generation
 with remote egress disabled by default and secret-safe model-run diagnostics. It does **not** yet
-implement job retries, folder watching, scalable vector retrieval, AI-derived candidate creation,
-grounded-answer repair retries, or desktop packaging. The current hybrid answer path combines
+implement job retries, folder watching, scalable vector retrieval, generalized memory extraction,
+grounded-answer repair retries, or desktop packaging. Registered-root folder scans are available
+for explicit, on-demand Markdown/text import; missing files are previewed but never silently
+deleted. The current hybrid answer path combines
 lexical and dense retrieval through RRF and enforces server-owned evidence IDs plus exact immutable
 citations. Dense scoring is intentionally bounded and not yet a large-vault performance claim.
 Generation providers can also create decision candidates, but only after structured-output and
