@@ -4,7 +4,7 @@ import proofline.folder_scanning as folder_scanning
 import pytest
 from proofline.config import get_settings
 from proofline.ingestion import IngestionConflict
-from proofline.models import Chunk, Evidence, IngestionJob, Source
+from proofline.models import Chunk, Evidence, IngestionJob, Source, SourceVersion
 from sqlalchemy import func, select
 
 
@@ -80,11 +80,14 @@ def test_folder_scan_creates_skips_and_versions_unicode_source(client, monkeypat
     assert first["files"][0]["uri"] == source_path.resolve().as_uri()
     source_id = first["files"][0]["source_id"]
     first_version_id = first["files"][0]["source_version_id"]
+    first_job_id = first["files"][0]["job_id"]
     assert client.get(f"/api/v1/sources/{source_id}").json()["content"] == first_content
 
     unchanged = client.post("/api/v1/folder-scans", json={}).json()
     assert unchanged["unchanged_count"] == 1
     assert unchanged["files"][0]["source_version_id"] == first_version_id
+    assert unchanged["files"][0]["job_id"] is None
+    assert [job["id"] for job in client.get("/api/v1/jobs").json()] == [first_job_id]
     assert len(client.get(f"/api/v1/sources/{source_id}/versions").json()) == 1
 
     second_content = "# ADR\n\nQuyết định: Dùng DuckDB\nLý do: hỗ trợ phân tích local."
@@ -96,6 +99,65 @@ def test_folder_scan_creates_skips_and_versions_unicode_source(client, monkeypat
     assert len(client.get(f"/api/v1/sources/{source_id}/versions").json()) == 2
     assert client.get("/api/v1/search", params={"q": "SQLite"}).json()["hits"] == []
     assert client.get("/api/v1/search", params={"q": "DuckDB"}).json()["hits"]
+
+
+def test_folder_scan_rejects_file_changed_during_read_then_retries_cleanly(
+    client, session, monkeypatch, tmp_path
+):
+    root = tmp_path / "vault"
+    root.mkdir()
+    source_path = root / "partial.md"
+    original = "Decision: Keep immutable evidence\nReason: stable input"
+    replacement = "Decision: Retry stable evidence\nReason: complete write"
+    source_path.write_text(original, encoding="utf-8")
+    register_roots(monkeypatch, root)
+    created = client.post("/api/v1/folder-scans", json={}).json()
+    source_id = created["files"][0]["source_id"]
+    version_id = created["files"][0]["source_version_id"]
+    job_count = session.scalar(select(func.count()).select_from(IngestionJob))
+    version_count = session.scalar(select(func.count()).select_from(SourceVersion))
+    evidence_before = list(
+        session.scalars(select(Evidence).where(Evidence.source_id == source_id)).all()
+    )
+
+    real_read_bytes = folder_scanning.Path.read_bytes
+    mutated = False
+
+    def mutate_after_read(path):
+        nonlocal mutated
+        content = real_read_bytes(path)
+        if path == source_path.resolve() and not mutated:
+            mutated = True
+            source_path.write_text(replacement, encoding="utf-8")
+        return content
+
+    monkeypatch.setattr(folder_scanning.Path, "read_bytes", mutate_after_read)
+    failed = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert failed["failed_count"] == 1
+    assert failed["files"][0]["error_code"] == "file_changed_during_read"
+    assert failed["files"][0]["job_id"] is None
+    assert session.scalar(select(func.count()).select_from(IngestionJob)) == job_count
+    assert session.scalar(select(func.count()).select_from(SourceVersion)) == version_count
+    session.expire_all()
+    source = session.get(Source, source_id)
+    assert source.current_version_id == version_id
+    assert source.content == original
+    evidence_after_failure = list(
+        session.scalars(select(Evidence).where(Evidence.source_id == source_id)).all()
+    )
+    assert [item.id for item in evidence_after_failure] == [item.id for item in evidence_before]
+    assert all(item.source_version_id == version_id for item in evidence_after_failure)
+
+    monkeypatch.setattr(folder_scanning.Path, "read_bytes", real_read_bytes)
+    retried = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert retried["updated_count"] == 1
+    assert retried["failed_count"] == 0
+    assert retried["files"][0]["source_id"] == source_id
+    assert retried["files"][0]["source_version_id"] != version_id
+    assert retried["files"][0]["job_id"] is not None
+    assert client.get(f"/api/v1/sources/{source_id}").json()["content"] == replacement
 
 
 def test_folder_scan_rename_preserves_source_identity_history_and_evidence(

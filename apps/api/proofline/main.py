@@ -11,6 +11,8 @@ from . import __version__
 from .api import router
 from .config import get_settings
 from .database import engine, initialize_database
+from .folder_scanning import FolderScanCoordinator
+from .folder_watching import FolderWatcher
 from .ingestion import recover_orphaned_ingestion_jobs
 
 
@@ -20,7 +22,21 @@ def create_app(database_engine: Engine = engine) -> FastAPI:
         initialize_database(database_engine)
         with Session(database_engine) as recovery_session:
             recover_orphaned_ingestion_jobs(recovery_session)
-        yield
+        settings = get_settings()
+        folder_scan_coordinator = FolderScanCoordinator()
+        folder_watcher = FolderWatcher(
+            database_engine,
+            settings.import_roots,
+            settings.folder_watch_interval_seconds,
+            folder_scan_coordinator,
+        )
+        _app.state.folder_scan_coordinator = folder_scan_coordinator
+        _app.state.folder_watcher = folder_watcher
+        await folder_watcher.start()
+        try:
+            yield
+        finally:
+            await folder_watcher.stop()
 
     application = FastAPI(
         title="Proofline API",

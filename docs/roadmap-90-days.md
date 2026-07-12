@@ -66,7 +66,9 @@ Before delivery work, record:
 
 - Harden Markdown/text upload and safe registered-root folder scanning. On-demand scanning,
   containment checks, deterministic ordering, immutable updates, audited unambiguous rename, and
-  missing-file preview plus exact-set confirmed deletion are implemented; watching remains open.
+  missing-file preview plus exact-set confirmed deletion are implemented. An opt-in process-local
+  polling watcher now runs the same scan sequentially with fresh sessions and preview-only deletion;
+  native filesystem notifications and multi-worker coordination remain open.
 - Harden the implemented immutable source versioning and explicit SQLite migrations. Atomic crash
   rollback, v7-to-v8 backfill, startup recovery, idempotency, and stale-claim concurrency are
   tested. A large legacy-database fixture now exercises provenance backfill, idempotent re-open,

@@ -75,6 +75,28 @@ class FolderScanResponse(BaseModel):
     files: list[FolderScanFileResult]
 
 
+class FolderWatchStatus(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    enabled: bool
+    running: bool
+    scan_in_progress: bool
+    interval_seconds: int = Field(ge=0, le=3600)
+    registered_root_count: int = Field(ge=0)
+    completed_cycles: int = Field(ge=0)
+    last_started_at: datetime | None
+    last_completed_at: datetime | None
+    last_error_code: str | None
+    last_root_error_count: int = Field(ge=0)
+    last_discovered_count: int = Field(ge=0)
+    last_created_count: int = Field(ge=0)
+    last_updated_count: int = Field(ge=0)
+    last_unchanged_count: int = Field(ge=0)
+    last_renamed_count: int = Field(ge=0)
+    last_failed_count: int = Field(ge=0)
+    last_missing_count: int = Field(ge=0)
+
+
 class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

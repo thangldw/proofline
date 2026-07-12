@@ -19,6 +19,22 @@ class Settings:
     embedding_model: str | None = None
     embedding_api_key: str | None = None
     allow_remote_ai: bool = False
+    folder_watch_interval_seconds: int = 0
+
+
+def _folder_watch_interval() -> int:
+    raw_value = os.getenv("PROOFLINE_FOLDER_WATCH_INTERVAL_SECONDS", "0")
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(
+            "PROOFLINE_FOLDER_WATCH_INTERVAL_SECONDS must be 0 or an integer from 1 to 3600"
+        ) from exc
+    if value < 0 or value > 3600:
+        raise ValueError(
+            "PROOFLINE_FOLDER_WATCH_INTERVAL_SECONDS must be 0 or an integer from 1 to 3600"
+        )
+    return value
 
 
 def get_settings() -> Settings:
@@ -51,4 +67,5 @@ def get_settings() -> Settings:
         embedding_model=os.getenv("PROOFLINE_EMBEDDING_MODEL"),
         embedding_api_key=os.getenv("PROOFLINE_EMBEDDING_API_KEY"),
         allow_remote_ai=allow_remote_ai,
+        folder_watch_interval_seconds=_folder_watch_interval(),
     )
