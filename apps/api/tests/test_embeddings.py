@@ -1,5 +1,13 @@
+import math
+
 import proofline.embeddings as embeddings_module
-from proofline.embeddings import hybrid_search, index_current_embeddings
+import pytest
+from proofline.embeddings import (
+    cosine_similarity,
+    hybrid_search,
+    index_current_embeddings,
+    semantic_search,
+)
 from proofline.ingestion import delete_source, ingest_source
 from proofline.model_gateway import FakeEmbeddingProvider
 from proofline.models import Chunk, ChunkEmbedding
@@ -87,6 +95,103 @@ def test_old_version_embeddings_are_excluded_from_semantic_search(session):
     hits = hybrid_search(session, "legacy streaming platform", provider, 5)
 
     assert all(hit.chunk_id != old_chunk.id for hit in hits)
+
+
+def test_cosine_similarity_rejects_invalid_vectors_and_preserves_opposites():
+    assert cosine_similarity([1.0, 0.0], [-1.0, 0.0]) == -1.0
+    assert cosine_similarity([1.0], [1.0, 0.0]) is None
+    assert cosine_similarity([], []) is None
+    assert cosine_similarity([0.0, 0.0], [1.0, 0.0]) is None
+    assert cosine_similarity([math.nan, 0.0], [1.0, 0.0]) is None
+    assert cosine_similarity([math.inf, 0.0], [1.0, 0.0]) is None
+    assert cosine_similarity([1e308, 1e308], [1e308, 1e308]) == pytest.approx(1.0)
+
+
+def test_semantic_threshold_includes_equality_and_orders_ties_deterministically(session):
+    for title, uri in [("Alpha", "file:///alpha.md"), ("Beta", "file:///beta.md")]:
+        ingest_source(
+            session,
+            SourceCreate(title=title, uri=uri, content=f"Decision: retain {title} context."),
+        )
+    chunks = list(session.scalars(select(Chunk)).all())
+    vectors = {chunk.content: [0.6, 0.8] for chunk in chunks}
+    vectors["semantic-only query"] = [1.0, 0.0]
+    provider = FakeEmbeddingProvider(vectors)
+    index_current_embeddings(session, provider)
+
+    first = semantic_search(
+        session, "semantic-only query", provider, limit=10, min_semantic_score=0.6
+    )
+    second = semantic_search(
+        session, "semantic-only query", provider, limit=10, min_semantic_score=0.6
+    )
+    excluded = semantic_search(
+        session, "semantic-only query", provider, limit=10, min_semantic_score=0.600001
+    )
+
+    assert len(first) == 2
+    assert [hit.chunk_id for hit in second] == [hit.chunk_id for hit in first]
+    assert [hit.chunk_id for hit in first] == sorted(hit.chunk_id for hit in first)
+    assert all(hit.semantic_score == pytest.approx(0.6) for hit in first)
+    assert excluded == []
+
+
+def test_legacy_invalid_embedding_is_skipped_while_valid_hit_remains(session):
+    first, _ = ingest_source(
+        session,
+        SourceCreate(title="First", uri="file:///first.md", content="First architecture note."),
+    )
+    second, _ = ingest_source(
+        session,
+        SourceCreate(title="Second", uri="file:///second.md", content="Second architecture note."),
+    )
+    chunks = list(session.scalars(select(Chunk)).all())
+    vectors = {
+        chunk.content: [1.0, 0.0] if chunk.source_id == first.id else [0.0, 1.0] for chunk in chunks
+    }
+    vectors["semantic-only lookup"] = [0.0, 1.0]
+    provider = FakeEmbeddingProvider(vectors)
+    index_current_embeddings(session, provider)
+    corrupt = session.scalar(select(ChunkEmbedding).where(ChunkEmbedding.source_id == first.id))
+    corrupt.vector_json = [0.0, 0.0]
+    session.commit()
+
+    hits = semantic_search(session, "semantic-only lookup", provider, limit=10)
+
+    assert [hit.source_id for hit in hits] == [second.id]
+
+
+def test_lexical_match_survives_below_semantic_floor(session):
+    source, _ = ingest_source(
+        session,
+        SourceCreate(
+            title="Lexical ADR",
+            uri="file:///lexical.md",
+            content="Decision: preserve the exact lexical anchor.",
+        ),
+    )
+    chunk = session.scalar(select(Chunk).where(Chunk.source_id == source.id))
+    provider = FakeEmbeddingProvider(
+        {chunk.content: [1.0, 0.0], "exact lexical anchor": [-1.0, 0.0]}
+    )
+    index_current_embeddings(session, provider)
+
+    hits = hybrid_search(
+        session,
+        "exact lexical anchor",
+        provider,
+        limit=5,
+        min_semantic_score=0.0,
+    )
+
+    assert [hit.chunk_id for hit in hits] == [chunk.id]
+    assert hits[0].retrieval_channels == ["lexical"]
+    assert hits[0].semantic_score is None
+    assert hits[0].content == chunk.content
+    assert (hits[0].start_offset, hits[0].end_offset) == (
+        chunk.start_offset,
+        chunk.end_offset,
+    )
 
 
 def search_hit(chunk_id: str, source_id: str, rank: float = -1.0) -> SearchHit:
