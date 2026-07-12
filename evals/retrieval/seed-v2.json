@@ -1,0 +1,112 @@
+{
+  "version": "retrieval-seed-v2",
+  "provenance": "synthetic-versioned-unicode",
+  "description": "Synthetic credential-free retrieval regression corpus for Unicode lexical matching and current-version-only behavior; not pilot relevance evidence.",
+  "sources": [
+    {
+      "title": "Japanese queue revision",
+      "uri": "eval-v2://revision/japanese-queue",
+      "content": "# キュー旧版\n\nDecision: 旧式キュー を採用する。\nReason: alphaold は旧版だけの識別子です。",
+      "revisions": ["# キュー現行版\n\nDecision: 新式キュー を採用する。\nReason: alphanew は現行版だけの識別子です。"]
+    },
+    {
+      "title": "Vietnamese database revision",
+      "uri": "eval-v2://revision/vietnamese-database",
+      "content": "# Cơ sở dữ liệu cũ\n\nQuyết định: Dùng CSDL-Cũ cho metadata.\nLý do: betaold chỉ có trong bản cũ.",
+      "revisions": ["# Cơ sở dữ liệu hiện tại\n\nQuyết định: Dùng CSDL-Mới cho metadata.\nLý do: betanew chỉ có trong bản hiện tại."]
+    },
+    {
+      "title": "Chinese identity revision",
+      "uri": "eval-v2://revision/chinese-identity",
+      "content": "# 旧身份方案\n\nDecision: 使用旧身份令牌。\nReason: gammaold 仅存在于旧版本。",
+      "revisions": ["# 当前身份方案\n\nDecision: 使用联合身份令牌。\nReason: gammanew 仅存在于当前版本。"]
+    },
+    {
+      "title": "Korean deployment revision",
+      "uri": "eval-v2://revision/korean-deployment",
+      "content": "# 이전 배포\n\nDecision: 이전클러스터 배포를 사용한다.\nReason: deltaold 는 이전 버전에만 있다.",
+      "revisions": ["# 현재 배포\n\nDecision: 로컬컴포즈 배포를 사용한다.\nReason: deltanew 는 현재 버전에만 있다."]
+    },
+    {
+      "title": "English cache revision",
+      "uri": "eval-v2://revision/english-cache",
+      "content": "# Old cache\n\nDecision: Use LegacyCache for metadata.\nReason: epsilonold exists only in the superseded revision.",
+      "revisions": ["# Current cache\n\nDecision: Use LocalCache for metadata.\nReason: epsilonnew exists only in the current revision."]
+    },
+    {
+      "title": "Japanese tracing revision",
+      "uri": "eval-v2://revision/japanese-tracing",
+      "content": "# 旧トレース\n\nDecision: 旧式追跡 を使う。\nReason: zetaold は置換前の語です。",
+      "revisions": ["# 現行トレース\n\nDecision: 統合追跡 を使う。\nReason: zetanew は現行だけの語です。"]
+    },
+    {
+      "title": "Chinese analytics revision",
+      "uri": "eval-v2://revision/chinese-analytics",
+      "content": "# 旧分析引擎\n\nDecision: 使用旧分析引擎。\nReason: etaold 是历史标记。",
+      "revisions": ["# 当前分析引擎\n\nDecision: 使用本地分析引擎。\nReason: etanew 是当前标记。"]
+    },
+    {
+      "title": "Vietnamese sync revision",
+      "uri": "eval-v2://revision/vietnamese-sync",
+      "content": "# Đồng bộ cũ\n\nQuyết định: Dùng ĐồngBộ-Cũ.\nLý do: thetaold thuộc phiên bản đã thay thế.",
+      "revisions": ["# Đồng bộ hiện tại\n\nQuyết định: Dùng ĐồngBộ-Mới.\nLý do: thetanew thuộc phiên bản hiện tại."]
+    },
+    {
+      "title": "English broker revision",
+      "uri": "eval-v2://revision/english-broker",
+      "content": "# Superseded broker\n\nDecision: Use RetiredBroker for events.\nReason: iotaold belongs only to the superseded source version.",
+      "revisions": ["# Current broker\n\nDecision: Use ActiveBroker for events.\nReason: iotanew belongs only to the current source version."]
+    },
+    {
+      "title": "Japanese encoding revision",
+      "uri": "eval-v2://revision/japanese-encoding",
+      "content": "# 旧文字コード\n\nDecision: 旧式文字コード を使う。\nReason: kappaold は旧版固有です。",
+      "revisions": ["# 現在の文字コード\n\nDecision: 統一文字コード を使う。\nReason: kappanew は現行版固有です。"]
+    },
+    {
+      "title": "Chinese local-data constraint",
+      "uri": "eval-v2://unicode/chinese-constraint",
+      "content": "# 数据边界\n\nConstraint: 源数据不得离开本机。\nReason: lambda-current 标识本地数据约束。"
+    },
+    {
+      "title": "Vietnamese writer assumption",
+      "uri": "eval-v2://unicode/vietnamese-assumption",
+      "content": "# Giả định ghi dữ liệu\n\nGiả định: Chỉ một tiến trình ghi dữ liệu.\nLý do: mu-current xác định mô hình ghi cục bộ."
+    },
+    {
+      "title": "Japanese storage alternative",
+      "uri": "eval-v2://unicode/japanese-alternative",
+      "content": "# 保存方法\n\nAlternative: 将来は オブジェクト保存 を検討する。\nReason: nu-current は代替案の識別子です。"
+    }
+  ],
+  "queries": [
+    {"id": "v2-p01-current-ja", "question": "新式キュー alphanew", "relevance": {"eval-v2://revision/japanese-queue": 3}},
+    {"id": "v2-p02-current-vi", "question": "CSDL-Mới betanew", "relevance": {"eval-v2://revision/vietnamese-database": 3}},
+    {"id": "v2-p03-current-zh", "question": "联合身份令牌 gammanew", "relevance": {"eval-v2://revision/chinese-identity": 3}},
+    {"id": "v2-p04-current-ko", "question": "로컬컴포즈 deltanew", "relevance": {"eval-v2://revision/korean-deployment": 3}},
+    {"id": "v2-p05-current-en", "question": "LocalCache epsilonnew", "relevance": {"eval-v2://revision/english-cache": 3}},
+    {"id": "v2-p06-current-ja", "question": "統合追跡 zetanew", "relevance": {"eval-v2://revision/japanese-tracing": 3}},
+    {"id": "v2-p07-current-zh", "question": "本地分析引擎 etanew", "relevance": {"eval-v2://revision/chinese-analytics": 3}},
+    {"id": "v2-p08-current-vi", "question": "ĐồngBộ-Mới thetanew", "relevance": {"eval-v2://revision/vietnamese-sync": 3}},
+    {"id": "v2-p09-current-en", "question": "ActiveBroker iotanew", "relevance": {"eval-v2://revision/english-broker": 3}},
+    {"id": "v2-p10-current-ja", "question": "統一文字コード kappanew", "relevance": {"eval-v2://revision/japanese-encoding": 3}},
+
+    {"id": "v2-n01-old-ja", "question": "旧式キュー alphaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n02-old-vi", "question": "CSDL-Cũ betaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n03-old-zh", "question": "旧身份令牌 gammaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n04-old-ko", "question": "이전클러스터 deltaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n05-old-en", "question": "LegacyCache epsilonold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n06-old-ja", "question": "旧式追跡 zetaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n07-old-zh", "question": "旧分析引擎 etaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n08-old-vi", "question": "ĐồngBộ-Cũ thetaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n09-old-en", "question": "RetiredBroker iotaold", "relevance": {}, "expected_empty": true},
+    {"id": "v2-n10-old-ja", "question": "旧式文字コード kappaold", "relevance": {}, "expected_empty": true},
+
+    {"id": "v2-p11-unicode-zh", "question": "源数据不得离开本机 lambda-current", "relevance": {"eval-v2://unicode/chinese-constraint": 3}},
+    {"id": "v2-p12-unicode-vi", "question": "một tiến trình ghi dữ liệu mu-current", "relevance": {"eval-v2://unicode/vietnamese-assumption": 3}},
+    {"id": "v2-p13-unicode-ja", "question": "オブジェクト保存 nu-current", "relevance": {"eval-v2://unicode/japanese-alternative": 3}},
+    {"id": "v2-p14-current-token", "question": "alphanew", "relevance": {"eval-v2://revision/japanese-queue": 3}},
+    {"id": "v2-p15-current-token", "question": "gammanew", "relevance": {"eval-v2://revision/chinese-identity": 3}},
+    {"id": "v2-p16-current-token", "question": "thetanew", "relevance": {"eval-v2://revision/vietnamese-sync": 3}}
+  ]
+}

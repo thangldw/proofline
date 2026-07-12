@@ -36,9 +36,105 @@ def test_seed_dataset_is_reproducible_and_clearly_synthetic():
     assert report.dataset_version == "seed-v1"
     assert report.dataset_provenance == "synthetic"
     assert report.query_count == 15
+    assert report.positive_query_count == 15
+    assert report.expected_empty_query_count == 0
+    assert report.expected_empty_accuracy == 1
     assert report.recall_at_k >= 0.8
     assert report.ndcg_at_k >= 0.8
     assert any(not query.retrieved_source_uris for query in report.queries)
+
+
+def test_versioned_unicode_retrieval_v2_excludes_old_terms_without_diluting_mrr():
+    root = Path(__file__).resolve().parents[3]
+    dataset = root / "evals/retrieval/seed-v2.json"
+
+    report = evaluate_dataset(dataset)
+
+    assert report.dataset_version == "retrieval-seed-v2"
+    assert report.dataset_provenance == "synthetic-versioned-unicode"
+    assert report.query_count == 26
+    assert report.positive_query_count == 16
+    assert report.expected_empty_query_count == 10
+    assert report.expected_empty_accuracy == 1
+    assert report.recall_at_k == 1
+    assert report.mrr == 1
+    assert report.ndcg_at_k == 1
+    old_queries = [query for query in report.queries if query.expected_empty]
+    current_queries = [query for query in report.queries if not query.expected_empty]
+    assert len(old_queries) == 10
+    assert all(query.retrieved_source_uris == [] for query in old_queries)
+    assert all(query.empty_result_correct is True for query in old_queries)
+    assert all(query.reciprocal_rank == 0 for query in old_queries)
+    assert all(query.retrieved_source_uris for query in current_queries)
+    assert any("unicode/chinese" in query.retrieved_source_uris[0] for query in current_queries)
+    assert any("unicode/vietnamese" in query.retrieved_source_uris[0] for query in current_queries)
+    assert any("unicode/japanese" in query.retrieved_source_uris[0] for query in current_queries)
+
+
+def test_expected_empty_metrics_are_separate_from_positive_ranking_metrics():
+    correct = query_metrics("negative-correct", [], {}, 10, expected_empty=True)
+    incorrect = query_metrics(
+        "negative-incorrect",
+        ["source://unexpected"],
+        {},
+        10,
+        expected_empty=True,
+    )
+
+    assert correct.empty_result_correct is True
+    assert incorrect.empty_result_correct is False
+    assert correct.reciprocal_rank == incorrect.reciprocal_rank == 0
+    assert correct.ndcg_at_k == incorrect.ndcg_at_k == 0
+
+
+def test_v2_cli_fails_when_an_obsolete_term_resolves(tmp_path, capsys):
+    root = Path(__file__).resolve().parents[3]
+    payload = json.loads((root / "evals/retrieval/seed-v2.json").read_text(encoding="utf-8"))
+    negative = next(query for query in payload["queries"] if query.get("expected_empty"))
+    negative["question"] = "alphanew"
+    dataset = tmp_path / "negative-regression.json"
+    dataset.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(SystemExit) as raised:
+        main(
+            [
+                "eval",
+                "--dataset",
+                str(dataset),
+                "--min-expected-empty-accuracy",
+                "1.0",
+            ]
+        )
+
+    assert raised.value.code == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["expected_empty_accuracy"] == pytest.approx(0.9)
+    failed = next(query for query in output["queries"] if query["query_id"] == negative["id"])
+    assert failed["empty_result_correct"] is False
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--min-recall", "nan"],
+        ["--min-recall", "-0.1"],
+        ["--min-ndcg", "1.1"],
+        ["--min-expected-empty-accuracy", "inf"],
+    ],
+)
+def test_retrieval_cli_rejects_invalid_thresholds(arguments, capsys):
+    with pytest.raises(SystemExit) as raised:
+        main(
+            [
+                "eval",
+                "--dataset",
+                "evals/retrieval/seed-v2.json",
+                *arguments,
+            ]
+        )
+
+    assert raised.value.code == 2
+    assert "usage:" in capsys.readouterr().err
 
 
 def test_percentile_uses_linear_interpolation():

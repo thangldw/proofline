@@ -2,10 +2,11 @@
 
 Evaluation datasets are versioned inputs, not product marketing claims.
 
-`retrieval/seed-v1.json` is a synthetic regression corpus. It proves that the evaluation runner,
-real SQLite migrations, ingestion, and retrieval can be reproduced in CI. It deliberately includes
-three paraphrase queries with no lexical overlap so the baseline records the known gap that semantic
-retrieval must close.
+`retrieval/seed-v1.json` remains the immutable first synthetic lexical baseline, including three
+paraphrase queries that record its known lexical-overlap gap. `retrieval/seed-v2.json` is the current
+credential-free gate. V2 has 26 queries, Unicode lexical cases, and ten sources with an initial and
+current revision. Each revision pair has a positive current-term query and an `expected_empty`
+superseded-term query.
 
 Run the current gate with:
 
@@ -13,9 +14,12 @@ Run the current gate with:
 make eval
 ```
 
-The dataset records graded relevance at source URI level. The runner reports Recall@k,
-Precision@k, reciprocal rank, and nDCG@k after deduplicating chunk hits by source. Add a new dataset
-version instead of rewriting historical judgments.
+Positive queries retain graded relevance at source URI level. The runner reports Recall@k,
+Precision@k, reciprocal rank, and nDCG@k after deduplicating chunk hits by source. Expected-empty
+queries instead contribute only to `expected_empty_accuracy`; they are deliberately excluded from
+positive-query MRR/nDCG aggregation. This prevents a correct empty result from either lowering MRR
+or being mislabeled as a relevant retrieval. Add a new dataset version instead of rewriting
+historical judgments.
 
 The synthetic corpus does not satisfy the roadmap requirement for at least 25 real pilot questions.
 That dataset must be collected with permission, sanitized, labeled with source evidence, and marked
