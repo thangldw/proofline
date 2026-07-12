@@ -5,13 +5,22 @@ import math
 import tempfile
 import time
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, Field
-from sqlalchemy import text
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .database import initialize_database, make_engine
+from .grounding import GroundingValidationError, answer_question
 from .ingestion import ingest_source
+from .model_gateway import (
+    GenerationRequest,
+    GenerationResult,
+    ProviderRequestError,
+    StructuredOutputError,
+)
+from .models import ModelRun
 from .retrieval import lexical_search
 from .schemas import SourceCreate
 
@@ -73,6 +82,151 @@ class LexicalBenchmarkReport(BaseModel):
     result_limit: int
     latency_unit: str
     latency: LatencySummary
+
+
+class GroundedExpectedStatement(BaseModel):
+    text: str = Field(min_length=1)
+    kind: Literal["direct", "synthesis", "inference"]
+    supporting_source_uris: list[str] = Field(min_length=1)
+
+
+class GroundedEvaluationQuery(BaseModel):
+    id: str
+    question: str = Field(min_length=2)
+    expected_status: Literal["grounded", "insufficient_evidence"]
+    expected_statements: list[GroundedExpectedStatement] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_status_contract(self) -> GroundedEvaluationQuery:
+        if self.expected_status == "grounded" and not self.expected_statements:
+            raise ValueError("grounded queries require expected statements")
+        if self.expected_status == "insufficient_evidence" and self.expected_statements:
+            raise ValueError("insufficient-evidence queries cannot expect statements")
+        return self
+
+
+class GroundedEvaluationDataset(BaseModel):
+    version: str
+    provenance: str
+    description: str
+    sources: list[EvaluationSource] = Field(min_length=1)
+    queries: list[GroundedEvaluationQuery] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_source_references(self) -> GroundedEvaluationDataset:
+        uris = {source.uri for source in self.sources}
+        titles = [source.title for source in self.sources]
+        if len(uris) != len(self.sources) or len(set(titles)) != len(titles):
+            raise ValueError("grounded evaluation source URIs and titles must be unique")
+        query_ids = [query.id for query in self.queries]
+        if len(set(query_ids)) != len(query_ids):
+            raise ValueError("grounded evaluation query IDs must be unique")
+        referenced = {
+            uri
+            for query in self.queries
+            for statement in query.expected_statements
+            for uri in statement.supporting_source_uris
+        }
+        if unknown := referenced - uris:
+            raise ValueError(f"unknown supporting source URIs: {sorted(unknown)}")
+        return self
+
+
+class GroundedQueryResult(BaseModel):
+    query_id: str
+    expected_status: str
+    actual_status: str
+    expected_statement_kinds: list[str]
+    actual_statement_kinds: list[str]
+    statement_kinds_match: bool
+    expected_supporting_source_uris: list[str]
+    resolved_source_uris: list[str]
+    emitted_citations: int
+    resolved_citations: int
+    relevant_citations: int
+    model_run_count: int
+    error_code: str | None = None
+
+
+class GroundedEvaluationReport(BaseModel):
+    dataset_version: str
+    dataset_provenance: str
+    dataset_description: str
+    query_count: int
+    expected_grounded_count: int
+    emitted_citations: int
+    resolved_citations: int
+    relevant_citations: int
+    citation_resolution: float
+    citation_precision: float
+    grounded_success: float
+    expected_status_accuracy: float
+    statement_kind_accuracy: float
+    queries: list[GroundedQueryResult]
+
+
+class DatasetScriptedGenerationProvider:
+    """Generate dataset expectations using only evidence IDs present in the real request."""
+
+    id = "grounded_eval_scripted"
+    model = "synthetic-expectation-v1"
+
+    def __init__(
+        self,
+        query: GroundedEvaluationQuery,
+        title_by_uri: dict[str, str],
+    ) -> None:
+        self.query = query
+        self.title_by_uri = title_by_uri
+        self.call_count = 0
+        self.last_emitted_evidence_ids: list[str] = []
+
+    def generate(self, request: GenerationRequest) -> GenerationResult:
+        self.call_count += 1
+        user_message = next(
+            message for message in reversed(request.messages) if message.role == "user"
+        )
+        payload = json.loads(user_message.content)
+        evidence = payload["evidence"]
+        evidence_id_by_title: dict[str, str] = {}
+        for item in evidence:
+            evidence_id_by_title.setdefault(item["source_title"], item["evidence_id"])
+
+        statements: list[dict] = []
+        if self.query.expected_status == "insufficient_evidence":
+            # This is reached only when retrieval unexpectedly found evidence. Returning a valid,
+            # visibly inferred statement makes the status mismatch observable without bypassing
+            # answer validation.
+            statements.append(
+                {
+                    "text": "The synthetic evaluator unexpectedly retrieved evidence.",
+                    "kind": "inference",
+                    "evidence_ids": [],
+                }
+            )
+        else:
+            for statement in self.query.expected_statements:
+                evidence_ids = []
+                for uri in statement.supporting_source_uris:
+                    title = self.title_by_uri[uri]
+                    evidence_ids.append(evidence_id_by_title.get(title, f"unresolved:{uri}"))
+                statements.append(
+                    {
+                        "text": statement.text,
+                        "kind": statement.kind,
+                        "evidence_ids": list(dict.fromkeys(evidence_ids)),
+                    }
+                )
+        self.last_emitted_evidence_ids = list(
+            dict.fromkeys(
+                evidence_id for statement in statements for evidence_id in statement["evidence_ids"]
+            )
+        )
+        return GenerationResult(
+            content=json.dumps({"statements": statements}, separators=(",", ":")),
+            prompt_tokens=0,
+            completion_tokens=0,
+        )
 
 
 def discounted_cumulative_gain(grades: list[int]) -> float:
@@ -145,6 +299,86 @@ def evaluate_dataset(dataset_path: Path, k: int = 10) -> EvaluationReport:
         mrr=sum(result.reciprocal_rank for result in results) / count,
         ndcg_at_k=sum(result.ndcg_at_k for result in results) / count,
         queries=results,
+    )
+
+
+def evaluate_grounded_dataset(
+    dataset_path: Path,
+    limit: int = 8,
+) -> GroundedEvaluationReport:
+    """Run a credential-free synthetic grounded-QA corpus through the production answer path."""
+    if not 1 <= limit <= 12:
+        raise ValueError("grounded evaluation limit must be between 1 and 12")
+    dataset = GroundedEvaluationDataset.model_validate_json(
+        dataset_path.read_text(encoding="utf-8")
+    )
+    title_by_uri = {source.uri: source.title for source in dataset.sources}
+    with tempfile.TemporaryDirectory(prefix="proofline-grounded-eval-") as temporary_directory:
+        engine = make_engine(f"sqlite:///{Path(temporary_directory) / 'evaluation.db'}")
+        initialize_database(engine)
+        factory = sessionmaker(bind=engine, expire_on_commit=False)
+        try:
+            with factory() as session:
+                source_uri_by_id = _ingest_dataset(session, dataset)
+                results = [
+                    _evaluate_grounded_query(
+                        session,
+                        query,
+                        title_by_uri,
+                        source_uri_by_id,
+                        limit,
+                    )
+                    for query in dataset.queries
+                ]
+        finally:
+            engine.dispose()
+
+    query_count = len(results)
+    expected_grounded = sum(result.expected_status == "grounded" for result in results)
+    emitted = sum(result.emitted_citations for result in results)
+    resolved = sum(result.resolved_citations for result in results)
+    relevant = sum(result.relevant_citations for result in results)
+    citation_resolution = resolved / emitted if emitted else 1.0
+    citation_precision = relevant / resolved if resolved else (1.0 if emitted == 0 else 0.0)
+    grounded_successes = sum(
+        result.expected_status == "grounded" and result.actual_status == "grounded"
+        for result in results
+    )
+    return GroundedEvaluationReport(
+        dataset_version=dataset.version,
+        dataset_provenance=dataset.provenance,
+        dataset_description=dataset.description,
+        query_count=query_count,
+        expected_grounded_count=expected_grounded,
+        emitted_citations=emitted,
+        resolved_citations=resolved,
+        relevant_citations=relevant,
+        citation_resolution=citation_resolution,
+        citation_precision=citation_precision,
+        grounded_success=grounded_successes / expected_grounded if expected_grounded else 1.0,
+        expected_status_accuracy=(
+            sum(result.expected_status == result.actual_status for result in results) / query_count
+        ),
+        statement_kind_accuracy=(
+            sum(result.statement_kinds_match for result in results) / query_count
+        ),
+        queries=results,
+    )
+
+
+def grounded_report_meets_thresholds(
+    report: GroundedEvaluationReport,
+    *,
+    min_citation_resolution: float = 0,
+    min_citation_precision: float = 0,
+    min_grounded_success: float = 0,
+    min_status_accuracy: float = 0,
+) -> bool:
+    return (
+        report.citation_resolution >= min_citation_resolution
+        and report.citation_precision >= min_citation_precision
+        and report.grounded_success >= min_grounded_success
+        and report.expected_status_accuracy >= min_status_accuracy
     )
 
 
@@ -225,7 +459,9 @@ def benchmark_lexical_search(
     )
 
 
-def _ingest_dataset(session: Session, dataset: RetrievalDataset) -> dict[str, str]:
+def _ingest_dataset(
+    session: Session, dataset: RetrievalDataset | GroundedEvaluationDataset
+) -> dict[str, str]:
     source_uri_by_id: dict[str, str] = {}
     for item in dataset.sources:
         source, _created = ingest_source(
@@ -234,6 +470,66 @@ def _ingest_dataset(session: Session, dataset: RetrievalDataset) -> dict[str, st
         )
         source_uri_by_id[source.id] = item.uri
     return source_uri_by_id
+
+
+def _evaluate_grounded_query(
+    session: Session,
+    query: GroundedEvaluationQuery,
+    title_by_uri: dict[str, str],
+    source_uri_by_id: dict[str, str],
+    limit: int,
+) -> GroundedQueryResult:
+    provider = DatasetScriptedGenerationProvider(query, title_by_uri)
+    before_runs = session.scalar(select(func.count()).select_from(ModelRun)) or 0
+    answer = None
+    error_code = None
+    try:
+        answer = answer_question(session, query.question, provider, limit=limit)
+        actual_status = answer.status
+    except (GroundingValidationError, StructuredOutputError) as exc:
+        actual_status = "validation_failed"
+        run = session.get(ModelRun, exc.run_id)
+        error_code = run.error_code if run else "validation_failed"
+    except ProviderRequestError as exc:
+        actual_status = "provider_failed"
+        run = session.get(ModelRun, exc.run_id) if exc.run_id else None
+        error_code = run.error_code if run else "provider_failed"
+    after_runs = session.scalar(select(func.count()).select_from(ModelRun)) or 0
+
+    emitted_ids = provider.last_emitted_evidence_ids
+    resolved_ids = [] if answer is None else [citation.evidence_id for citation in answer.citations]
+    resolved_uris = sorted(
+        {
+            source_uri_by_id[citation.source_id]
+            for citation in (answer.citations if answer else [])
+            if citation.source_id in source_uri_by_id
+        }
+    )
+    expected_uris = sorted(
+        {uri for statement in query.expected_statements for uri in statement.supporting_source_uris}
+    )
+    relevant_ids = {
+        citation.evidence_id
+        for citation in (answer.citations if answer else [])
+        if source_uri_by_id.get(citation.source_id) in expected_uris
+    }
+    actual_kinds = [] if answer is None else [statement.kind for statement in answer.statements]
+    expected_kinds = [statement.kind for statement in query.expected_statements]
+    return GroundedQueryResult(
+        query_id=query.id,
+        expected_status=query.expected_status,
+        actual_status=actual_status,
+        expected_statement_kinds=expected_kinds,
+        actual_statement_kinds=actual_kinds,
+        statement_kinds_match=actual_kinds == expected_kinds,
+        expected_supporting_source_uris=expected_uris,
+        resolved_source_uris=resolved_uris,
+        emitted_citations=len(set(emitted_ids)),
+        resolved_citations=len(set(resolved_ids)),
+        relevant_citations=len(relevant_ids),
+        model_run_count=after_runs - before_runs,
+        error_code=error_code,
+    )
 
 
 def _evaluate_query(

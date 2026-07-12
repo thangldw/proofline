@@ -9,10 +9,25 @@ import uvicorn
 from .config import get_settings
 from .database import SessionLocal, initialize_database
 from .embeddings import index_current_embeddings
-from .evaluation import benchmark_lexical_search, evaluate_dataset
+from .evaluation import (
+    benchmark_lexical_search,
+    evaluate_dataset,
+    evaluate_grounded_dataset,
+    grounded_report_meets_thresholds,
+)
 from .ingestion import ingest_source
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .schemas import SourceCreate
+
+
+def unit_interval(value: str) -> float:
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a number between 0 and 1") from exc
+    if not 0 <= number <= 1:
+        raise argparse.ArgumentTypeError("expected a number between 0 and 1")
+    return number
 
 
 def seed_demo() -> None:
@@ -26,7 +41,7 @@ def seed_demo() -> None:
     print(f"{'Indexed' if created else 'Already indexed'}: {source.title} ({source.id})")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="proofline")
     subcommands = parser.add_subparsers(dest="command", required=True)
     serve = subcommands.add_parser("serve", help="Run the local API")
@@ -38,6 +53,15 @@ def main() -> None:
     evaluate.add_argument("--k", type=int, default=10)
     evaluate.add_argument("--min-recall", type=float, default=0)
     evaluate.add_argument("--min-ndcg", type=float, default=0)
+    grounded = subcommands.add_parser(
+        "eval-grounded", help="Run a versioned credential-free grounded-QA evaluation"
+    )
+    grounded.add_argument("--dataset", type=Path, required=True)
+    grounded.add_argument("--limit", type=int, choices=range(1, 13), default=8)
+    grounded.add_argument("--min-citation-resolution", type=unit_interval, default=0)
+    grounded.add_argument("--min-citation-precision", type=unit_interval, default=0)
+    grounded.add_argument("--min-grounded-success", type=unit_interval, default=0)
+    grounded.add_argument("--min-status-accuracy", type=unit_interval, default=0)
     benchmark = subcommands.add_parser(
         "benchmark", help="Measure local SQLite FTS5 lexical search latency"
     )
@@ -45,7 +69,7 @@ def main() -> None:
     benchmark.add_argument("--queries", type=int, default=100)
     benchmark.add_argument("--limit", type=int, default=10)
     subcommands.add_parser("embed", help="Incrementally embed current source chunks")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
     elif args.command == "seed":
@@ -54,6 +78,17 @@ def main() -> None:
         report = evaluate_dataset(args.dataset, args.k)
         print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
         if report.recall_at_k < args.min_recall or report.ndcg_at_k < args.min_ndcg:
+            raise SystemExit(1)
+    elif args.command == "eval-grounded":
+        report = evaluate_grounded_dataset(args.dataset, args.limit)
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        if not grounded_report_meets_thresholds(
+            report,
+            min_citation_resolution=args.min_citation_resolution,
+            min_citation_precision=args.min_citation_precision,
+            min_grounded_success=args.min_grounded_success,
+            min_status_accuracy=args.min_status_accuracy,
+        ):
             raise SystemExit(1)
     elif args.command == "benchmark":
         try:

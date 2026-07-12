@@ -65,7 +65,9 @@ As of 2026-07-12:
 - Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
 - Also implemented: deterministic local lexical benchmark reporting and a versioned environment-
   qualified observation receipt; this is not a product performance guarantee.
-- Not yet implemented: scalable vector index, reranker, assumption/constraint extraction, model
-  repair retries, desktop packaging, cloud services, or telemetry.
+- Also implemented: a credential-free synthetic grounded-QA regression gate that exercises the
+  production answer and fail-closed citation path; it is not pilot or real-model quality evidence.
+- Not yet implemented: scalable vector index, reranker, real-model/pilot evaluation, desktop
+  packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

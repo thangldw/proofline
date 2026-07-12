@@ -21,6 +21,40 @@ The synthetic corpus does not satisfy the roadmap requirement for at least 25 re
 That dataset must be collected with permission, sanitized, labeled with source evidence, and marked
 with non-synthetic provenance before it can support product-quality or go/no-go claims.
 
+## Grounded-QA regression gate
+
+`grounded-qa/seed-v1.json` is a synthetic, scripted regression corpus for the complete local answer
+path. It runs real migrations, ingestion, lexical retrieval, context selection, `answer_question`,
+structured-output validation, and server-side citation resolution. Its deterministic provider reads
+the bounded user request and translates expected source titles to evidence IDs that Proofline issued
+in that request. Missing evidence therefore reaches the normal unknown-citation repair/fail-closed
+path; the evaluator does not inject citations directly into an answer.
+
+Run it without credentials or network access:
+
+```bash
+proofline eval-grounded \
+  --dataset evals/grounded-qa/seed-v1.json \
+  --min-citation-resolution 1.0 \
+  --min-citation-precision 1.0 \
+  --min-grounded-success 1.0 \
+  --min-status-accuracy 1.0
+```
+
+The report counts evidence IDs emitted by the scripted draft, citations resolved by the production
+answer path, and resolved citations whose source URI is relevant according to the dataset. Aggregate
+metrics are:
+
+- `citation_resolution`: resolved citations divided by emitted citation IDs;
+- `citation_precision`: relevant citations divided by resolved citations;
+- `grounded_success`: expected-grounded queries that returned a grounded answer; and
+- `expected_status_accuracy`: queries whose actual status matched the expected status.
+
+Per-query output also records expected/actual statement kinds and model-run count. The explicit
+insufficient-evidence fixture must create no model run. These values test deterministic contracts;
+because statements and expectations are synthetic and scripted, they are not estimates of real-model
+answer quality, pilot citation precision, useful-answer rate, or semantic entailment accuracy.
+
 ## Local lexical benchmark
 
 The CLI can measure SQLite FTS5 query latency against a generated, deterministic, temporary
