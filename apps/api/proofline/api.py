@@ -227,7 +227,14 @@ def create_folder_scan(
     except FolderScanError as exc:
         status_code = (
             status.HTTP_409_CONFLICT
-            if exc.code in {"import_roots_disabled", "import_root_unavailable"}
+            if exc.code
+            in {
+                "import_roots_disabled",
+                "import_root_unavailable",
+                "missing_confirmation_mismatch",
+                "missing_deletion_scan_failed",
+                "missing_deletion_failed",
+            }
             else status.HTTP_422_UNPROCESSABLE_CONTENT
         )
         raise HTTPException(

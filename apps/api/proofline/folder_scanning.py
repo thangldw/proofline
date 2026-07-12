@@ -9,7 +9,12 @@ from urllib.parse import unquote, urlparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .ingestion import IngestionConflict, IngestionExecutionError, run_ingestion_job
+from .ingestion import (
+    IngestionConflict,
+    IngestionExecutionError,
+    delete_source,
+    run_ingestion_job,
+)
 from .models import AuditEvent, Source, SourceVersion, utc_now
 from .schemas import (
     FolderScanFileResult,
@@ -301,10 +306,77 @@ def scan_registered_folder(
         status: sum(item.status == status for item in files)
         for status in ("created", "updated", "unchanged", "renamed", "failed")
     }
+    deletion_mode = "preview_only"
+    deleted_count = 0
+    confirmed_ids = payload.confirmed_missing_source_ids
+    if confirmed_ids is not None:
+        if not payload.delete_missing:
+            raise FolderScanError(
+                "missing_confirmation_without_delete",
+                "Confirmed missing IDs require delete_missing=true.",
+            )
+        if (
+            not confirmed_ids
+            or any(not item for item in confirmed_ids)
+            or len(set(confirmed_ids)) != len(confirmed_ids)
+        ):
+            raise FolderScanError(
+                "missing_confirmation_invalid",
+                "Confirmed missing source IDs are invalid.",
+            )
+        confirmed_sources = {
+            source.id: source for source in sources if source.id in set(confirmed_ids)
+        }
+        if len(confirmed_sources) != len(confirmed_ids):
+            raise FolderScanError(
+                "missing_confirmation_invalid",
+                "Confirmed missing source IDs are not owned by this scan.",
+            )
+        if any(
+            not (source_path := _safe_file_uri(source.uri))
+            or not _is_within(source_path, scan_path)
+            for source in confirmed_sources.values()
+        ):
+            raise FolderScanError(
+                "missing_confirmation_invalid",
+                "Confirmed missing source IDs are not owned by this scan.",
+            )
+        if counts["failed"]:
+            raise FolderScanError(
+                "missing_deletion_scan_failed",
+                "Missing sources were not deleted because the scan reported failures.",
+            )
+        if sorted(confirmed_ids) != missing_source_ids:
+            raise FolderScanError(
+                "missing_confirmation_mismatch",
+                "The confirmed missing source set no longer matches the current scan.",
+            )
+        if any(
+            (source_path := _safe_file_uri(source.uri)) is None or source_path.exists()
+            for source in confirmed_sources.values()
+        ):
+            raise FolderScanError(
+                "missing_confirmation_mismatch",
+                "The confirmed missing source set no longer matches the current scan.",
+            )
+        try:
+            for source_id in missing_source_ids:
+                delete_source(session, confirmed_sources[source_id], commit=False)
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            raise FolderScanError(
+                "missing_deletion_failed",
+                "Confirmed missing sources could not be deleted.",
+            ) from exc
+        deletion_mode = "confirmed_delete"
+        deleted_count = len(missing_source_ids)
     return FolderScanResponse(
         root=str(root),
         path=scan_path.relative_to(root).as_posix() or ".",
         delete_missing_requested=payload.delete_missing,
+        deletion_mode=deletion_mode,
+        deleted_count=deleted_count,
         discovered_count=len(files),
         created_count=counts["created"],
         updated_count=counts["updated"],

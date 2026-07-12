@@ -668,7 +668,7 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
     return SourceDeletionImpact(**dict(row))
 
 
-def delete_source(session: Session, source: Source) -> None:
+def delete_source(session: Session, source: Source, *, commit: bool = True) -> None:
     session.execute(
         update(IngestionJob)
         .where(IngestionJob.source_id == source.id)
@@ -690,4 +690,5 @@ def delete_source(session: Session, source: Source) -> None:
         text("DELETE FROM chunk_search WHERE source_id = :source"), {"source": source.id}
     )
     session.delete(source)
-    session.commit()
+    if commit:
+        session.commit()

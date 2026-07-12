@@ -320,3 +320,171 @@ def test_folder_scan_only_previews_missing_sources(client, monkeypatch, tmp_path
     assert report["missing_source_ids"] == [source_id]
     assert client.get(f"/api/v1/sources/{source_id}").status_code == 200
     assert client.get("/api/v1/search", params={"q": "Preserve history"}).json()["hits"]
+
+
+def test_folder_scan_exact_confirmation_deletes_with_complete_cascade(
+    client, session, monkeypatch, tmp_path
+):
+    root = tmp_path / "vault"
+    root.mkdir()
+    source_path = root / "removed.md"
+    source_path.write_text(
+        "Decision: Preserve exact deletion evidence\nReason: local ownership.",
+        encoding="utf-8",
+    )
+    register_roots(monkeypatch, root)
+    created = client.post("/api/v1/folder-scans", json={}).json()
+    source_id = created["files"][0]["source_id"]
+    job_id = created["files"][0]["job_id"]
+    memory = client.get("/api/v1/memories").json()[0]
+    assert (
+        client.patch(f"/api/v1/memories/{memory['id']}", json={"status": "accepted"}).status_code
+        == 200
+    )
+    source_path.unlink()
+
+    preview = client.post("/api/v1/folder-scans", json={}).json()
+    confirmed = client.post(
+        "/api/v1/folder-scans",
+        json={
+            "delete_missing": True,
+            "confirmed_missing_source_ids": preview["missing_source_ids"],
+        },
+    )
+
+    assert confirmed.status_code == 200
+    report = confirmed.json()
+    assert report["deletion_mode"] == "confirmed_delete"
+    assert report["deleted_count"] == 1
+    assert report["missing_source_ids"] == [source_id]
+    assert client.get(f"/api/v1/sources/{source_id}").status_code == 404
+    assert (
+        client.get("/api/v1/search", params={"q": "exact deletion evidence"}).json()["hits"] == []
+    )
+    assert (
+        session.scalar(select(func.count()).select_from(Chunk).where(Chunk.source_id == source_id))
+        == 0
+    )
+    assert (
+        session.scalar(
+            select(func.count()).select_from(Evidence).where(Evidence.source_id == source_id)
+        )
+        == 0
+    )
+    assert (
+        client.get(
+            "/api/v1/audit-events", params={"object_type": "memory", "object_id": memory["id"]}
+        ).json()
+        == []
+    )
+    job = session.get(IngestionJob, job_id)
+    assert job.source_id is None
+    assert job.source_version_id is None
+
+
+def test_folder_scan_confirmation_fails_closed_when_missing_set_changes(
+    client, monkeypatch, tmp_path
+):
+    root = tmp_path / "vault"
+    root.mkdir()
+    first = root / "first.md"
+    second = root / "second.md"
+    first.write_text("Decision: Keep first source", encoding="utf-8")
+    second.write_text("Decision: Keep second source", encoding="utf-8")
+    register_roots(monkeypatch, root)
+    created = client.post("/api/v1/folder-scans", json={}).json()
+    source_ids = {item["relative_path"]: item["source_id"] for item in created["files"]}
+    first.unlink()
+    preview = client.post("/api/v1/folder-scans", json={}).json()
+    assert preview["missing_source_ids"] == [source_ids["first.md"]]
+    second.unlink()
+
+    stale = client.post(
+        "/api/v1/folder-scans",
+        json={
+            "delete_missing": True,
+            "confirmed_missing_source_ids": preview["missing_source_ids"],
+        },
+    )
+
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "missing_confirmation_mismatch"
+    assert all(
+        client.get(f"/api/v1/sources/{source_id}").status_code == 200
+        for source_id in source_ids.values()
+    )
+
+
+def test_folder_scan_rejects_unowned_malformed_or_unrequested_confirmation(
+    client, monkeypatch, tmp_path
+):
+    root = tmp_path / "vault"
+    root.mkdir()
+    register_roots(monkeypatch, root)
+    outside = tmp_path / "outside.md"
+    outside_source = client.post(
+        "/api/v1/sources",
+        json={
+            "title": "Outside",
+            "uri": outside.resolve().as_uri(),
+            "content": "Decision: Remain outside the registered scan",
+        },
+    ).json()
+
+    without_delete = client.post(
+        "/api/v1/folder-scans",
+        json={"confirmed_missing_source_ids": []},
+    )
+    duplicate = client.post(
+        "/api/v1/folder-scans",
+        json={
+            "delete_missing": True,
+            "confirmed_missing_source_ids": [outside_source["id"], outside_source["id"]],
+        },
+    )
+    empty = client.post(
+        "/api/v1/folder-scans",
+        json={"delete_missing": True, "confirmed_missing_source_ids": []},
+    )
+    unowned = client.post(
+        "/api/v1/folder-scans",
+        json={
+            "delete_missing": True,
+            "confirmed_missing_source_ids": [outside_source["id"]],
+        },
+    )
+
+    assert without_delete.status_code == 422
+    assert without_delete.json()["detail"]["code"] == "missing_confirmation_without_delete"
+    assert duplicate.status_code == 422
+    assert duplicate.json()["detail"]["code"] == "missing_confirmation_invalid"
+    assert empty.status_code == 422
+    assert empty.json()["detail"]["code"] == "missing_confirmation_invalid"
+    assert unowned.status_code == 422
+    assert unowned.json()["detail"]["code"] == "missing_confirmation_invalid"
+    assert client.get(f"/api/v1/sources/{outside_source['id']}").status_code == 200
+
+
+def test_folder_scan_confirmation_fails_closed_on_scan_error(client, monkeypatch, tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    removed = root / "removed.md"
+    removed.write_text("Decision: Preserve source when another file fails", encoding="utf-8")
+    register_roots(monkeypatch, root)
+    created = client.post("/api/v1/folder-scans", json={}).json()
+    source_id = created["files"][0]["source_id"]
+    removed.unlink()
+    preview = client.post("/api/v1/folder-scans", json={}).json()
+    (root / "invalid.md").write_bytes(b"\xff\xfe")
+
+    response = client.post(
+        "/api/v1/folder-scans",
+        json={
+            "delete_missing": True,
+            "confirmed_missing_source_ids": preview["missing_source_ids"],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "missing_deletion_scan_failed"
+    assert client.get(f"/api/v1/sources/{source_id}").status_code == 200
