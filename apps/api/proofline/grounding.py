@@ -19,7 +19,10 @@ from .model_gateway import (
     run_generation,
 )
 from .models import ModelRun, SourceVersion
-from .schemas import AnswerCitation, AnswerResponse, AnswerStatement, SearchHit
+from .schemas import AnswerCitation, AnswerExclusion, AnswerResponse, AnswerStatement, SearchHit
+
+MAX_EVIDENCE_PACK_BYTES = 64 * 1024
+MAX_EVIDENCE_ITEM_BYTES = 8 * 1024
 
 
 class DraftStatement(BaseModel):
@@ -57,19 +60,51 @@ def validate_evidence_spans(session: Session, hits: list[SearchHit]) -> None:
             )
 
 
-def build_generation_request(question: str, hits: list[SearchHit]) -> GenerationRequest:
-    evidence = [
-        {
-            "evidence_id": hit.chunk_id,
-            "source_title": hit.source_title,
-            "lines": [hit.start_line, hit.end_line],
-            "content": hit.content,
-        }
-        for hit in hits
-    ]
-    prompt = json.dumps(
-        {"question": question, "evidence": evidence}, ensure_ascii=False, separators=(",", ":")
+def evidence_item(hit: SearchHit) -> dict:
+    return {
+        "evidence_id": hit.chunk_id,
+        "source_title": hit.source_title,
+        "lines": [hit.start_line, hit.end_line],
+        "content": hit.content,
+    }
+
+
+def serialize_evidence_prompt(question: str, evidence: list[dict]) -> str:
+    return json.dumps(
+        {"question": question, "evidence": evidence},
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
+
+
+def select_bounded_evidence(
+    question: str, hits: list[SearchHit]
+) -> tuple[list[SearchHit], list[AnswerExclusion]]:
+    selected: list[SearchHit] = []
+    selected_items: list[dict] = []
+    exclusions: list[AnswerExclusion] = []
+    for hit in hits:
+        item = evidence_item(hit)
+        item_size = len(json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        if item_size > MAX_EVIDENCE_ITEM_BYTES:
+            exclusions.append(AnswerExclusion(evidence_id=hit.chunk_id, reason="context_budget"))
+            continue
+        candidate_items = [*selected_items, item]
+        if (
+            len(serialize_evidence_prompt(question, candidate_items).encode("utf-8"))
+            > MAX_EVIDENCE_PACK_BYTES
+        ):
+            exclusions.append(AnswerExclusion(evidence_id=hit.chunk_id, reason="context_budget"))
+            continue
+        selected.append(hit)
+        selected_items.append(item)
+    return selected, exclusions
+
+
+def build_generation_request(question: str, hits: list[SearchHit]) -> GenerationRequest:
+    prompt = serialize_evidence_prompt(question, [evidence_item(hit) for hit in hits])
+    if len(prompt.encode("utf-8")) > MAX_EVIDENCE_PACK_BYTES:
+        raise ValueError("evidence pack exceeds the hard context budget")
     return GenerationRequest(
         messages=[
             ChatMessage(
@@ -118,6 +153,16 @@ def answer_question(
             model_run_id=None,
         )
     validate_evidence_spans(session, hits)
+    hits, exclusions = select_bounded_evidence(question, hits)
+    if not hits:
+        return AnswerResponse(
+            status="insufficient_evidence",
+            answer="Indexed evidence was excluded by the context budget.",
+            statements=[],
+            citations=[],
+            model_run_id=None,
+            exclusions=exclusions,
+        )
     if provider is None:
         return AnswerResponse(
             status="provider_unavailable",
@@ -125,6 +170,7 @@ def answer_question(
             statements=[],
             citations=[AnswerCitation.from_hit(hit) for hit in hits],
             model_run_id=None,
+            exclusions=exclusions,
         )
 
     request = build_generation_request(question, hits)
@@ -197,5 +243,6 @@ def answer_question(
             statements=statements,
             citations=citations,
             model_run_id=run.id,
+            exclusions=exclusions,
         )
     raise AssertionError("bounded generation loop exited without a result")

@@ -32,6 +32,40 @@ def test_chunks_preserve_exact_unicode_spans():
     assert spans[-1].end_line == 5
 
 
+def test_single_large_paragraph_is_split_without_content_loss():
+    content = "x" * (5 * 1024 * 1024)
+
+    spans = chunk_markdown(content)
+
+    assert len(spans) > 3_000
+    assert all(0 < len(span.text) <= 1_600 for span in spans)
+    assert "".join(span.text for span in spans) == content
+    assert spans[0].start_offset == 0
+    assert spans[-1].end_offset == len(content)
+
+
+def test_new_source_versions_record_bounded_parser_version(session):
+    source, _ = ingest_source(
+        session,
+        SourceCreate(title="Parser version", content="Decision: Bound every chunk"),
+    )
+
+    assert source.versions[0].parser_version == "deterministic-v2"
+
+
+def test_overlong_unicode_paragraph_preserves_codepoint_spans_and_lines():
+    unit = "中文🧠e\u0301"
+    content = unit * 700
+
+    spans = chunk_markdown(content)
+
+    assert len(spans) > 1
+    assert all(len(span.text) <= 1_600 for span in spans)
+    assert "".join(span.text for span in spans) == content
+    assert all(content[span.start_offset : span.end_offset] == span.text for span in spans)
+    assert all(span.start_line == span.end_line == 1 for span in spans)
+
+
 def test_crlf_and_combining_characters_keep_exact_offsets_and_lines():
     content = (
         "# Cafe\u0301 architecture\r\n\r\n"

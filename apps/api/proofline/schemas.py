@@ -193,12 +193,18 @@ class AnswerCitation(BaseModel):
         )
 
 
+class AnswerExclusion(BaseModel):
+    evidence_id: str
+    reason: Literal["context_budget"]
+
+
 class AnswerResponse(BaseModel):
     status: Literal["grounded", "insufficient_evidence", "provider_unavailable"]
     answer: str
     statements: list[AnswerStatement]
     citations: list[AnswerCitation]
     model_run_id: str | None
+    exclusions: list[AnswerExclusion] = Field(default_factory=list)
 
 
 class Overview(BaseModel):
