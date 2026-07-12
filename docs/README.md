@@ -41,7 +41,8 @@ As of 2026-07-12:
   search, source/decision browsing, overview counts, and evidence inspection.
 - Local container scaffolding and root setup/development/quality commands are present.
 - Also implemented: immutable source-version history and versioned SQLite migrations.
-- Not yet implemented: persisted ingestion jobs, model
+- Also implemented: persisted terminal status for synchronous ingestion jobs.
+- Not yet implemented: resumable/retryable job execution, model
   providers, embeddings/hybrid retrieval, AI-derived decision review, grounded answer
   generation, desktop packaging, cloud services, or telemetry.
 

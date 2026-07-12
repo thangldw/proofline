@@ -63,7 +63,7 @@ Before delivery work, record:
 - Harden the implemented immutable source versioning and explicit SQLite migrations with crash,
   concurrency, and larger legacy-database fixtures.
 - Harden the implemented FTS5 lexical search and exact-span contract.
-- Implement persisted in-process jobs, retries, and dead-letter states.
+- Extend the implemented persisted ingestion job status with retries and dead-letter states.
 - Extend the implemented source/decision inventory UI with stage diagnostics.
 - Implement deletion preview and cascade behavior for derived data.
 

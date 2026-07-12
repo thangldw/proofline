@@ -101,3 +101,20 @@ class SourceVersionRead(BaseModel):
 
 class SourceVersionContentRead(SourceVersionRead):
     content: str
+
+
+class IngestionJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_id: str | None
+    source_version_id: str | None
+    kind: str
+    state: str
+    stage: str
+    attempts: int
+    error_code: str | None
+    error_detail: str | None
+    retryable: bool
+    created_at: datetime
+    updated_at: datetime

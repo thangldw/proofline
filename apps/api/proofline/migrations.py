@@ -185,9 +185,35 @@ def _add_source_versions(connection: Connection) -> None:
         )
 
 
+def _add_ingestion_jobs(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS ingestion_jobs (
+            id VARCHAR(36) PRIMARY KEY,
+            source_id VARCHAR(36) REFERENCES sources(id) ON DELETE SET NULL,
+            source_version_id VARCHAR(36),
+            kind VARCHAR(30) NOT NULL,
+            state VARCHAR(30) NOT NULL,
+            stage VARCHAR(30) NOT NULL,
+            attempts INTEGER NOT NULL,
+            error_code VARCHAR(80),
+            error_detail VARCHAR(500),
+            retryable BOOLEAN NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_source_id ON ingestion_jobs (source_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_state ON ingestion_jobs (state, updated_at)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
+    (3, "observable ingestion jobs", _add_ingestion_jobs),
 )
 
 

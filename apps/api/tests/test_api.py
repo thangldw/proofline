@@ -11,6 +11,7 @@ def test_complete_workflow(client):
         json={"title": "ADR-007", "content": content, "uri": "file:///adr-007.md"},
     )
     assert created.status_code == 201
+    job_id = created.headers["x-proofline-job-id"]
     source = created.json()
     assert source["chunk_count"] >= 1
     assert source["decision_count"] == 1
@@ -26,6 +27,10 @@ def test_complete_workflow(client):
 
     source_detail = client.get(f"/api/v1/sources/{source['id']}").json()
     assert source_detail["content"] == content
+    job = client.get(f"/api/v1/jobs/{job_id}").json()
+    assert job["state"] == "succeeded"
+    assert job["stage"] == "ready"
+    assert job["source_id"] == source["id"]
 
     deleted = client.delete(f"/api/v1/sources/{source['id']}")
     assert deleted.status_code == 204
@@ -38,6 +43,7 @@ def test_duplicate_import_returns_existing_source(client):
     assert client.post("/api/v1/sources", json=payload).status_code == 201
     assert client.post("/api/v1/sources", json=payload).status_code == 200
     assert client.get("/api/v1/overview").json()["sources"] == 1
+    assert len(client.get("/api/v1/jobs", params={"state": "succeeded"}).json()) == 2
 
 
 def test_updating_same_uri_searches_current_version_and_lists_history(client):

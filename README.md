@@ -41,6 +41,9 @@ The initial executable slice deliberately excludes LLM generation:
 This establishes the evidence contract that decision extraction, hybrid
 retrieval, and grounded answers will build on.
 
+Every ingestion request also creates an inspectable job record. Terminal failures retain a safe
+error code and stage without copying source content into diagnostic fields.
+
 ## Repository layout
 
 ```text
