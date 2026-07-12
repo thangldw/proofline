@@ -279,6 +279,15 @@ def _add_chunk_embeddings(connection: Connection) -> None:
     )
 
 
+def _link_decisions_to_model_runs(connection: Connection) -> None:
+    columns = {column["name"] for column in inspect(connection).get_columns("decisions")}
+    if "model_run_id" not in columns:
+        connection.exec_driver_sql("ALTER TABLE decisions ADD COLUMN model_run_id VARCHAR(36)")
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decisions_model_run_id ON decisions (model_run_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -286,6 +295,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (4, "governed memory audit trail", _add_memory_audit),
     (5, "provider-neutral model runs", _add_model_runs),
     (6, "versioned chunk embeddings", _add_chunk_embeddings),
+    (7, "model-derived decision candidates", _link_decisions_to_model_runs),
 )
 
 
