@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session, selectinload
 from .config import get_settings
 from .database import get_session
 from .embeddings import hybrid_search, index_current_embeddings
-from .extraction import CandidateExtractionError, extract_decision_candidates
+from .extraction import (
+    CandidateExtractionError,
+    extract_decision_candidates,
+    extract_memory_candidates,
+)
 from .folder_scanning import FolderScanError, scan_registered_folder
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
@@ -50,6 +54,9 @@ from .schemas import (
     FolderScanRequest,
     FolderScanResponse,
     IngestionJobRead,
+    MemoryKind,
+    MemoryRead,
+    MemoryUpdate,
     ModelRunRead,
     Overview,
     ProviderStatus,
@@ -72,7 +79,11 @@ def source_to_read(source: Source) -> SourceRead:
             chunk.source_version_id == source.current_version_id for chunk in source.chunks
         ),
         decision_count=sum(
-            decision.source_version_id == source.current_version_id for decision in source.decisions
+            decision.source_version_id == source.current_version_id and decision.kind == "decision"
+            for decision in source.decisions
+        ),
+        memory_count=sum(
+            memory.source_version_id == source.current_version_id for memory in source.decisions
         ),
     )
 
@@ -85,12 +96,42 @@ def decision_to_read(decision: Decision, source_title: str | None = None) -> Dec
 
 def decision_snapshot(decision: Decision) -> dict[str, str | None]:
     return {
+        "kind": decision.kind,
         "title": decision.title,
         "statement": decision.statement,
         "rationale": decision.rationale,
         "status": decision.status,
         "updated_at": decision.updated_at.isoformat(),
     }
+
+
+def apply_memory_update(
+    session: Session,
+    memory: Decision,
+    changes: dict,
+    *,
+    object_type: str,
+    action: str,
+) -> DecisionRead:
+    before = decision_snapshot(memory)
+    for field, value in changes.items():
+        setattr(memory, field, value)
+    memory.updated_at = utc_now()
+    after = decision_snapshot(memory)
+    session.add(
+        AuditEvent(
+            actor="local_user",
+            action=action,
+            object_type=object_type,
+            object_id=memory.id,
+            before_json=before,
+            after_json=after,
+        )
+    )
+    session.commit()
+    source_title = session.scalar(select(Source.title).where(Source.id == memory.source_id))
+    session.refresh(memory)
+    return decision_to_read(memory, source_title)
 
 
 @router.get("/overview", response_model=Overview)
@@ -105,6 +146,16 @@ def overview(session: Session = Depends(get_session)) -> Overview:
         )
         or 0,
         decisions=session.scalar(
+            select(func.count())
+            .select_from(Decision)
+            .join(Source)
+            .where(
+                Decision.source_version_id == Source.current_version_id,
+                Decision.kind == "decision",
+            )
+        )
+        or 0,
+        memories=session.scalar(
             select(func.count())
             .select_from(Decision)
             .join(Source)
@@ -408,6 +459,36 @@ def extract_source_decisions(
     return [decision_to_read(decision, source.title) for decision in decisions]
 
 
+@router.post("/sources/{source_id}/extract-memories", response_model=list[MemoryRead])
+def extract_source_memories(
+    source_id: str,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> list[MemoryRead]:
+    source = session.get(Source, source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        provider = build_generation_provider(get_settings())
+        if provider is None:
+            raise HTTPException(status_code=409, detail="AI provider is disabled")
+        memories, run = extract_memory_candidates(session, source, provider)
+    except ProviderConfigurationError as exc:
+        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
+    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
+        run_id = getattr(exc, "run_id", None)
+        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
+        raise HTTPException(
+            status_code=502,
+            detail="model output could not produce grounded memory candidates",
+            headers=headers,
+        ) from exc
+    response.headers["X-Proofline-Model-Run-ID"] = run.id
+    return [
+        MemoryRead(**decision_to_read(memory, source.title).model_dump()) for memory in memories
+    ]
+
+
 @router.get(
     "/sources/{source_id}/versions/{version_id}",
     response_model=SourceVersionContentRead,
@@ -434,6 +515,62 @@ def remove_source(source_id: str, session: Session = Depends(get_session)) -> Re
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/memories", response_model=list[MemoryRead])
+def list_memories(
+    memory_kind: MemoryKind | None = Query(default=None, alias="kind"),
+    memory_status: str | None = Query(default=None, alias="status"),
+    session: Session = Depends(get_session),
+) -> list[DecisionRead]:
+    query = (
+        select(Decision, Source.title)
+        .join(Source)
+        .where(Decision.source_version_id == Source.current_version_id)
+        .options(selectinload(Decision.evidence))
+        .order_by(Decision.created_at.desc())
+    )
+    if memory_kind:
+        query = query.where(Decision.kind == memory_kind)
+    if memory_status:
+        query = query.where(Decision.status == memory_status)
+    return [decision_to_read(memory, title) for memory, title in session.execute(query).all()]
+
+
+@router.get("/memories/{memory_id}", response_model=MemoryRead)
+def get_memory(memory_id: str, session: Session = Depends(get_session)) -> DecisionRead:
+    row = session.execute(
+        select(Decision, Source.title)
+        .join(Source)
+        .where(Decision.id == memory_id)
+        .options(selectinload(Decision.evidence))
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return decision_to_read(row[0], row[1])
+
+
+@router.patch("/memories/{memory_id}", response_model=MemoryRead)
+def update_memory(
+    memory_id: str,
+    payload: MemoryUpdate,
+    session: Session = Depends(get_session),
+) -> DecisionRead:
+    memory = session.scalar(
+        select(Decision).where(Decision.id == memory_id).options(selectinload(Decision.evidence))
+    )
+    if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="No memory changes supplied")
+    return apply_memory_update(
+        session,
+        memory,
+        changes,
+        object_type="memory",
+        action="memory.updated",
+    )
+
+
 @router.get("/decisions", response_model=list[DecisionRead])
 def list_decisions(
     decision_status: str | None = Query(default=None, alias="status"),
@@ -442,7 +579,10 @@ def list_decisions(
     query = (
         select(Decision, Source.title)
         .join(Source)
-        .where(Decision.source_version_id == Source.current_version_id)
+        .where(
+            Decision.source_version_id == Source.current_version_id,
+            Decision.kind == "decision",
+        )
         .options(selectinload(Decision.evidence))
         .order_by(Decision.created_at.desc())
     )
@@ -456,7 +596,7 @@ def get_decision(decision_id: str, session: Session = Depends(get_session)) -> D
     row = session.execute(
         select(Decision, Source.title)
         .join(Source)
-        .where(Decision.id == decision_id)
+        .where(Decision.id == decision_id, Decision.kind == "decision")
         .options(selectinload(Decision.evidence))
     ).one_or_none()
     if not row:
@@ -471,32 +611,22 @@ def update_decision(
     session: Session = Depends(get_session),
 ) -> DecisionRead:
     decision = session.scalar(
-        select(Decision).where(Decision.id == decision_id).options(selectinload(Decision.evidence))
+        select(Decision)
+        .where(Decision.id == decision_id, Decision.kind == "decision")
+        .options(selectinload(Decision.evidence))
     )
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=422, detail="No decision changes supplied")
-    before = decision_snapshot(decision)
-    for field, value in changes.items():
-        setattr(decision, field, value)
-    decision.updated_at = utc_now()
-    after = decision_snapshot(decision)
-    session.add(
-        AuditEvent(
-            actor="local_user",
-            action="decision.updated",
-            object_type="decision",
-            object_id=decision.id,
-            before_json=before,
-            after_json=after,
-        )
+    return apply_memory_update(
+        session,
+        decision,
+        changes,
+        object_type="decision",
+        action="decision.updated",
     )
-    session.commit()
-    source_title = session.scalar(select(Source.title).where(Source.id == decision.source_id))
-    session.refresh(decision)
-    return decision_to_read(decision, source_title)
 
 
 @router.get("/audit-events", response_model=list[AuditEventRead])

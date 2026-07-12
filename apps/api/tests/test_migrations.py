@@ -16,7 +16,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert {
         "sources",
         "source_versions",
@@ -81,7 +81,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 9))
+    assert versions == list(range(1, 10))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -89,6 +89,72 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
     assert job["started_at"] == job["created_at"]
     assert job["finished_at"] == job["updated_at"]
     assert staged_count == 0
+    engine.dispose()
+
+
+def test_v8_decisions_are_backfilled_as_decision_kind(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v8-memory.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:8]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+        connection.execute(
+            text(
+                """INSERT INTO sources
+                   (id, title, kind, uri, content, content_hash, status, created_at, indexed_at,
+                    current_version_id)
+                   VALUES ('source-v8', 'Legacy ADR', 'markdown', 'file:///legacy.md',
+                           'Decision: Keep compatibility', :identity, 'indexed', :now, :now,
+                           'version-v8')"""
+            ),
+            {"identity": "a" * 64, "now": "2026-07-12T00:00:00+00:00"},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO source_versions
+                   (id, source_id, content_hash, content, version_number, content_length,
+                    status, parser_version, created_at)
+                   VALUES ('version-v8', 'source-v8', :content_hash,
+                           'Decision: Keep compatibility', 1, 28, 'indexed',
+                           'deterministic-v1', :now)"""
+            ),
+            {"content_hash": "b" * 64, "now": "2026-07-12T00:00:00+00:00"},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO decisions
+                   (id, source_id, source_version_id, title, statement, status, confidence,
+                    extraction_method, created_at, updated_at)
+                   VALUES ('decision-v8', 'source-v8', 'version-v8', 'Keep compatibility',
+                           'Keep compatibility', 'active', 1.0, 'deterministic', :now, :now)"""
+            ),
+            {"now": "2026-07-12T00:00:00+00:00"},
+        )
+
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        memory = (
+            connection.execute(text("SELECT id, kind FROM decisions WHERE id = 'decision-v8'"))
+            .mappings()
+            .one()
+        )
+        indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list(decisions)")}
+    assert dict(memory) == {"id": "decision-v8", "kind": "decision"}
+    assert "ix_decisions_kind" in indexes
     engine.dispose()
 
 
@@ -162,11 +228,17 @@ def test_populated_foundation_database_is_backfilled_without_changing_ids(tmp_pa
             .mappings()
             .one()
         )
+        decision = (
+            connection.execute(text("SELECT id, kind FROM decisions WHERE id = 'decision-1'"))
+            .mappings()
+            .one()
+        )
         foreign_key_errors = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
     assert source["id"] == "source-1"
     assert source["current_version_id"] == version["id"]
     assert version["version_number"] == 1
     assert evidence["source_version_id"] == version["id"]
+    assert dict(decision) == {"id": "decision-1", "kind": "decision"}
     assert len(evidence["quote_hash"]) == 64
     assert foreign_key_errors == []
     engine.dispose()

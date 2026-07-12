@@ -94,6 +94,7 @@ def test_updating_same_uri_searches_current_version_and_lists_history(client):
         "sources": 1,
         "chunks": 1,
         "decisions": 1,
+        "memories": 1,
         "evidence": 1,
     }
     assert client.get(f"/api/v1/decisions/{old_decision['id']}").status_code == 200

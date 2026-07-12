@@ -38,6 +38,7 @@ class SourceDeletionImpact:
     chunks: int
     embeddings: int
     decisions: int
+    memories: int
     evidence: int
     ingestion_jobs_to_detach: int
     audit_events_to_delete: int
@@ -85,11 +86,20 @@ SAFE_ERROR_DETAILS = {
 DEFAULT_MAX_ATTEMPTS = 3
 
 
-DECISION_PREFIX = re.compile(
-    r"^(?:decision|quy(?:ế|e)t định|we (?:will|chose|choose|decided to))\s*[:\-]\s*(.+)$",
-    re.IGNORECASE,
-)
-DECISION_HEADING = re.compile(r"^#{1,6}\s+(?:decision|quy(?:ế|e)t định)\s*[:\-]?\s*(.*)$", re.I)
+MEMORY_MARKERS = {
+    "decision": r"(?:decision|quy(?:ế|e)t định|we (?:will|chose|choose|decided to))",
+    "assumption": r"(?:assumption|giả định|gia dinh)",
+    "constraint": r"(?:constraint|ràng buộc|rang buoc)",
+    "alternative": r"(?:alternative|phương án|phuong an)",
+}
+MEMORY_PATTERNS = {
+    kind: (
+        re.compile(rf"^(?:{marker})\s*[:\-]\s*(.+)$", re.I),
+        re.compile(rf"^#{{1,6}}\s+(?:{marker})\s*[:\-]?\s*(.*)$", re.I),
+    )
+    for kind, marker in MEMORY_MARKERS.items()
+}
+DECISION_PREFIX, DECISION_HEADING = MEMORY_PATTERNS["decision"]
 RATIONALE_PREFIX = re.compile(r"^(?:rationale|reason|because|lý do)\s*[:\-]\s*(.+)$", re.I)
 STATUS_PREFIX = re.compile(r"^(?:status|trạng thái)\s*[:\-]\s*(.+)$", re.I)
 
@@ -137,7 +147,15 @@ def chunk_markdown(content: str, max_chars: int = 1600) -> list[TextSpan]:
     return spans
 
 
-def extract_decisions(content: str) -> list[dict]:
+def _match_memory_marker(value: str) -> tuple[str, re.Match[str]] | None:
+    for kind, (prefix, heading) in MEMORY_PATTERNS.items():
+        match = heading.match(value) or prefix.match(value)
+        if match:
+            return kind, match
+    return None
+
+
+def extract_memories(content: str) -> list[dict]:
     lines = content.splitlines(keepends=True)
     results: list[dict] = []
     cursor = 0
@@ -145,15 +163,15 @@ def extract_decisions(content: str) -> list[dict]:
     while index < len(lines):
         raw = lines[index]
         stripped = raw.strip()
-        heading = DECISION_HEADING.match(stripped)
-        prefix = DECISION_PREFIX.match(stripped)
-        if not heading and not prefix:
+        marker = _match_memory_marker(stripped)
+        if not marker:
             cursor += len(raw)
             index += 1
             continue
 
-        statement = (heading or prefix).group(1).strip()
-        title = statement or "Recorded decision"
+        kind, match = marker
+        statement = match.group(1).strip()
+        title = statement or f"Recorded {kind}"
         start = cursor + len(raw) - len(raw.lstrip())
         end = cursor + len(raw.rstrip("\r\n"))
         rationale = None
@@ -162,7 +180,7 @@ def extract_decisions(content: str) -> list[dict]:
 
         for next_index in range(index + 1, min(index + 5, len(lines))):
             candidate = lines[next_index].strip()
-            if not candidate or candidate.startswith("#") or DECISION_PREFIX.match(candidate):
+            if not candidate or candidate.startswith("#") or _match_memory_marker(candidate):
                 break
             rationale_match = RATIONALE_PREFIX.match(candidate)
             status_match = STATUS_PREFIX.match(candidate)
@@ -182,6 +200,7 @@ def extract_decisions(content: str) -> list[dict]:
         quote = content[start:end]
         results.append(
             {
+                "kind": kind,
                 "title": title[:300],
                 "statement": statement or title,
                 "rationale": rationale,
@@ -196,6 +215,11 @@ def extract_decisions(content: str) -> list[dict]:
         cursor += len(raw)
         index += 1
     return results
+
+
+def extract_decisions(content: str) -> list[dict]:
+    """Compatibility view for callers that only consume deterministic decisions."""
+    return [item for item in extract_memories(content) if item["kind"] == "decision"]
 
 
 def _index_version(session: Session, source: Source, version: SourceVersion, content: str) -> None:
@@ -220,7 +244,7 @@ def _index_version(session: Session, source: Source, version: SourceVersion, con
             {"chunk": chunk.id, "source": source.id, "content": chunk.content},
         )
 
-    for extracted in extract_decisions(content):
+    for extracted in extract_memories(content):
         quote = extracted.pop("quote")
         span_fields = {
             key: extracted.pop(key)
@@ -601,13 +625,15 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
                 (SELECT count(*) FROM source_versions WHERE source_id = :source) AS versions,
                 (SELECT count(*) FROM chunks WHERE source_id = :source) AS chunks,
                 (SELECT count(*) FROM chunk_embeddings WHERE source_id = :source) AS embeddings,
-                (SELECT count(*) FROM decisions WHERE source_id = :source) AS decisions,
+                (SELECT count(*) FROM decisions
+                   WHERE source_id = :source AND kind = 'decision') AS decisions,
+                (SELECT count(*) FROM decisions WHERE source_id = :source) AS memories,
                 (SELECT count(*) FROM evidence WHERE source_id = :source) AS evidence,
                 (SELECT count(*) FROM ingestion_jobs WHERE source_id = :source)
                     AS ingestion_jobs_to_detach,
                 (SELECT count(*) FROM audit_events
                    WHERE (object_type = 'source' AND object_id = :source)
-                      OR (object_type = 'decision' AND object_id IN
+                      OR (object_type IN ('decision', 'memory') AND object_id IN
                           (SELECT id FROM decisions WHERE source_id = :source)))
                     AS audit_events_to_delete,
                 (SELECT count(*) FROM chunk_search WHERE source_id = :source) AS fts_rows"""
@@ -629,7 +655,7 @@ def delete_source(session: Session, source: Source) -> None:
     session.execute(
         text(
             """DELETE FROM audit_events
-               WHERE object_type = 'decision'
+               WHERE object_type IN ('decision', 'memory')
                  AND object_id IN (SELECT id FROM decisions WHERE source_id = :source)"""
         ),
         {"source": source.id},

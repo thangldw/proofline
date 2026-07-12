@@ -6,6 +6,7 @@ from proofline.ingestion import (
     IngestionExecutionError,
     chunk_markdown,
     extract_decisions,
+    extract_memories,
     ingest_source,
     run_ingestion_job,
 )
@@ -62,6 +63,50 @@ def test_extracts_decision_and_exact_evidence():
     assert result["rationale"] == "triển khai local đơn giản."
     assert content[result["start_offset"] : result["end_offset"]] == result["quote"]
     assert result["end_line"] == 5
+
+
+def test_extracts_generalized_memory_kinds_with_exact_evidence(session):
+    content = (
+        "Decision: Use SQLite for local state\nReason: no external service.\n\n"
+        "Assumption: A single writer owns the database.\n\n"
+        "## Ràng buộc: Dữ liệu không được rời máy\n\n"
+        "Phương án: Use Postgres for a future team deployment."
+    )
+
+    extracted = extract_memories(content)
+
+    assert [item["kind"] for item in extracted] == [
+        "decision",
+        "assumption",
+        "constraint",
+        "alternative",
+    ]
+    assert [item["kind"] for item in extract_decisions(content)] == ["decision"]
+    assert all(
+        content[item["start_offset"] : item["end_offset"]] == item["quote"] for item in extracted
+    )
+    source, _created = ingest_source(
+        session,
+        SourceCreate(title="Generalized ADR", content=content),
+    )
+    memories = list(
+        session.scalars(
+            select(Decision)
+            .where(Decision.source_version_id == source.current_version_id)
+            .order_by(Decision.created_at)
+        ).all()
+    )
+    assert {memory.kind for memory in memories} == {
+        "decision",
+        "assumption",
+        "constraint",
+        "alternative",
+    }
+    for memory in memories:
+        assert memory.status == "active"
+        assert len(memory.evidence) == 1
+        evidence = memory.evidence[0]
+        assert content[evidence.start_offset : evidence.end_offset] == evidence.quote
 
 
 def test_ingestion_is_idempotent(session):

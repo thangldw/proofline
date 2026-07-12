@@ -76,6 +76,7 @@ class Decision(Base):
     source_version_id: Mapped[str] = mapped_column(
         ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
     )
+    kind: Mapped[str] = mapped_column(String(30), default="decision", index=True)
     title: Mapped[str] = mapped_column(String(300))
     statement: Mapped[str] = mapped_column(Text)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
