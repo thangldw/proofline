@@ -43,6 +43,114 @@
   padding: 1px 4px;
 }
 
+.search-scope {
+  margin-top: 12px;
+  border: 1px solid #d8ddd5;
+  border-radius: 9px;
+  background: #fafbf8;
+}
+
+.search-scope > summary {
+  cursor: pointer;
+  padding: 10px 13px;
+  color: #53605a;
+  font: 500 11px var(--font-mono);
+}
+
+.scope-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 18px;
+  align-items: start;
+  border-top: 1px solid #e1e5de;
+  padding: 14px;
+}
+
+.scope-controls fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.scope-controls legend {
+  margin-bottom: 8px;
+  color: #63706a;
+  font: 500 10px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.source-scope-options {
+  display: grid;
+  max-height: 150px;
+  gap: 6px;
+  overflow: auto;
+}
+
+.source-scope-options label,
+.time-scope label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #33422e;
+  font-size: 12px;
+}
+
+.time-scope {
+  display: grid;
+  gap: 8px;
+}
+
+.time-scope label {
+  justify-content: space-between;
+}
+
+.time-scope input {
+  min-width: 0;
+  border: 1px solid #ccd3ca;
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px;
+  color: #33422e;
+  font-size: 11px;
+}
+
+.time-scope small {
+  color: #748078;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.scope-controls > button {
+  border: 1px solid #ccd3ca;
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.scope-controls > button:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.scope-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 2px 0;
+  color: #748078;
+  font-size: 11px;
+}
+
+.scope-summary strong {
+  color: #53605a;
+}
+
+.scope-summary.active {
+  color: #365202;
+}
+
 .integrity-error {
   background: #fff0ed;
   border-color: #ffc2b7;
@@ -91,7 +199,7 @@
   display: inline-block;
   border-radius: 4px;
   padding: 4px 7px;
-  font: 500 10px "IBM Plex Mono";
+  font: 500 10px var(--font-mono);
   text-transform: uppercase;
   background: #edf1eb;
   color: #53605a;
@@ -122,7 +230,7 @@
   width: fit-content;
   color: #53605a;
   cursor: pointer;
-  font: 500 11px "IBM Plex Mono";
+  font: 500 11px var(--font-mono);
 }
 
 .retrieval-debug[open] summary {
@@ -146,7 +254,7 @@
 
 .retrieval-debug dt {
   color: #748078;
-  font: 500 9px "IBM Plex Mono";
+  font: 500 9px var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -158,6 +266,10 @@
 }
 
 @media (max-width: 760px) {
+  .scope-controls {
+    grid-template-columns: 1fr;
+  }
+
   .retrieval-debug dl {
     grid-template-columns: 1fr 1fr;
   }
@@ -183,7 +295,7 @@
   min-width: 54px;
   padding: 7px 0;
   color: #63706a;
-  font: 500 10px "IBM Plex Mono";
+  font: 500 10px var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -212,7 +324,7 @@
 .memory-kind {
   border-radius: 4px;
   padding: 4px 7px;
-  font: 500 10px "IBM Plex Mono";
+  font: 500 10px var(--font-mono);
   text-transform: uppercase;
   background: #e8f1fa;
   color: #275779;
@@ -341,7 +453,7 @@
 }
 
 .job-error-code {
-  font-family: "IBM Plex Mono";
+  font-family: var(--font-mono);
 }
 
 .source-actions button {
@@ -429,7 +541,7 @@
 
 .impact-counts dd {
   margin: 4px 0 0;
-  font: 600 18px "IBM Plex Mono";
+  font: 600 18px var(--font-mono);
 }
 
 .deletion-dialog footer {

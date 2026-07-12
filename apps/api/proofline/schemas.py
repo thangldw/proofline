@@ -1,11 +1,36 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MemoryKind = Literal["decision", "assumption", "constraint", "alternative"]
+
+
+def normalize_retrieval_filters(
+    source_ids: list[str] | None,
+    ingested_from: datetime | None,
+    ingested_before: datetime | None,
+) -> tuple[list[str] | None, datetime | None, datetime | None]:
+    normalized_ids = list(dict.fromkeys(source_ids)) if source_ids is not None else None
+    if normalized_ids is not None and len(normalized_ids) > 100:
+        raise ValueError("source_ids must contain at most 100 unique values")
+    for name, value in (
+        ("ingested_from", ingested_from),
+        ("ingested_before", ingested_before),
+    ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError(f"{name} must include a timezone offset")
+    normalized_from = ingested_from.astimezone(UTC) if ingested_from is not None else None
+    normalized_before = ingested_before.astimezone(UTC) if ingested_before is not None else None
+    if (
+        normalized_from is not None
+        and normalized_before is not None
+        and normalized_from >= normalized_before
+    ):
+        raise ValueError("ingested_from must be earlier than ingested_before")
+    return normalized_ids, normalized_from, normalized_before
 
 
 class SourceCreate(BaseModel):
@@ -160,12 +185,24 @@ class AnswerRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2_000)
     limit: int = Field(default=8, ge=1, le=12)
     max_per_source: int = Field(default=2, ge=1, le=12)
+    source_ids: list[str] | None = Field(default=None, max_length=100)
+    ingested_from: datetime | None = None
+    ingested_before: datetime | None = None
     min_semantic_score: float = Field(
         default=0.0,
         ge=0.0,
         le=1.0,
         allow_inf_nan=False,
     )
+
+    @model_validator(mode="after")
+    def normalize_filters(self) -> AnswerRequest:
+        self.source_ids, self.ingested_from, self.ingested_before = normalize_retrieval_filters(
+            self.source_ids,
+            self.ingested_from,
+            self.ingested_before,
+        )
+        return self
 
 
 class AnswerStatement(BaseModel):

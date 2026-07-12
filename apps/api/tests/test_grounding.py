@@ -165,6 +165,23 @@ def test_no_retrieval_match_returns_insufficient_evidence_without_model_call(ses
     assert session.scalar(select(ModelRun)) is None
 
 
+def test_filtered_empty_answer_does_not_call_generation_provider(session):
+    indexed_evidence(session)
+    provider = ScriptedGenerationProvider(["must not run"])
+
+    answer = answer_question(
+        session,
+        "operational complexity",
+        provider,
+        source_ids=["source-not-in-scope"],
+    )
+
+    assert answer.status == "insufficient_evidence"
+    assert answer.citations == []
+    assert provider.requests == []
+    assert session.scalar(select(ModelRun)) is None
+
+
 def test_negative_semantic_only_match_is_insufficient_without_generation(session):
     source, _hit = indexed_evidence(session)
     chunk = session.scalar(select(Chunk).where(Chunk.source_id == source.id))

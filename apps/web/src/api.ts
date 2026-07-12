@@ -1,4 +1,4 @@
-import type { GroundedAnswer, IngestionJob, Memory, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
+import type { GroundedAnswer, IngestionJob, Memory, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -33,12 +33,22 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(changes),
     }),
-  search: async (query: string) =>
-    (await request<{ hits: SearchHit[] }>(`/api/v1/search?q=${encodeURIComponent(query)}`)).hits,
-  answer: (question: string) =>
+  search: async (query: string, scope?: SearchScope) => {
+    const params = new URLSearchParams({ q: query });
+    for (const sourceId of scope?.sourceIds ?? []) params.append("source_id", sourceId);
+    if (scope?.ingestedFrom) params.set("ingested_from", scope.ingestedFrom);
+    if (scope?.ingestedBefore) params.set("ingested_before", scope.ingestedBefore);
+    return (await request<{ hits: SearchHit[] }>(`/api/v1/search?${params.toString()}`)).hits;
+  },
+  answer: (question: string, scope?: SearchScope) =>
     request<GroundedAnswer>("/api/v1/answers", {
       method: "POST",
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({
+        question,
+        ...(scope?.sourceIds.length ? { source_ids: scope.sourceIds } : {}),
+        ...(scope?.ingestedFrom ? { ingested_from: scope.ingestedFrom } : {}),
+        ...(scope?.ingestedBefore ? { ingested_before: scope.ingestedBefore } : {}),
+      }),
     }),
   importSource: (title: string, content: string, uri?: string) =>
     request<Source>("/api/v1/sources", {
