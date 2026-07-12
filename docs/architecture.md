@@ -139,9 +139,15 @@ Domain code requests a capability, not a vendor. Persisted model runs record pro
 prompt/template version, input content hashes, latency, token counts when available, and
 validation outcome. Secrets must never be written to logs or model-run records.
 
-Structured results are parsed as untrusted data, validated against versioned schemas, and
-either accepted or moved to a retryable dead-letter state. Provider errors must not corrupt
-existing source or memory records.
+Structured results are parsed as untrusted data and validated against versioned schemas. Invalid
+results persist a failed model run without creating memory. Retry and dead-letter execution remain
+planned. Provider errors must not corrupt existing source or memory records.
+
+Model-assisted decision extraction is implemented as a separate source action. Candidates must
+cite known chunks from the current immutable source version, are deduplicated per version, retain
+the generating `ModelRun`, and always enter the governed review flow as `candidate`. Unknown
+evidence fails the run before any memory object is persisted. Assumption/constraint extraction and
+repair retries remain planned.
 
 ### 7. Retrieval and answering
 

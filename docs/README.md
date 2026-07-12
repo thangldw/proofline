@@ -51,7 +51,10 @@ As of 2026-07-12:
   Precision@10, MRR, and nDCG@10. Real pilot judgments are still required.
 - Also implemented: separate OpenAI-compatible embedding provider, incremental versioned vectors,
   dense cosine retrieval, and reciprocal-rank fusion with lexical results.
+- Also implemented: schema-validated, evidence-grounded AI decision candidates linked to model
+  runs and the existing human review/audit workflow.
 - Not yet implemented: resumable/retryable job execution, scalable vector index, reranker,
-  AI-derived decision review, repair retries, desktop packaging, cloud services, or telemetry.
+  assumption/constraint extraction, repair retries, desktop packaging, cloud services, or
+  telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.
