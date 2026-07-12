@@ -141,7 +141,8 @@ Before delivery work, record:
 - Harden the implemented deterministic citation identifier and quoted-span validation.
 - Extend the implemented citation navigation with a retrieval debug view. Raw results now expose
   channel/rank/score, immutable source version, and exact line/offset diagnostics.
-- Add grounded-QA golden tests and evaluation harness.
+- Maintain the implemented credential-free synthetic grounded-QA golden harness. It exercises the
+  production answer/citation path, but real pilot judgments remain required for quality claims.
 
 ### Exit gate
 

@@ -1,0 +1,121 @@
+{
+  "version": "grounded-seed-v1",
+  "provenance": "synthetic-scripted",
+  "description": "Synthetic credential-free grounded-QA regression fixtures. Expected statements are scripted and do not constitute pilot or model-quality evidence.",
+  "sources": [
+    {
+      "title": "GQA ADR Local storage",
+      "uri": "grounded://adr/storage",
+      "content": "# Local storage\n\nDecision: Use SQLite for local metadata and jobs.\nReason: SQLite provides transactional recovery without operating another service."
+    },
+    {
+      "title": "GQA ADR Messaging",
+      "uri": "grounded://adr/messaging",
+      "content": "# Control-plane messaging\n\nDecision: Use NATS for control-plane messaging.\nReason: The workload is modest and NATS reduces broker operational complexity."
+    },
+    {
+      "title": "GQA ADR Deployment",
+      "uri": "grounded://adr/deployment",
+      "content": "# Local deployment\n\nDecision: Use Docker Compose for the local stack.\nReason: A single-machine deployment should not require Kubernetes cluster orchestration."
+    },
+    {
+      "title": "GQA ADR Observability",
+      "uri": "grounded://adr/observability",
+      "content": "# Observability\n\nDecision: Use OpenTelemetry for traces and metrics.\nConstraint: Source content and prompts must never become telemetry attributes."
+    },
+    {
+      "title": "GQA ADR Authentication",
+      "uri": "grounded://adr/authentication",
+      "content": "# Authentication\n\nDecision: Use OpenID Connect for user login.\nReason: OIDC integrates with identity providers and avoids storing user passwords."
+    }
+  ],
+  "queries": [
+    {
+      "id": "gq01-direct-storage",
+      "question": "Why does local metadata use SQLite transactional recovery?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "SQLite is used for local metadata because it provides transactional recovery without another service.",
+          "kind": "direct",
+          "supporting_source_uris": ["grounded://adr/storage"]
+        }
+      ]
+    },
+    {
+      "id": "gq02-direct-messaging",
+      "question": "Why does control-plane messaging use NATS operational complexity?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "NATS was selected because the workload is modest and it reduces broker operational complexity.",
+          "kind": "direct",
+          "supporting_source_uris": ["grounded://adr/messaging"]
+        }
+      ]
+    },
+    {
+      "id": "gq03-synthesis-local-stack",
+      "question": "How do SQLite local metadata and Docker Compose support a single-machine local deployment?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "SQLite and Docker Compose keep the local stack transactional while avoiding extra services and cluster orchestration.",
+          "kind": "synthesis",
+          "supporting_source_uris": [
+            "grounded://adr/storage",
+            "grounded://adr/deployment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gq04-inference-operability",
+      "question": "What operational simplicity principle connects SQLite metadata and NATS messaging?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "The two decisions suggest a preference for components that reduce local operational overhead.",
+          "kind": "inference",
+          "supporting_source_uris": [
+            "grounded://adr/storage",
+            "grounded://adr/messaging"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gq05-direct-observability",
+      "question": "What telemetry constraint applies to source content and prompts?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "Source content and prompts must not become telemetry attributes.",
+          "kind": "direct",
+          "supporting_source_uris": ["grounded://adr/observability"]
+        }
+      ]
+    },
+    {
+      "id": "gq06-synthesis-sensitive-data",
+      "question": "How do OIDC password avoidance and telemetry prompt exclusion reduce sensitive-data handling?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "OIDC avoids storing passwords while the telemetry constraint prevents source content and prompts from entering attributes.",
+          "kind": "synthesis",
+          "supporting_source_uris": [
+            "grounded://adr/authentication",
+            "grounded://adr/observability"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gq07-insufficient",
+      "question": "Which quantum orchard algorithm schedules lunar robots?",
+      "expected_status": "insufficient_evidence",
+      "expected_statements": []
+    }
+  ]
+}

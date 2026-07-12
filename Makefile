@@ -26,6 +26,9 @@ test:
 
 eval:
 	.venv/bin/proofline eval --dataset evals/retrieval/seed-v1.json --min-recall 0.80 --min-ndcg 0.80
+	.venv/bin/proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json \
+		--min-citation-resolution 1.0 --min-citation-precision 1.0 \
+		--min-grounded-success 1.0 --min-status-accuracy 1.0
 
 check:
 	.venv/bin/ruff check .
