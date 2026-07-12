@@ -56,6 +56,7 @@ class DecisionRead(BaseModel):
     status: str
     confidence: float
     extraction_method: str
+    model_run_id: str | None
     valid_from: datetime | None
     valid_to: datetime | None
     created_at: datetime
