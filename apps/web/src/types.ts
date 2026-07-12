@@ -136,3 +136,31 @@ export type GroundedAnswer = {
     reason: "context_budget";
   }>;
 };
+
+export type ModelRun = {
+  id: string;
+  provider_id: string;
+  model_id: string;
+  operation: string;
+  template_version: string;
+  input_hashes: string[];
+  parent_run_id: string | null;
+  attempt_number: number;
+  repair_reason: string | null;
+  status: string;
+  validation_status: string | null;
+  latency_ms: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  error_code: string | null;
+  created_at: string;
+  finished_at: string | null;
+};
+
+export type ModelRunFilters = {
+  status?: string;
+  operation?: string;
+  providerId?: string;
+  parentRunId?: string;
+  limit?: number;
+};

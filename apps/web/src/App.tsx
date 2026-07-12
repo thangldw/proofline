@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
+import { Activity, BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Evidence, GroundedAnswer, IngestionJob, Memory, MemoryKind, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
+import type { Evidence, GroundedAnswer, IngestionJob, Memory, MemoryKind, ModelRun, ModelRunFilters, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
 
-type View = "search" | "memories" | "sources";
+type View = "search" | "memories" | "sources" | "model runs";
 
 type DeletionState = {
   source: Source;
@@ -53,6 +53,7 @@ export function App() {
         <Nav icon={<Search size={18}/>} active={view === "search"} onClick={() => setView("search")}>Search</Nav>
         <Nav icon={<GitBranch size={18}/>} active={view === "memories"} onClick={() => setView("memories")} count={overview.memories}>Memories</Nav>
         <Nav icon={<BookOpen size={18}/>} active={view === "sources"} onClick={() => setView("sources")} count={overview.sources}>Sources</Nav>
+        <Nav icon={<Activity size={18}/>} active={view === "model runs"} onClick={() => setView("model runs")}>Model runs</Nav>
       </nav>
       <div className="system-status"><span className={error || indexDegraded ? "dot error-dot" : "dot"}/><div><strong>{error ? "API unavailable" : indexDegraded ? "Index degraded" : "Index ready"}</strong><span>{overview.chunks} searchable chunks</span></div></div>
     </aside>
@@ -80,6 +81,7 @@ export function App() {
             current?.item.source_id === sourceId ? null : current)}
         />
       )}
+      {view === "model runs" && <ModelRunsView/>}
     </main>
     {evidence && <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)}/>} 
   </div>;
@@ -87,6 +89,136 @@ export function App() {
 
 function Nav({icon, active, onClick, count, children}: {icon: React.ReactNode; active: boolean; onClick: () => void; count?: number; children: React.ReactNode}) {
   return <button className={active ? "nav-item active" : "nav-item"} onClick={onClick}>{icon}<span>{children}</span>{count !== undefined && <b>{count}</b>}</button>;
+}
+
+type RunLineage = {
+  current: ModelRun;
+  parent: ModelRun | null;
+  children: ModelRun[];
+};
+
+export function ModelRunsView() {
+  const [runs, setRuns] = useState<ModelRun[]>([]);
+  const [status, setStatus] = useState("");
+  const [operation, setOperation] = useState("");
+  const [providerId, setProviderId] = useState("");
+  const [parentRunId, setParentRunId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
+  const [lineage, setLineage] = useState<RunLineage | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  const loadRuns = useCallback(async (filters: ModelRunFilters = {}) => {
+    setLoading(true);
+    setListError("");
+    try {
+      setRuns(await api.modelRuns({ ...filters, limit: 100 }));
+    } catch (reason) {
+      setListError(errorMessage(reason, "Model-run diagnostics are unavailable"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadRuns(); }, [loadRuns]);
+
+  async function openRun(runId: string) {
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      const current = await api.modelRun(runId);
+      const [parent, children] = await Promise.all([
+        current.parent_run_id ? api.modelRun(current.parent_run_id) : Promise.resolve(null),
+        api.modelRuns({ parentRunId: current.id, limit: 100 }),
+      ]);
+      setLineage({ current, parent, children });
+    } catch (reason) {
+      setDetailError(errorMessage(reason, "Model-run detail is unavailable"));
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function applyFilters(event: React.FormEvent) {
+    event.preventDefault();
+    setLineage(null);
+    void loadRuns({
+      status: status.trim() || undefined,
+      operation: operation.trim() || undefined,
+      providerId: providerId.trim() || undefined,
+      parentRunId: parentRunId.trim() || undefined,
+    });
+  }
+
+  function clearFilters() {
+    setStatus("");
+    setOperation("");
+    setProviderId("");
+    setParentRunId("");
+    setLineage(null);
+    void loadRuns();
+  }
+
+  return <section className="content model-runs-view" aria-labelledby="model-runs-heading">
+    <div className="section-heading"><div><span className="eyebrow">SAFE MODEL DIAGNOSTICS</span><h2 id="model-runs-heading">Model runs</h2></div><span className="mode-badge">Metadata only</span></div>
+    <p className="diagnostic-intro">Inspect provider, operation, validation, timing, and repair lineage. Source text, prompts, model output, and credentials are never displayed.</p>
+    <form className="model-run-filters" onSubmit={applyFilters}>
+      <label>Status<select value={status} onChange={event => setStatus(event.target.value)}><option value="">Any status</option><option value="running">Running</option><option value="succeeded">Succeeded</option><option value="failed">Failed</option></select></label>
+      <label>Operation<input value={operation} onChange={event => setOperation(event.target.value)} placeholder="generate or embed"/></label>
+      <label>Provider<input value={providerId} onChange={event => setProviderId(event.target.value)} placeholder="provider ID"/></label>
+      <label>Parent run<input value={parentRunId} onChange={event => setParentRunId(event.target.value)} placeholder="parent run ID"/></label>
+      <div><button type="submit" disabled={loading}>Apply filters</button><button type="button" onClick={clearFilters} disabled={loading}>Clear</button></div>
+    </form>
+    {loading && <div className="diagnostic-state" role="status">Loading safe model-run metadata…</div>}
+    {listError && <div className="integrity-error" role="alert">{listError}</div>}
+    {!loading && !listError && runs.length === 0 && <div className="empty-card" role="status">No model runs match these filters.</div>}
+    {!loading && !listError && runs.length > 0 && <div className="model-run-layout">
+      <div className="model-run-list" aria-label="Model runs">{runs.map(run => <button className={lineage?.current.id === run.id ? "model-run-row selected" : "model-run-row"} key={run.id} onClick={() => void openRun(run.id)} aria-label={`Open model run ${run.id}`} aria-pressed={lineage?.current.id === run.id}>
+        <span><strong>{run.operation}</strong><code>{run.id}</code></span>
+        <span>{run.provider_id}<small>{run.model_id}</small></span>
+        <span className={`run-status ${run.status}`}>{run.status}</span>
+        <time dateTime={run.created_at}>{formatRunTime(run.created_at)}</time>
+      </button>)}</div>
+      <aside className="model-run-detail" aria-live="polite">
+        {detailLoading && <div className="diagnostic-state" role="status">Loading model-run detail and lineage…</div>}
+        {detailError && <div className="integrity-error" role="alert">{detailError}</div>}
+        {!detailLoading && !detailError && !lineage && <div className="diagnostic-state">Select a run to inspect safe details and repair lineage.</div>}
+        {!detailLoading && !detailError && lineage && <ModelRunDetail lineage={lineage} onOpen={openRun}/>}
+      </aside>
+    </div>}
+  </section>;
+}
+
+function ModelRunDetail({lineage, onOpen}: {lineage: RunLineage; onOpen: (runId: string) => Promise<void>}) {
+  const run = lineage.current;
+  return <article>
+    <div className="decision-top"><span className={`run-status ${run.status}`}>{run.status}</span><span>Attempt {run.attempt_number}</span></div>
+    <h3>{run.operation} · {run.provider_id}</h3>
+    <code className="run-id">{run.id}</code>
+    <dl className="run-metadata">
+      <div><dt>Model</dt><dd>{run.model_id}</dd></div>
+      <div><dt>Template</dt><dd>{run.template_version}</dd></div>
+      <div><dt>Validation</dt><dd>{run.validation_status ?? "not recorded"}</dd></div>
+      <div><dt>Latency</dt><dd>{run.latency_ms === null ? "not recorded" : `${run.latency_ms} ms`}</dd></div>
+      <div><dt>Prompt tokens</dt><dd>{run.prompt_tokens ?? "not recorded"}</dd></div>
+      <div><dt>Completion tokens</dt><dd>{run.completion_tokens ?? "not recorded"}</dd></div>
+      <div><dt>Created</dt><dd>{formatRunTime(run.created_at)}</dd></div>
+      <div><dt>Finished</dt><dd>{run.finished_at ? formatRunTime(run.finished_at) : "not finished"}</dd></div>
+      <div><dt>Error code</dt><dd>{run.error_code ?? "none"}</dd></div>
+      <div><dt>Repair reason</dt><dd>{run.repair_reason ?? "none"}</dd></div>
+    </dl>
+    <section className="run-lineage" aria-labelledby="run-lineage-heading"><h4 id="run-lineage-heading">Repair lineage</h4>
+      {lineage.parent ? <button onClick={() => void onOpen(lineage.parent!.id)}><span>Parent</span><code>{lineage.parent.id}</code><small>{lineage.parent.status} · attempt {lineage.parent.attempt_number}</small></button> : <p>No parent repair run.</p>}
+      <div className="lineage-current"><span>Current</span><code>{run.id}</code><small>{run.status} · attempt {run.attempt_number}</small></div>
+      {lineage.children.length > 0 ? lineage.children.map(child => <button key={child.id} onClick={() => void onOpen(child.id)}><span>Child repair</span><code>{child.id}</code><small>{child.status} · attempt {child.attempt_number}</small></button>) : <p>No child repair runs.</p>}
+    </section>
+  </article>;
+}
+
+function formatRunTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "not recorded" : date.toLocaleString();
 }
 
 export function SearchView({onEvidence, sources = []}: {onEvidence: (item: Evidence, title: string) => void; sources?: Source[]}) {

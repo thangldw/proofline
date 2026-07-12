@@ -1,4 +1,4 @@
-import type { GroundedAnswer, IngestionJob, Memory, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
+import type { GroundedAnswer, IngestionJob, Memory, ModelRun, ModelRunFilters, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -20,6 +20,15 @@ export const api = {
   deleteSource: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   jobs: () => request<IngestionJob[]>("/api/v1/jobs?limit=200"),
+  modelRuns: (filters: ModelRunFilters = {}) => {
+    const params = new URLSearchParams({ limit: String(filters.limit ?? 100) });
+    if (filters.status) params.set("status", filters.status);
+    if (filters.operation) params.set("operation", filters.operation);
+    if (filters.providerId) params.set("provider_id", filters.providerId);
+    if (filters.parentRunId) params.set("parent_run_id", filters.parentRunId);
+    return request<ModelRun[]>(`/api/v1/model/runs?${params.toString()}`);
+  },
+  modelRun: (id: string) => request<ModelRun>(`/api/v1/model/runs/${id}`),
   retryJob: (id: string) =>
     request<IngestionJob>(`/api/v1/jobs/${id}/retry`, { method: "POST" }),
   source: (id: string) => request<Source & { content: string }>(`/api/v1/sources/${id}`),
