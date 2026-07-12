@@ -89,10 +89,11 @@ Before delivery work, record:
 
 - Harden the implemented fake/OpenAI-compatible gateway across selected remote and local runtimes.
 - Extend the implemented explicit remote-egress configuration and secret-safe diagnostics.
-- Version extraction prompts and output schemas.
+- Extend the implemented versioned decision-extraction prompt/schema to assumptions and
+  constraints.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
-- Extend the implemented decision review actions and append-only audit trail into an
-  AI-generated candidate queue.
+- Extend the implemented AI decision candidate queue and audit-backed review actions to other
+  memory kinds.
 - Run extraction evaluation across at least one remote and one local/cheap model if available.
 
 ### Exit gate

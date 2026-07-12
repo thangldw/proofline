@@ -48,6 +48,10 @@ Decisions can be accepted, rejected, corrected, or marked obsolete. Every change
 before/after audit event while retaining the original source evidence; complete source deletion
 also removes content-bearing audit records.
 
+Configured generation providers can extract additional decision candidates from a source. Model
+output is schema-validated, must cite server-issued chunk IDs, remains `candidate` until human
+review, records its model run, and is idempotent within an immutable source version.
+
 The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
 against the immutable source version; unknown, missing, or corrupted evidence fails closed.

@@ -73,6 +73,8 @@ implement job retries, folder watching, scalable vector retrieval, AI-derived ca
 grounded-answer repair retries, or desktop packaging. The current hybrid answer path combines
 lexical and dense retrieval through RRF and enforces server-owned evidence IDs plus exact immutable
 citations. Dense scoring is intentionally bounded and not yet a large-vault performance claim.
+Generation providers can also create decision candidates, but only after structured-output and
+evidence-ID validation; candidates remain unaccepted until the user reviews them.
 
 ## MVP outcome
 
