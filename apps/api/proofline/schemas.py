@@ -37,7 +37,7 @@ class SourceCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     content: str = Field(min_length=1, max_length=5_000_000)
     kind: str = Field(default="markdown", pattern="^(markdown|text)$")
-    uri: str | None = None
+    uri: str | None = Field(default=None, max_length=4_096)
 
 
 class FolderScanRequest(BaseModel):

@@ -209,11 +209,12 @@ def extract_memories(content: str) -> list[dict]:
             elif status_match:
                 found_metadata = True
                 normalized = status_match.group(1).strip().lower()
-                status = (
-                    "obsolete"
-                    if normalized in {"superseded", "replaced", "obsolete"}
-                    else normalized
-                )
+                if normalized in {"superseded", "replaced", "obsolete"}:
+                    status = "obsolete"
+                elif normalized in {"candidate", "active", "accepted", "rejected"}:
+                    status = normalized
+                else:
+                    status = "candidate"
                 end = lookahead_cursor + len(lines[next_index].rstrip("\r\n"))
             else:
                 break
@@ -244,7 +245,10 @@ def extract_decisions(content: str) -> list[dict]:
     return [item for item in extract_memories(content) if item["kind"] == "decision"]
 
 
-def _index_version(session: Session, source: Source, version: SourceVersion, content: str) -> None:
+def index_source_version_chunks(
+    session: Session, source: Source, version: SourceVersion, content: str
+) -> None:
+    """Build deterministic chunk and FTS rows without deriving governed memories."""
     for ordinal, span in enumerate(chunk_markdown(content)):
         chunk = Chunk(
             source_id=source.id,
@@ -266,6 +270,9 @@ def _index_version(session: Session, source: Source, version: SourceVersion, con
             {"chunk": chunk.id, "source": source.id, "content": chunk.content},
         )
 
+
+def _index_version(session: Session, source: Source, version: SourceVersion, content: str) -> None:
+    index_source_version_chunks(session, source, version, content)
     for extracted in extract_memories(content):
         quote = extracted.pop("quote")
         span_fields = {

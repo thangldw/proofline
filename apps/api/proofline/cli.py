@@ -28,6 +28,7 @@ from .portability import (
     build_portable_export,
     load_and_verify_export,
 )
+from .portable_import import import_portable_export, load_verified_import
 from .schemas import SourceCreate
 
 
@@ -102,6 +103,10 @@ def main(argv: list[str] | None = None) -> None:
     export.add_argument("--force", action="store_true")
     verify_export = subcommands.add_parser("verify-export", help="Verify a portable JSON snapshot")
     verify_export.add_argument("path", type=Path)
+    import_export = subcommands.add_parser(
+        "import", help="Restore a verified portable JSON snapshot into an empty database"
+    )
+    import_export.add_argument("path", type=Path)
     backup = subcommands.add_parser("backup", help="Create a complete local SQLite backup")
     backup.add_argument("--output", type=Path, required=True)
     backup.add_argument("--force", action="store_true")
@@ -195,6 +200,15 @@ def main(argv: list[str] | None = None) -> None:
         except PortabilityError as exc:
             raise SystemExit(f"export verification failed: {exc.code}") from exc
         print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
+    elif args.command == "import":
+        initialize_database()
+        try:
+            document = load_verified_import(args.path)
+            with SessionLocal() as session, session.begin():
+                report = import_portable_export(session, document)
+        except PortabilityError as exc:
+            raise SystemExit(f"import failed: {exc.code}") from exc
+        print(json.dumps({"valid": True, **report}, sort_keys=True))
     elif args.command == "backup":
         if engine.dialect.name != "sqlite":
             raise SystemExit("backup failed: sqlite_required")

@@ -201,3 +201,17 @@ class ChunkEmbedding(Base):
     vector_json: Mapped[list[float]] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
+class ImportReceipt(Base):
+    """Persistent idempotency receipt for a verified portable export payload."""
+
+    __tablename__ = "import_receipts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    schema: Mapped[str] = mapped_column(String(100))
+    payload_sha256: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    export_app_version: Mapped[str] = mapped_column(String(50))
+    export_created_at: Mapped[datetime] = mapped_column()
+    imported_at: Mapped[datetime] = mapped_column(default=utc_now)
+    counts_json: Mapped[dict] = mapped_column(JSON)

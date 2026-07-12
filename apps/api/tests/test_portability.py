@@ -2,9 +2,10 @@ import copy
 import hashlib
 import json
 import stat
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import proofline.cli as cli_module
+import proofline.portability as portability_module
 import pytest
 from proofline.cli import main
 from proofline.ingestion import ingest_source
@@ -230,6 +231,120 @@ def test_verifier_detects_rehashed_line_and_orphan_memory_tampering(session):
         verify_portable_export(invalid_identity)
 
 
+def rehash(document):
+    document["manifest"]["payload_sha256"] = payload_sha256(document["payload"])
+    return document
+
+
+@pytest.mark.parametrize(
+    ("collection", "field", "value", "error_code"),
+    [
+        ("sources", "title", False, "invalid_source_field"),
+        ("sources", "kind", "pdf", "invalid_source_kind"),
+        ("source_versions", "content_length", True, "invalid_version_content_length"),
+        ("memories", "kind", "fact", "invalid_memory_kind"),
+        ("memories", "status", "approved", "invalid_memory_status"),
+        ("memories", "confidence", 1.01, "invalid_memory_confidence"),
+        ("model_runs", "attempt_number", 0, "invalid_model_attempt"),
+        ("model_runs", "prompt_tokens", -1, "invalid_model_counter"),
+        ("model_runs", "status", "complete", "invalid_model_status"),
+        ("ingestion_jobs", "retryable", 1, "invalid_ingestion_diagnostic"),
+        ("ingestion_jobs", "attempts", -1, "invalid_ingestion_attempts"),
+    ],
+)
+def test_verifier_rejects_invalid_scalar_enum_and_numeric_fields(
+    session, collection, field, value, error_code
+):
+    rich_export_fixture(session)
+    changed = build_portable_export(session)
+    changed["payload"][collection][0][field] = value
+
+    with pytest.raises(PortabilityError, match=error_code):
+        verify_portable_export(rehash(changed))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("created_at", "2026-01-01T00:00:00"),
+        ("created_at", "not-a-date"),
+        ("created_at", 123),
+    ],
+)
+def test_verifier_requires_parseable_timezone_aware_datetimes(session, field, value):
+    rich_export_fixture(session)
+    changed = build_portable_export(session)
+    changed["payload"]["memories"][0][field] = value
+
+    with pytest.raises(PortabilityError, match="invalid_memory_datetime"):
+        verify_portable_export(rehash(changed))
+
+
+def test_verifier_rejects_reversed_validity_and_oversized_fields(session):
+    rich_export_fixture(session)
+    reversed_range = build_portable_export(session)
+    memory = reversed_range["payload"]["memories"][0]
+    memory["valid_from"] = "2026-02-01T00:00:00+00:00"
+    memory["valid_to"] = "2026-01-01T00:00:00+00:00"
+    with pytest.raises(PortabilityError, match="invalid_memory_validity_range"):
+        verify_portable_export(rehash(reversed_range))
+
+    oversized = build_portable_export(session)
+    oversized["payload"]["sources"][0]["title"] = "x" * 301
+    with pytest.raises(PortabilityError, match="invalid_source_field"):
+        verify_portable_export(rehash(oversized))
+
+
+def test_verifier_rejects_nonfinite_json_and_noninteger_counts(session):
+    rich_export_fixture(session)
+    nonfinite = build_portable_export(session)
+    nonfinite["payload"]["memories"][0]["confidence"] = float("inf")
+    with pytest.raises(PortabilityError, match="invalid_payload"):
+        verify_portable_export(nonfinite)
+
+    invalid_count = build_portable_export(session)
+    invalid_count["manifest"]["counts"]["sources"] = True
+    with pytest.raises(PortabilityError, match="invalid_counts"):
+        verify_portable_export(invalid_count)
+
+
+def test_verifier_requires_canonical_order_datetime_and_float(session):
+    rich_export_fixture(session)
+    reversed_versions = build_portable_export(session)
+    reversed_versions["payload"]["source_versions"].reverse()
+    with pytest.raises(PortabilityError, match="noncanonical_order"):
+        verify_portable_export(rehash(reversed_versions))
+
+    shifted_datetime = build_portable_export(session)
+    original = datetime.fromisoformat(shifted_datetime["payload"]["memories"][0]["created_at"])
+    shifted_datetime["payload"]["memories"][0]["created_at"] = original.astimezone(
+        timezone(timedelta(hours=9))
+    ).isoformat()
+    with pytest.raises(PortabilityError, match="invalid_memory_datetime"):
+        verify_portable_export(rehash(shifted_datetime))
+
+    integer_confidence = build_portable_export(session)
+    integer_confidence["payload"]["memories"][0]["confidence"] = 1
+    with pytest.raises(PortabilityError, match="invalid_memory_confidence"):
+        verify_portable_export(rehash(integer_confidence))
+
+
+def test_verifier_derives_identity_and_rejects_duplicate_version_content(session):
+    rich_export_fixture(session)
+    forged_identity = build_portable_export(session)
+    forged_identity["payload"]["sources"][0]["identity_hash"] = "a" * 64
+    with pytest.raises(PortabilityError, match="invalid_source_identity"):
+        verify_portable_export(rehash(forged_identity))
+
+    duplicate = build_portable_export(session)
+    first, second = duplicate["payload"]["source_versions"][:2]
+    second["content"] = first["content"]
+    second["content_hash"] = first["content_hash"]
+    second["content_length"] = first["content_length"]
+    with pytest.raises(PortabilityError, match="duplicate_source_version"):
+        verify_portable_export(rehash(duplicate))
+
+
 def test_atomic_writer_refuses_overwrite_and_enforces_private_permissions(session, tmp_path):
     document = build_portable_export(session)
     output = tmp_path / "portable.json"
@@ -250,6 +365,15 @@ def test_atomic_writer_refuses_overwrite_and_enforces_private_permissions(sessio
     atomic_write_export(output, replacement, force=True)
     assert stat.S_IMODE(output.stat().st_mode) == 0o600
     assert output.read_bytes() != original
+
+
+def test_loader_enforces_size_while_reading(tmp_path, monkeypatch):
+    oversized = tmp_path / "oversized.json"
+    oversized.write_bytes(b"{}" + b" " * 8)
+    monkeypatch.setattr(portability_module, "MAX_EXPORT_BYTES", 8)
+
+    with pytest.raises(PortabilityError, match="export_too_large"):
+        load_and_verify_export(oversized)
 
 
 def test_export_and_verifier_cli_pass_and_fail_safely(session, tmp_path, monkeypatch, capsys):

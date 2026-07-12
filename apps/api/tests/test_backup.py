@@ -3,6 +3,7 @@ import json
 import shutil
 import sqlite3
 import stat
+from datetime import UTC, datetime
 
 import proofline.backup as backup_module
 import proofline.cli as cli_module
@@ -10,7 +11,14 @@ import pytest
 from proofline.backup import BackupError, create_sqlite_backup, verify_sqlite_backup
 from proofline.cli import main
 from proofline.ingestion import ingest_source
-from proofline.models import AuditEvent, Decision, IngestionJob, IngestionJobInput, ModelRun
+from proofline.models import (
+    AuditEvent,
+    Decision,
+    ImportReceipt,
+    IngestionJob,
+    IngestionJobInput,
+    ModelRun,
+)
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
 
@@ -79,6 +87,15 @@ def raw_backup_fixture(session):
             content_hash=hashlib.sha256(private_content.encode()).hexdigest(),
         )
     )
+    session.add(
+        ImportReceipt(
+            schema="proofline-portable-export-v1",
+            payload_sha256="b" * 64,
+            export_app_version="0.1.0a2",
+            export_created_at=datetime(2026, 7, 13, tzinfo=UTC),
+            counts_json={"sources": 2, "source_versions": 2},
+        )
+    )
     session.commit()
     return {
         "source_id": source.id,
@@ -116,6 +133,10 @@ def test_online_backup_is_complete_sensitive_and_live_database_remains_usable(se
         )
         assert recovered.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0] == 1
         assert recovered.execute("SELECT id FROM model_runs").fetchone()[0] == expected["run_id"]
+        assert (
+            recovered.execute("SELECT payload_sha256 FROM import_receipts").fetchone()[0]
+            == "b" * 64
+        )
 
     ingest_source(
         session,

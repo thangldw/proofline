@@ -171,6 +171,16 @@ def test_superseded_source_status_normalizes_to_reviewable_obsolete():
         assert memory["status"] == "obsolete"
 
 
+def test_unknown_source_status_normalizes_to_reviewable_candidate():
+    [memory] = extract_memories("Decision: Choose a queue\nStatus: pending")
+    assert memory["status"] == "candidate"
+
+
+def test_source_uri_is_bounded_at_write_boundary():
+    with pytest.raises(ValueError):
+        SourceCreate(title="Too long", content="Decision: Reject oversized URI", uri="x" * 4_097)
+
+
 def test_ingestion_is_idempotent(session):
     payload = SourceCreate(title="ADR", content="Decision: Use SQLite\nReason: simple local setup")
     first, first_created = ingest_source(session, payload)

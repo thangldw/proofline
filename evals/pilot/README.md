@@ -8,6 +8,10 @@ Use copies in a private, access-controlled workspace. Do not commit raw question
 text, source spans, company names, participant identities, credentials, prompts, or model output.
 Only explicitly approved anonymized aggregates may return to this repository.
 
+The separate [`pilot-simulation/`](../pilot-simulation/) corpus tests the workflow with invented
+personas and sources. Its output is always simulation-only and MUST NOT be copied into these
+external-pilot templates as evidence.
+
 ## Files
 
 - `manifest.v1.template.json`: consent, ownership, study window, retention, and security policy.

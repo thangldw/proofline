@@ -73,8 +73,8 @@ Current and target boundaries are:
 - governed memory review service — implemented for four memory kinds;
 - provider gateway plus safe model-run API and web diagnostics — implemented, with provider settings UI planned;
 - job status, retry, and source diagnostics — implemented; and
-- deletion impact/cascade plus portable export and SQLite backup services — implemented locally,
-  while portable import remains planned.
+- deletion impact/cascade plus portable export/import and SQLite backup services — implemented
+  locally; portable import is intentionally limited to an empty target.
 
 ### 4. Ingestion pipeline
 
@@ -337,8 +337,10 @@ GET    /api/v1/search
 POST   /api/v1/answers
 ```
 
-Portable JSON export/verification and complete SQLite backup/verification are implemented as local
-CLI operations. Portable import is not implemented.
+Portable JSON export/verification, strict empty-database import, and complete SQLite
+backup/verification are implemented as local CLI operations. Import preserves exported domain
+identity in one transaction, rebuilds chunks/FTS without extraction, and records the payload hash;
+merge, overwrite, and ID remapping are not implemented.
 
 Planned MVP operations (exact contracts remain undecided):
 
@@ -393,7 +395,7 @@ These are engineering targets to validate, not current performance claims:
 | --- | --- |
 | Recoverability | Interrupted ingestion can resume without duplicate domain objects |
 | Provenance | 100% of answer citations pass deterministic span validation |
-| Portability | Verified provider-neutral JSON export is implemented; portable import remains open |
+| Portability | Verified JSON export plus transactional empty-database import and receipts are implemented; merge import remains open |
 | Offline behavior | Search and reviewed-memory browsing work without a network |
 | Provider failure | Existing indexed sources remain usable when a model is unavailable |
 | Scale envelope | 10,000 Markdown files / 1 GB text on a developer laptop; benchmark required |

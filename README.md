@@ -168,7 +168,7 @@ npm run test:e2e
 
 The pre-alpha workflow runs source-development smoke checks
 on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. Its checked-in script covers
-installation, local SQLite ingestion/search, exact evidence, portable export,
+installation, local SQLite ingestion/search, exact evidence, portable export/import,
 raw backup verification, and an optimized web build without model
 credentials or external runtime services. A successful hosted receipt for revision `0dde53f` is
 recorded under [`evals/platform/`](evals/platform/github-actions-0dde53f.json). It does not claim
@@ -207,16 +207,25 @@ SQLite backup. Always verify the artifact after creating it:
 ```bash
 .venv/bin/proofline export --output proofline-export.json
 .venv/bin/proofline verify-export proofline-export.json
+.venv/bin/proofline import proofline-export.json
 
 .venv/bin/proofline backup --output proofline-backup.db
 .venv/bin/proofline verify-backup proofline-backup.db
 ```
 
-Portable import is not implemented, so the JSON artifact is not a restorable
-backup. The SQLite backup contains all local data, including sensitive source
-contents and private staged retry inputs. See the
+Portable import accepts schema v1 only and restores into a completely empty initialized database.
+It preserves exported IDs, immutable source versions, governed memories, evidence, safe model-run
+lineage, audit events, and terminal ingestion diagnostics in one transaction. It rebuilds
+deterministic chunks and FTS rows, but not embeddings, and records a payload-hash receipt. It does
+not merge, overwrite, remap IDs, or restore excluded private retry inputs. The SQLite backup remains
+the exact local recovery artifact and contains all local data, including sensitive source contents
+and private staged retry inputs. See the
 [backup and recovery guide](docs/backup-recovery.md) before storing or restoring
 either artifact.
+
+Imported terminal ingestion diagnostics retain their historical `retryable` flag for payload
+fidelity, but their private staged input is intentionally absent. Retrying such a diagnostic fails
+closed to `dead_letter` with `ingestion_input_missing`; re-ingest the authorized source instead.
 
 Folder access is disabled unless roots are explicitly registered. Use the operating-system path
 separator (`:` on Unix-like systems, `;` on Windows), restart the API, then request a scan:

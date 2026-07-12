@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import tempfile
 from datetime import UTC, datetime
@@ -16,6 +17,23 @@ from .models import AuditEvent, Decision, Evidence, IngestionJob, ModelRun, Sour
 
 PORTABLE_EXPORT_SCHEMA = "proofline-portable-export-v1"
 TERMINAL_INGESTION_STATES = {"succeeded", "failed", "dead_letter"}
+SOURCE_KINDS = {"markdown", "text"}
+SOURCE_STATUSES = {"indexed"}
+MEMORY_KINDS = {"decision", "assumption", "constraint", "alternative"}
+MEMORY_STATUSES = {"candidate", "active", "accepted", "rejected", "obsolete"}
+EXTRACTION_METHODS = {"deterministic", "model"}
+MODEL_OPERATIONS = {"generate", "embed"}
+MODEL_RUN_STATUSES = {"running", "succeeded", "failed"}
+MODEL_VALIDATION_STATUSES = {
+    "not_requested",
+    "valid",
+    "invalid",
+    "grounding_invalid",
+}
+INGESTION_STAGES = {"accepted", "indexing", "ready", "parse", "failed"}
+MAX_CONTENT_LENGTH = 5_000_000
+MAX_COUNTER = 2**63 - 1
+MAX_EXPORT_BYTES = 256 * 1024 * 1024
 PAYLOAD_KEYS = {
     "sources",
     "source_versions",
@@ -337,10 +355,283 @@ def _by_id(items: list[dict[str, Any]], code: str) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for item in items:
         identifier = item.get("id")
-        if not isinstance(identifier, str) or not identifier or identifier in result:
+        if (
+            not isinstance(identifier, str)
+            or not identifier
+            or len(identifier) > 36
+            or identifier in result
+        ):
             raise PortabilityError(code)
         result[identifier] = item
     return result
+
+
+def _require_string(
+    value: Any,
+    code: str,
+    *,
+    max_length: int,
+    nullable: bool = False,
+    allow_empty: bool = False,
+) -> str | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, str) or (not allow_empty and not value) or len(value) > max_length:
+        raise PortabilityError(code)
+    return value
+
+
+def _require_enum(value: Any, allowed: set[str], code: str, *, nullable: bool = False) -> None:
+    if value is None and nullable:
+        return
+    if not isinstance(value, str) or value not in allowed:
+        raise PortabilityError(code)
+
+
+def _require_integer(
+    value: Any,
+    code: str,
+    *,
+    minimum: int = 0,
+    maximum: int = MAX_COUNTER,
+    nullable: bool = False,
+) -> int | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum or value > maximum:
+        raise PortabilityError(code)
+    return value
+
+
+def _require_number(
+    value: Any,
+    code: str,
+    *,
+    minimum: float,
+    maximum: float,
+) -> float:
+    if (
+        not isinstance(value, float)
+        or not math.isfinite(value)
+        or value < minimum
+        or value > maximum
+        or (value == 0 and math.copysign(1, value) < 0)
+    ):
+        raise PortabilityError(code)
+    return float(value)
+
+
+def _require_datetime(value: Any, code: str, *, nullable: bool = False) -> datetime | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, str) or not value or len(value) > 64:
+        raise PortabilityError(code)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (ValueError, OverflowError) as exc:
+        raise PortabilityError(code) from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise PortabilityError(code)
+    if _iso(parsed) != value:
+        raise PortabilityError(code)
+    return parsed
+
+
+def _require_canonical_order(arrays: dict[str, list[dict[str, Any]]]) -> None:
+    expected = {
+        "sources": sorted(arrays["sources"], key=lambda item: item["id"]),
+        "source_versions": sorted(
+            arrays["source_versions"],
+            key=lambda item: (item["source_id"], item["version_number"], item["id"]),
+        ),
+    }
+    for key in PAYLOAD_KEYS - {"sources", "source_versions"}:
+        expected[key] = sorted(arrays[key], key=lambda item: item["id"])
+    if any(arrays[key] != expected[key] for key in PAYLOAD_KEYS):
+        raise PortabilityError("noncanonical_order")
+
+
+def _require_hash(value: Any, code: str) -> None:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise PortabilityError(code)
+
+
+def _require_id(value: Any, code: str, *, nullable: bool = False) -> None:
+    _require_string(value, code, max_length=36, nullable=nullable)
+
+
+def _require_json_value(value: Any, code: str, *, depth: int = 0) -> None:
+    if depth > 20:
+        raise PortabilityError(code)
+    if value is None or isinstance(value, (str, bool)):
+        return
+    if isinstance(value, int):
+        if abs(value) > MAX_COUNTER:
+            raise PortabilityError(code)
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise PortabilityError(code)
+        return
+    if isinstance(value, list):
+        if len(value) > 10_000:
+            raise PortabilityError(code)
+        for item in value:
+            _require_json_value(item, code, depth=depth + 1)
+        return
+    if isinstance(value, dict):
+        if len(value) > 10_000 or not all(isinstance(key, str) for key in value):
+            raise PortabilityError(code)
+        for item in value.values():
+            _require_json_value(item, code, depth=depth + 1)
+        return
+    raise PortabilityError(code)
+
+
+def _validate_scalar_fields(
+    manifest: dict[str, Any], arrays: dict[str, list[dict[str, Any]]]
+) -> None:
+    _require_datetime(manifest["created_at"], "invalid_manifest_datetime")
+    _require_string(manifest["app_version"], "invalid_manifest", max_length=50)
+    _require_hash(manifest["payload_sha256"], "invalid_manifest_hash")
+
+    for source in arrays["sources"]:
+        _require_string(source["title"], "invalid_source_field", max_length=300)
+        _require_enum(source["kind"], SOURCE_KINDS, "invalid_source_kind")
+        _require_string(
+            source["uri"],
+            "invalid_source_field",
+            # Schema v1 predates the 4 KiB write-boundary limit; keep old exports restorable.
+            max_length=MAX_CONTENT_LENGTH,
+            nullable=True,
+            allow_empty=True,
+        )
+        _require_hash(source["identity_hash"], "invalid_source_identity")
+        _require_enum(source["status"], SOURCE_STATUSES, "invalid_source_status")
+        _require_datetime(source["created_at"], "invalid_source_datetime")
+        _require_datetime(source["indexed_at"], "invalid_source_datetime")
+        _require_id(source["current_version_id"], "invalid_current_version")
+
+    for version in arrays["source_versions"]:
+        _require_id(version["source_id"], "invalid_version_reference")
+        _require_hash(version["content_hash"], "invalid_version_hash")
+        _require_string(
+            version["content"],
+            "invalid_version_content",
+            max_length=MAX_CONTENT_LENGTH,
+            allow_empty=True,
+        )
+        _require_integer(version["version_number"], "invalid_version_number", minimum=1)
+        _require_integer(
+            version["content_length"],
+            "invalid_version_content_length",
+            maximum=MAX_CONTENT_LENGTH,
+        )
+        _require_enum(version["status"], SOURCE_STATUSES, "invalid_version_status")
+        _require_string(version["parser_version"], "invalid_version_field", max_length=30)
+        _require_datetime(version["created_at"], "invalid_version_datetime")
+
+    for memory in arrays["memories"]:
+        _require_id(memory["source_id"], "invalid_memory_reference")
+        _require_id(memory["source_version_id"], "invalid_memory_reference")
+        _require_enum(memory["kind"], MEMORY_KINDS, "invalid_memory_kind")
+        _require_string(memory["title"], "invalid_memory_field", max_length=300)
+        _require_string(memory["statement"], "invalid_memory_field", max_length=MAX_CONTENT_LENGTH)
+        _require_string(
+            memory["rationale"],
+            "invalid_memory_field",
+            max_length=MAX_CONTENT_LENGTH,
+            nullable=True,
+            allow_empty=True,
+        )
+        _require_enum(memory["status"], MEMORY_STATUSES, "invalid_memory_status")
+        _require_number(memory["confidence"], "invalid_memory_confidence", minimum=0, maximum=1)
+        _require_enum(memory["extraction_method"], EXTRACTION_METHODS, "invalid_extraction_method")
+        _require_id(memory["model_run_id"], "invalid_memory_model_reference", nullable=True)
+        valid_from = _require_datetime(
+            memory["valid_from"], "invalid_memory_datetime", nullable=True
+        )
+        valid_to = _require_datetime(memory["valid_to"], "invalid_memory_datetime", nullable=True)
+        if valid_from is not None and valid_to is not None and valid_from > valid_to:
+            raise PortabilityError("invalid_memory_validity_range")
+        _require_datetime(memory["created_at"], "invalid_memory_datetime")
+        _require_datetime(memory["updated_at"], "invalid_memory_datetime")
+
+    for item in arrays["evidence"]:
+        for field in ("memory_id", "source_id", "source_version_id"):
+            _require_id(item[field], "invalid_evidence_reference")
+        _require_string(item["quote"], "invalid_evidence_span", max_length=MAX_CONTENT_LENGTH)
+        _require_hash(item["quote_hash"], "invalid_evidence_quote_hash")
+        for field in ("start_offset", "end_offset"):
+            _require_integer(item[field], "invalid_evidence_span", maximum=MAX_CONTENT_LENGTH)
+        for field in ("start_line", "end_line"):
+            _require_integer(item[field], "invalid_evidence_line", minimum=1)
+
+    for run in arrays["model_runs"]:
+        _require_string(run["provider_id"], "invalid_model_metadata", max_length=100)
+        _require_string(run["model_id"], "invalid_model_metadata", max_length=200)
+        _require_enum(run["operation"], MODEL_OPERATIONS, "invalid_model_operation")
+        _require_string(run["template_version"], "invalid_model_metadata", max_length=80)
+        if not isinstance(run["input_hashes"], list) or len(run["input_hashes"]) > 10_000:
+            raise PortabilityError("invalid_model_metadata")
+        for input_hash in run["input_hashes"]:
+            _require_hash(input_hash, "invalid_model_metadata")
+        _require_id(run["parent_run_id"], "invalid_model_lineage", nullable=True)
+        _require_integer(run["attempt_number"], "invalid_model_attempt", minimum=1)
+        _require_string(
+            run["repair_reason"], "invalid_model_metadata", max_length=80, nullable=True
+        )
+        _require_enum(run["status"], MODEL_RUN_STATUSES, "invalid_model_status")
+        _require_enum(
+            run["validation_status"],
+            MODEL_VALIDATION_STATUSES,
+            "invalid_model_validation_status",
+            nullable=True,
+        )
+        for field in ("latency_ms", "prompt_tokens", "completion_tokens"):
+            _require_integer(run[field], "invalid_model_counter", nullable=True)
+        _require_string(run["error_code"], "invalid_model_metadata", max_length=80, nullable=True)
+        _require_datetime(run["created_at"], "invalid_model_datetime")
+        _require_datetime(run["finished_at"], "invalid_model_datetime", nullable=True)
+
+    for event in arrays["audit_events"]:
+        _require_string(event["actor"], "invalid_audit_field", max_length=100)
+        _require_string(event["action"], "invalid_audit_field", max_length=80)
+        _require_enum(
+            event["object_type"], {"source", "memory", "decision"}, "invalid_audit_reference"
+        )
+        _require_id(event["object_id"], "invalid_audit_reference")
+        if not isinstance(event["before"], dict) or not isinstance(event["after"], dict):
+            raise PortabilityError("invalid_audit_snapshot")
+        _require_json_value(event["before"], "invalid_audit_snapshot")
+        _require_json_value(event["after"], "invalid_audit_snapshot")
+        _require_datetime(event["created_at"], "invalid_audit_datetime")
+
+    for job in arrays["ingestion_jobs"]:
+        _require_id(job["source_id"], "invalid_job_reference", nullable=True)
+        _require_id(job["source_version_id"], "invalid_job_reference", nullable=True)
+        _require_enum(job["kind"], {"source_ingestion"}, "invalid_ingestion_diagnostic")
+        _require_enum(job["state"], TERMINAL_INGESTION_STATES, "invalid_ingestion_diagnostic")
+        _require_enum(job["stage"], INGESTION_STAGES, "invalid_ingestion_diagnostic")
+        attempts = _require_integer(job["attempts"], "invalid_ingestion_attempts", minimum=1)
+        max_attempts = _require_integer(
+            job["max_attempts"], "invalid_ingestion_attempts", minimum=1
+        )
+        if attempts is not None and max_attempts is not None and attempts > max_attempts:
+            raise PortabilityError("invalid_ingestion_attempts")
+        _require_string(
+            job["error_code"], "invalid_ingestion_diagnostic", max_length=80, nullable=True
+        )
+        if not isinstance(job["retryable"], bool):
+            raise PortabilityError("invalid_ingestion_diagnostic")
+        for field in ("created_at", "updated_at"):
+            _require_datetime(job[field], "invalid_ingestion_datetime")
+        for field in ("started_at", "finished_at"):
+            _require_datetime(job[field], "invalid_ingestion_datetime", nullable=True)
 
 
 def verify_portable_export(document: Any) -> dict[str, int]:
@@ -353,12 +644,14 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         raise PortabilityError("unexpected_fields")
     if manifest.get("schema") != PORTABLE_EXPORT_SCHEMA:
         raise PortabilityError("unsupported_schema")
-    if not isinstance(manifest.get("created_at"), str) or not isinstance(
-        manifest.get("app_version"), str
-    ):
-        raise PortabilityError("invalid_manifest")
     expected_hash = manifest.get("payload_sha256")
-    if not isinstance(expected_hash, str) or payload_sha256(payload) != expected_hash:
+    if not isinstance(expected_hash, str):
+        raise PortabilityError("payload_hash_mismatch")
+    try:
+        actual_hash = payload_sha256(payload)
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise PortabilityError("invalid_payload") from exc
+    if actual_hash != expected_hash:
         raise PortabilityError("payload_hash_mismatch")
 
     arrays = {key: _require_array(payload[key], "invalid_payload") for key in PAYLOAD_KEYS}
@@ -366,8 +659,13 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         raise PortabilityError("unexpected_fields")
     counts = _require_mapping(manifest.get("counts"), "invalid_counts")
     expected_counts = {key: len(arrays[key]) for key in sorted(PAYLOAD_KEYS)}
-    if counts != expected_counts:
+    if set(counts) != PAYLOAD_KEYS or any(
+        _require_integer(counts[key], "invalid_counts") != expected_counts[key]
+        for key in PAYLOAD_KEYS
+    ):
         raise PortabilityError("count_mismatch")
+
+    _validate_scalar_fields(manifest, arrays)
 
     sources = _by_id(arrays["sources"], "invalid_source_id")
     versions = _by_id(arrays["source_versions"], "invalid_version_id")
@@ -376,8 +674,10 @@ def verify_portable_export(document: Any) -> dict[str, int]:
     model_runs = _by_id(arrays["model_runs"], "invalid_model_run_id")
     _by_id(arrays["audit_events"], "invalid_audit_id")
     _by_id(arrays["ingestion_jobs"], "invalid_job_id")
+    _require_canonical_order(arrays)
 
     version_numbers: dict[str, set[int]] = {source_id: set() for source_id in sources}
+    version_hashes: dict[str, set[str]] = {source_id: set() for source_id in sources}
     for version in versions.values():
         source_id = version.get("source_id")
         content = version.get("content")
@@ -392,6 +692,10 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         ):
             raise PortabilityError("invalid_version_number")
         version_numbers[source_id].add(version_number)
+        content_hash = version.get("content_hash")
+        if content_hash in version_hashes[source_id]:
+            raise PortabilityError("duplicate_source_version")
+        version_hashes[source_id].add(content_hash)
         if hashlib.sha256(content.encode("utf-8")).hexdigest() != version.get("content_hash"):
             raise PortabilityError("source_content_hash_mismatch")
         if version.get("content_length") != len(content):
@@ -404,6 +708,9 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             or len(identity_hash) != 64
             or any(value not in "0123456789abcdef" for value in identity_hash)
         ):
+            raise PortabilityError("invalid_source_identity")
+        expected_identity = hashlib.sha256(f"source:{source['id']}".encode()).hexdigest()
+        if identity_hash != expected_identity:
             raise PortabilityError("invalid_source_identity")
         current = versions.get(source.get("current_version_id"))
         if not current or current.get("source_id") != source["id"]:
@@ -515,12 +822,24 @@ def verify_portable_export(document: Any) -> dict[str, int]:
     return expected_counts
 
 
-def load_and_verify_export(path: Path) -> dict[str, int]:
+def load_verified_export_document(path: Path) -> dict[str, Any]:
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        with path.open("rb") as handle:
+            encoded = handle.read(MAX_EXPORT_BYTES + 1)
+        if len(encoded) > MAX_EXPORT_BYTES:
+            raise PortabilityError("export_too_large")
+        document = json.loads(encoded.decode("utf-8"))
+    except PortabilityError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise PortabilityError("export_unreadable") from exc
-    return verify_portable_export(document)
+    verify_portable_export(document)
+    return document
+
+
+def load_and_verify_export(path: Path) -> dict[str, int]:
+    document = load_verified_export_document(path)
+    return document["manifest"]["counts"]
 
 
 def atomic_write_export(path: Path, document: dict[str, Any], *, force: bool = False) -> None:

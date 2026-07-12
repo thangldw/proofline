@@ -11,13 +11,14 @@ Proofline produces two different artifacts:
 
 | Artifact | Purpose | Contains | Does not contain |
 | --- | --- | --- | --- |
-| Portable JSON export | Inspectable, provider-neutral knowledge snapshot | immutable source versions, governed memories, exact evidence, safe model-run lineage, relevant audit and terminal ingestion metadata | derived chunks/indexes/embeddings, private staged retry inputs, credentials, prompts; import is not implemented |
+| Portable JSON export | Inspectable, provider-neutral knowledge snapshot and empty-database restore | immutable source versions, governed memories, exact evidence, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; merge/overwrite import is not implemented |
 | SQLite backup | Exact recovery of the current local deployment | the complete SQLite database, including source contents, historical versions, indexes, embeddings, audit data, model metadata, and staged ingestion inputs | external files or secrets stored outside SQLite |
 
-The portable export is **not a restorable backup** in the current pre-alpha.
-Its SHA-256 manifest detects accidental modification and the verifier checks
-internal references and exact evidence spans; it is not a digital signature or
-proof of authenticity.
+The portable export is restorable only into an empty initialized database. It is not an exact
+replacement for the SQLite backup because private retry inputs, embeddings, and derived index IDs
+are intentionally excluded. Its SHA-256 manifest detects accidental modification and the verifier
+checks internal references and exact evidence spans; it is not a digital signature or proof of
+authenticity.
 
 ## Create and verify a portable export
 
@@ -30,6 +31,26 @@ Run commands from the repository root after `make setup`:
 
 Both export and backup refuse to overwrite an existing output unless `--force`
 is supplied. Output files are created with owner-only permissions (`0600`).
+
+## Restore a portable export into an empty database
+
+```bash
+PROOFLINE_DATABASE_URL=sqlite:///./restored.db \
+  .venv/bin/proofline import proofline-export.json
+```
+
+The importer verifies the size-bounded schema-v1 document before writing. It preserves exported
+IDs and timestamps, rebuilds deterministic chunks and SQLite FTS rows without running extraction,
+leaves embeddings empty for explicit re-indexing, and commits a unique receipt for the payload
+hash. Any validation, constraint, indexing, or final payload-equivalence failure rolls back the
+whole import.
+
+A target containing any domain data, index rows, retry inputs, or previous import receipt fails
+with `target_not_empty`. There is no merge, overwrite, `--force`, or ID-remapping mode. Source URIs
+are preserved as provenance metadata and may refer to paths that do not exist on the new machine.
+Terminal ingestion diagnostics preserve their historical `retryable` value for exact payload
+fidelity, but excluded staged inputs cannot be recreated. Retrying one fails closed to
+`dead_letter` with `ingestion_input_missing`; operators must re-ingest the authorized source.
 
 ## Create and verify a SQLite backup
 

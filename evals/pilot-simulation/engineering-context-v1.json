@@ -1,0 +1,141 @@
+{
+  "version": "engineering-context-simulation-v1",
+  "provenance": "synthetic-simulation",
+  "description": "Credential-free synthetic engineering tasks for exercising the pilot collection and metric shape. These invented tasks and scripted answers are never external pilot evidence.",
+  "sources": [
+    {
+      "title": "Synthetic ADR Authentication",
+      "uri": "synthetic://adr/authentication",
+      "content": "# Authentication\n\nDecision: Use OpenID Connect for workforce login.\nRationale: Delegating authentication avoids storing workforce passwords in Proofline."
+    },
+    {
+      "title": "Synthetic ADR Messaging",
+      "uri": "synthetic://adr/messaging",
+      "content": "# Messaging revision 1\n\nDecision: Use NATS for job events.\nRationale: The expected throughput is modest and NATS is operationally small.",
+      "revisions": [
+        "# Messaging revision 2\n\nDecision: Use Redis Streams for job events.\nRationale: Load tests exceeded the original throughput assumption and the platform team already operates Redis.\nStatus: active"
+      ]
+    },
+    {
+      "title": "Synthetic Incident Retry Storm",
+      "uri": "synthetic://incident/retry-storm",
+      "content": "# Retry storm incident\n\nThe ingestion queue saturated when clients retried without jitter. The mitigation added exponential backoff with jitter and a bounded retry count."
+    },
+    {
+      "title": "Synthetic ADR Local Storage",
+      "uri": "synthetic://adr/local-storage",
+      "content": "# Local storage\n\nDecision: Use SQLite for local metadata and ingestion jobs.\nRationale: SQLite provides transactional recovery without requiring another local service."
+    },
+    {
+      "title": "Synthetic Operations Ownership",
+      "uri": "synthetic://operations/ownership",
+      "content": "# Operational ownership\n\nThe platform engineer owns ingestion queue alerts. The incident commander owns severity declaration and the application engineer owns retry-client remediation."
+    },
+    {
+      "title": "Synthetic ADR Telemetry",
+      "uri": "synthetic://adr/telemetry",
+      "content": "# Telemetry\n\nDecision: Use OpenTelemetry for traces and metrics.\nConstraint: Source content, credentials, and model prompts must never be telemetry attributes."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "sim-01-local-recovery",
+      "persona": "platform_engineer",
+      "intent": "rationale",
+      "question": "Why does local metadata use SQLite transactional recovery without another service?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "SQLite provides transactional recovery without requiring another local service.",
+          "kind": "direct",
+          "supporting_source_uris": ["synthetic://adr/local-storage"]
+        }
+      ]
+    },
+    {
+      "id": "sim-02-sensitive-data",
+      "persona": "security_engineer",
+      "intent": "decision",
+      "question": "How do OpenID Connect password avoidance and telemetry prompt constraints reduce sensitive data handling?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "OIDC avoids stored workforce passwords, while telemetry excludes source content, credentials, and prompts.",
+          "kind": "synthesis",
+          "supporting_source_uris": [
+            "synthetic://adr/authentication",
+            "synthetic://adr/telemetry"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sim-03-retry-incident",
+      "persona": "incident_commander",
+      "intent": "incident",
+      "question": "What caused the ingestion queue retry storm and which jitter mitigation was applied?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "Clients retried without jitter; exponential backoff with jitter and bounded retries mitigated the storm.",
+          "kind": "direct",
+          "supporting_source_uris": ["synthetic://incident/retry-storm"]
+        }
+      ]
+    },
+    {
+      "id": "sim-04-current-messaging",
+      "persona": "software_architect",
+      "intent": "change",
+      "temporal": true,
+      "question": "Which job event messaging decision is current after load tests exceeded the throughput assumption and why Redis Streams?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "Redis Streams is current because load tests exceeded the original assumption and Redis is already operated by the team.",
+          "kind": "direct",
+          "supporting_source_uris": ["synthetic://adr/messaging"]
+        }
+      ]
+    },
+    {
+      "id": "sim-05-alert-owner",
+      "persona": "engineering_manager",
+      "intent": "ownership",
+      "question": "Who owns ingestion queue alerts and retry client remediation?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "The platform engineer owns queue alerts and the application engineer owns retry-client remediation.",
+          "kind": "direct",
+          "supporting_source_uris": ["synthetic://operations/ownership"]
+        }
+      ]
+    },
+    {
+      "id": "sim-06-operability-pattern",
+      "persona": "software_architect",
+      "intent": "rationale",
+      "question": "What operational pattern connects SQLite without another service and Redis already operated by the platform team?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "The decisions favor reuse and avoiding additional operational services.",
+          "kind": "inference",
+          "supporting_source_uris": [
+            "synthetic://adr/local-storage",
+            "synthetic://adr/messaging"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sim-07-correct-abstention",
+      "persona": "platform_engineer",
+      "intent": "validity",
+      "question": "Which lunar orchard compiler controls the titanium weather satellites?",
+      "expected_status": "insufficient_evidence",
+      "expected_statements": []
+    }
+  ]
+}

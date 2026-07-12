@@ -18,15 +18,17 @@ def main() -> None:
         os.environ["PROOFLINE_ALLOW_REMOTE_AI"] = "false"
 
         from proofline.backup import create_sqlite_backup, verify_sqlite_backup
-        from proofline.database import SessionLocal, engine, initialize_database
+        from proofline.database import SessionLocal, engine, initialize_database, make_engine
         from proofline.ingestion import ingest_source
         from proofline.portability import (
             atomic_write_export,
             build_portable_export,
             load_and_verify_export,
         )
+        from proofline.portable_import import import_portable_export, load_verified_import
         from proofline.retrieval import lexical_search
         from proofline.schemas import SourceCreate
+        from sqlalchemy.orm import sessionmaker
 
         initialize_database()
         first_content = (
@@ -76,6 +78,16 @@ def main() -> None:
         atomic_write_export(export_path, document)
         export_counts = load_and_verify_export(export_path)
 
+        restored_engine = make_engine(f"sqlite:///{root / 'restored.db'}")
+        initialize_database(restored_engine)
+        restored_sessions = sessionmaker(bind=restored_engine, expire_on_commit=False)
+        with restored_sessions() as restored, restored.begin():
+            import_report = import_portable_export(restored, load_verified_import(export_path))
+        with restored_sessions() as restored:
+            restored_hits = lexical_search(restored, "inspectable versions", limit=5)
+            assert restored_hits and restored_hits[0].source_id == source.id
+        restored_engine.dispose()
+
         backup_path = root / "proofline-backup.db"
         backup_report = create_sqlite_backup(engine, backup_path)
         assert verify_sqlite_backup(backup_path) == backup_report
@@ -86,6 +98,7 @@ def main() -> None:
                     "status": "ok",
                     "sources": export_counts["sources"],
                     "source_versions": export_counts["source_versions"],
+                    "import_payload_sha256": import_report["payload_sha256"],
                     "migration_version": backup_report["migration_version"],
                 },
                 sort_keys=True,

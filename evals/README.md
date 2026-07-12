@@ -2,6 +2,29 @@
 
 Evaluation datasets are versioned inputs, not product marketing claims.
 
+## Synthetic pilot simulation
+
+`pilot-simulation/engineering-context-v1.json` contains invented sources and seven scripted tasks
+across five engineering personas. It exercises real local migrations, immutable source revisions,
+deterministic ingestion and retrieval, the grounded-answer path, and exact citation resolution.
+
+Run it without credentials or network access:
+
+```bash
+make simulate-pilot
+```
+
+The report includes task completion against scripted expectations, citation resolution and source
+precision, and local latency observations. It also compares the number of unique cited sources with
+a deliberately naive deterministic reference: scan sources in sorted URI order until all expected
+sources have been encountered, or scan the full corpus for an expected abstention. This is a source
+inspection count, not measured human time and not a comparison with a team's real tools.
+
+Every report is labeled `synthetic_pilot_simulation`. These fixtures cannot satisfy any external
+pilot gate, estimate human usefulness, adoption, willingness to pay, or production latency. They
+only validate the pilot metric shape and credential-free product path. A checked-in observation may
+be kept under `pilot-simulation/receipts/`; its latency applies only to the recorded local run.
+
 `retrieval/seed-v1.json` remains the immutable first synthetic lexical baseline, including three
 paraphrase queries that record its known lexical-overlap gap. `retrieval/seed-v2.json` is the current
 credential-free gate. V2 has 26 queries, Unicode lexical cases, and ten sources with an initial and

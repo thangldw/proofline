@@ -23,6 +23,7 @@ REQUIRED_CORE_TABLES = {
     "chunk_embeddings",
     "ingestion_jobs",
     "ingestion_job_inputs",
+    "import_receipts",
 }
 
 

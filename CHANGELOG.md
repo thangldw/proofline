@@ -7,7 +7,21 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.1.0-alpha.2`.
+### Added
+
+- A strict schema-v1 portable JSON import command restores exported domain records into an empty
+  database in one transaction, preserves exact IDs/history/evidence, rebuilds chunks and FTS
+  without re-running extraction, and records a unique payload-hash receipt.
+- A versioned credential-free pilot simulation exercises seven scripted engineering-context tasks
+  across five invented personas and records citation/source-inspection metrics with explicit
+  simulation-only qualification.
+
+### Security
+
+- Portable export verification now bounds input size and validates scalar types, enums, numeric
+  ranges, timezone-aware timestamps, JSON depth, model lineage, and exact provenance before import.
+- Import rejects non-empty targets and rolls back on any write, index, constraint, or final
+  payload-equivalence failure without exposing source content in its error contract.
 
 ## [0.1.0-alpha.2] - 2026-07-13
 

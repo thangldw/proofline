@@ -1,13 +1,16 @@
 import hashlib
+from datetime import UTC, datetime
 
+import pytest
 from proofline.backup import create_sqlite_backup, verify_sqlite_backup
 from proofline.database import initialize_database, make_engine
 from proofline.ingestion import delete_source, source_deletion_impact
 from proofline.migrations import MIGRATIONS, _initial_schema
-from proofline.models import Source
+from proofline.models import ImportReceipt, Source
 from proofline.portability import build_portable_export, verify_portable_export
 from proofline.retrieval import lexical_search
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 
@@ -24,7 +27,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == list(range(1, 12))
+    assert versions == list(range(1, 14))
     assert {
         "sources",
         "source_versions",
@@ -36,6 +39,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "model_runs",
         "chunk_embeddings",
         "ingestion_job_inputs",
+        "import_receipts",
     } <= tables
     engine.dispose()
 
@@ -89,7 +93,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 12))
+    assert versions == list(range(1, 14))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -223,7 +227,7 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 12))
+    assert versions == list(range(1, 14))
     engine.dispose()
 
 
@@ -279,22 +283,122 @@ def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
             ),
             {"now": now},
         )
+        connection.execute(
+            text(
+                """INSERT INTO decisions
+                   (id, source_id, source_version_id, kind, title, statement, status, confidence,
+                    extraction_method, created_at, updated_at)
+                   VALUES ('memory-v10-custom', 'source-v10', 'version-v10', 'decision',
+                           'Review queue', 'Review queue', 'PENDING', 1.0,
+                           'deterministic', :now, :now)"""
+            ),
+            {"now": now},
+        )
 
     initialize_database(engine)
     initialize_database(engine)
 
     with engine.connect() as connection:
-        status = connection.execute(
-            text("SELECT status FROM decisions WHERE id = 'memory-v10'")
-        ).scalar_one()
+        statuses = dict(
+            connection.execute(text("SELECT id, status FROM decisions ORDER BY id")).all()
+        )
         versions = (
             connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
             .scalars()
             .all()
         )
-    assert status == "obsolete"
-    assert versions == list(range(1, 12))
+    assert statuses == {"memory-v10": "obsolete", "memory-v10-custom": "candidate"}
+    assert versions == list(range(1, 14))
     engine.dispose()
+
+
+def test_v11_database_gains_persistent_unique_import_receipts(tmp_path):
+    database_path = tmp_path / "v11-import-receipts.db"
+    engine = make_engine(f"sqlite:///{database_path}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:11]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+
+    initialize_database(engine)
+    export_created_at = datetime(2026, 7, 13, 1, 2, 3, tzinfo=UTC)
+    with Session(engine) as session:
+        receipt = ImportReceipt(
+            schema="proofline-portable-export-v1",
+            payload_sha256="a" * 64,
+            export_app_version="0.1.0a2",
+            export_created_at=export_created_at,
+            counts_json={"sources": 2, "source_versions": 3},
+        )
+        session.add(receipt)
+        session.commit()
+        receipt_id = receipt.id
+        assert receipt.imported_at is not None
+
+    engine.dispose()
+    reopened = make_engine(f"sqlite:///{database_path}")
+    initialize_database(reopened)
+    with Session(reopened) as session:
+        receipt = session.scalar(select(ImportReceipt).where(ImportReceipt.id == receipt_id))
+        assert receipt is not None
+        assert receipt.schema == "proofline-portable-export-v1"
+        assert receipt.payload_sha256 == "a" * 64
+        assert receipt.export_app_version == "0.1.0a2"
+        assert receipt.export_created_at == export_created_at.replace(tzinfo=None)
+        assert receipt.counts_json == {"sources": 2, "source_versions": 3}
+
+        session.add(
+            ImportReceipt(
+                schema="proofline-portable-export-v1",
+                payload_sha256="a" * 64,
+                export_app_version="0.1.0a2",
+                export_created_at=export_created_at,
+                counts_json={},
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+    with reopened.connect() as connection:
+        columns = {
+            column["name"]: column for column in inspect(connection).get_columns("import_receipts")
+        }
+        versions = (
+            connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            .scalars()
+            .all()
+        )
+        indexes = {
+            row[1]: row[2]
+            for row in connection.exec_driver_sql("PRAGMA index_list(import_receipts)")
+        }
+    assert set(columns) == {
+        "id",
+        "schema",
+        "payload_sha256",
+        "export_app_version",
+        "export_created_at",
+        "imported_at",
+        "counts_json",
+    }
+    assert columns["imported_at"]["default"] == "CURRENT_TIMESTAMP"
+    assert indexes["ix_import_receipts_payload_sha256"] == 1
+    assert versions == list(range(1, 14))
+    reopened.dispose()
 
 
 def test_populated_foundation_database_is_backfilled_without_changing_ids(tmp_path):
