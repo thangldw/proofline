@@ -1,0 +1,54 @@
+{
+  "version": "seed-v1",
+  "provenance": "synthetic",
+  "description": "Synthetic engineering ADR fixtures for regression testing only; not pilot evidence.",
+  "sources": [
+    {
+      "title": "ADR-001 Local storage",
+      "uri": "eval://adr/storage",
+      "content": "# Local database\n\nDecision: Use SQLite for local metadata and jobs.\nReason: It provides transactional recovery without operating another service.\nAlternative: PostgreSQL remains appropriate for a hosted multi-user deployment."
+    },
+    {
+      "title": "ADR-002 Control-plane messaging",
+      "uri": "eval://adr/messaging",
+      "content": "# Message bus\n\nDecision: Use NATS for control-plane messaging.\nReason: The workload is modest and NATS reduces broker operational complexity.\nAlternative: Kafka was rejected because the throughput requirement does not justify its operations cost."
+    },
+    {
+      "title": "ADR-003 Authentication",
+      "uri": "eval://adr/auth",
+      "content": "# Identity federation\n\nDecision: Use OpenID Connect (OIDC) for user login.\nReason: OIDC integrates with existing identity providers and avoids storing passwords.\nConstraint: Enterprise deployments may require SAML federation through an OIDC bridge."
+    },
+    {
+      "title": "ADR-004 Local deployment",
+      "uri": "eval://adr/deployment",
+      "content": "# Local packaging\n\nDecision: Use Docker Compose for the self-hosted local stack.\nReason: A single-machine deployment should not require a cluster.\nAlternative: Kubernetes was rejected for the local edition because orchestration overhead exceeds the workload."
+    },
+    {
+      "title": "ADR-005 Observability",
+      "uri": "eval://adr/observability",
+      "content": "# Telemetry instrumentation\n\nDecision: Use OpenTelemetry for traces and metrics.\nReason: Vendor-neutral instrumentation keeps hosted and self-hosted backends replaceable.\nConstraint: Source content and prompts must never be telemetry attributes."
+    },
+    {
+      "title": "ADR-006 Local caching",
+      "uri": "eval://adr/cache",
+      "content": "# Cache policy\n\nDecision: Use an in-process LRU cache for local query metadata.\nReason: Local mode has one process and does not need network cache coherence.\nAlternative: Redis is deferred until a hosted deployment demonstrates cross-process cache requirements."
+    }
+  ],
+  "queries": [
+    {"id": "q01", "question": "Why use SQLite for the local database?", "relevance": {"eval://adr/storage": 3}},
+    {"id": "q02", "question": "transactional recovery for metadata jobs", "relevance": {"eval://adr/storage": 3}},
+    {"id": "q03", "question": "Why was NATS selected as the message bus?", "relevance": {"eval://adr/messaging": 3}},
+    {"id": "q04", "question": "broker operational complexity and Kafka throughput", "relevance": {"eval://adr/messaging": 3}},
+    {"id": "q05", "question": "Which protocol handles user login and identity providers?", "relevance": {"eval://adr/auth": 3}},
+    {"id": "q06", "question": "OIDC and SAML federation", "relevance": {"eval://adr/auth": 3}},
+    {"id": "q07", "question": "How is the local self-hosted stack packaged?", "relevance": {"eval://adr/deployment": 3}},
+    {"id": "q08", "question": "Why reject Kubernetes cluster orchestration?", "relevance": {"eval://adr/deployment": 3}},
+    {"id": "q09", "question": "vendor-neutral traces and metrics instrumentation", "relevance": {"eval://adr/observability": 3}},
+    {"id": "q10", "question": "What telemetry data must exclude prompts?", "relevance": {"eval://adr/observability": 3}},
+    {"id": "q11", "question": "Why use an in-process LRU cache?", "relevance": {"eval://adr/cache": 3}},
+    {"id": "q12", "question": "When should Redis cross-process caching be considered?", "relevance": {"eval://adr/cache": 3}},
+    {"id": "q13", "question": "single-node persistence choice", "relevance": {"eval://adr/storage": 3}},
+    {"id": "q14", "question": "lightweight event transport", "relevance": {"eval://adr/messaging": 3}},
+    {"id": "q15", "question": "avoid credential custody", "relevance": {"eval://adr/auth": 3}}
+  ]
+}

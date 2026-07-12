@@ -7,10 +7,31 @@ from sqlalchemy.orm import Session
 
 from .schemas import SearchHit
 
+ENGLISH_QUERY_STOPWORDS = {
+    "a",
+    "and",
+    "be",
+    "for",
+    "how",
+    "is",
+    "should",
+    "the",
+    "to",
+    "use",
+    "was",
+    "what",
+    "when",
+    "which",
+    "why",
+}
+
 
 def lexical_search(session: Session, query: str, limit: int = 10) -> list[SearchHit]:
     """Search current source versions while treating user input as terms, not FTS syntax."""
-    terms = re.findall(r"[\w\-]+", query, flags=re.UNICODE)
+    raw_terms = re.findall(r"[\w\-]+", query, flags=re.UNICODE)
+    terms = [term for term in raw_terms if term.casefold() not in ENGLISH_QUERY_STOPWORDS]
+    if not terms:
+        terms = raw_terms
     if not terms:
         return []
     fts_query = " OR ".join(f'"{term}"' for term in terms)

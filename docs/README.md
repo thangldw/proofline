@@ -47,6 +47,8 @@ As of 2026-07-12:
   explicit remote egress, structured-output validation, and persisted model-run diagnostics.
 - Also implemented: bounded lexical evidence packs, typed grounded statements, server-resolved
   exact citations, insufficient-evidence behavior, and fail-closed grounding validation.
+- Also implemented: a versioned synthetic retrieval corpus and CI gate for Recall@10,
+  Precision@10, MRR, and nDCG@10. Real pilot judgments are still required.
 - Not yet implemented: resumable/retryable job execution, embeddings/hybrid retrieval,
   AI-derived decision review, repair retries, desktop packaging, cloud services, or telemetry.
 
