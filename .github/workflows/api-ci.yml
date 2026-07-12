@@ -70,10 +70,14 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Test web application
+        run: npm run test:web
+
       - name: Build web application
-        run: |
-          npm ci
-          npm run build:web
+        run: npm run build:web
 
   container:
     runs-on: ubuntu-latest

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "tsc -b"
+    "test": "tsc -b && vitest run"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -14,8 +14,12 @@
     "lucide-react": "^0.468.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
     "vite": "^6.4.3",
+    "vitest": "^4.0.17",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "typescript": "^5.7.2"

@@ -22,6 +22,7 @@ embed:
 
 test:
 	.venv/bin/pytest -q
+	npm run test:web
 
 eval:
 	.venv/bin/proofline eval --dataset evals/retrieval/seed-v1.json --min-recall 0.80 --min-ndcg 0.80

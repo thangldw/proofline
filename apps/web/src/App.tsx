@@ -70,21 +70,48 @@ function Nav({icon, active, onClick, count, children}: {icon: React.ReactNode; a
   return <button className={active ? "nav-item active" : "nav-item"} onClick={onClick}>{icon}<span>{children}</span>{count !== undefined && <b>{count}</b>}</button>;
 }
 
-function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) => void}) {
+export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) => void}) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [answer, setAnswer] = useState<GroundedAnswer | null>(null);
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [answerError, setAnswerError] = useState("");
   async function run(event: React.FormEvent) {
     event.preventDefault();
     if (query.trim().length < 2) return;
     setBusy(true);
+    setSearchError("");
+    setAnswerError("");
+    setAnswer(null);
+    setHits([]);
+    setSearched(false);
     try {
-      const [nextHits, nextAnswer] = await Promise.all([api.search(query), api.answer(query)]);
-      setHits(nextHits);
-      setAnswer(nextAnswer);
-      setSearched(true);
+      const searchRequest = api.search(query).then(
+        nextHits => {
+          setHits(nextHits);
+          setSearched(true);
+        },
+        reason => {
+          setSearchError(errorMessage(reason, "Search failed"));
+          setSearched(true);
+        },
+      );
+      const answerRequest = api.answer(query).then(
+        nextAnswer => {
+          setAnswer(nextAnswer);
+          if (nextAnswer.status === "provider_unavailable") {
+            setAnswerError("Answer generation is unavailable. Showing raw retrieval results.");
+          }
+        },
+        reason => {
+          setAnswerError(
+            `${errorMessage(reason, "Answer generation failed")}. Showing raw retrieval results.`,
+          );
+        },
+      );
+      await Promise.allSettled([searchRequest, answerRequest]);
     } finally {
       setBusy(false);
     }
@@ -101,13 +128,31 @@ function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) =
       end_line: citation.end_line,
     }, citation.source_title);
   }
+  const citationById = new Map(answer?.citations.map(citation => [citation.evidence_id, citation]));
+  const unresolvedEvidenceIds = answer
+    ? [...new Set(answer.statements.flatMap(statement => statement.evidence_ids))]
+      .filter(evidenceId => !citationById.has(evidenceId))
+    : [];
+  const integrityFailed = unresolvedEvidenceIds.length > 0;
   return <section className="content search-view">
     <form className="search-box" onSubmit={run}><FileSearch/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search why a system was built this way…" aria-label="Search engineering memory"/><button disabled={busy}>{busy ? "Searching" : "Search"}</button></form>
     {!searched && <div className="hero-empty"><div className="line-art">↳</div><h2>Follow every claim back to its source.</h2><p>Search technical decisions, rationale, and implementation context. Proofline returns inspectable evidence—not an uncited answer.</p></div>}
-    {answer && <article className="result-card"><div className="decision-top"><span className="mode-badge">{answer.status.replaceAll("_", " ")}</span>{answer.model_run_id && <span>Run {answer.model_run_id.slice(0, 8)}</span>}</div><h2>Evidence-backed answer</h2><p>{answer.answer}</p>{answer.statements.map((statement, index) => <p key={`${statement.kind}-${index}`}><strong>{statement.kind}</strong> · {statement.text}</p>)}<footer>{answer.citations.map(citation => <button key={citation.evidence_id} onClick={() => openCitation(citation)}>{citation.source_title} · L{citation.start_line}–{citation.end_line}</button>)}</footer></article>}
+    {answerError && <div className="degraded-banner" role="status">{answerError}</div>}
+    {searchError && <div className="error-banner inline-error" role="alert">{searchError}</div>}
+    {answer && <article className="result-card answer-card"><div className="decision-top"><span className={`mode-badge${integrityFailed ? " integrity-failed" : ""}`}>{integrityFailed ? "integrity failure" : answer.status.replaceAll("_", " ")}</span>{answer.model_run_id && <span>Run {answer.model_run_id.slice(0, 8)}</span>}</div><h2>{integrityFailed ? "Answer citation integrity failed" : "Evidence-backed answer"}</h2>{integrityFailed && <div className="integrity-error" role="alert">Citation integrity failed: {unresolvedEvidenceIds.length} referenced evidence {unresolvedEvidenceIds.length === 1 ? "ID is" : "IDs are"} unavailable.</div>}{!integrityFailed && <><p>{answer.answer}</p><div className="answer-statements">{answer.statements.map((statement, index) => {
+      const statementCitations = [...new Set(statement.evidence_ids)].flatMap(evidenceId => {
+        const citation = citationById.get(evidenceId);
+        return citation ? [citation] : [];
+      });
+      return <article className="answer-statement" aria-label={`Answer statement: ${statement.kind}`} key={`${statement.kind}-${index}`}><div><span className={`statement-kind ${statement.kind}`}>{statement.kind}</span><p>{statement.text}</p></div>{statementCitations.length > 0 && <footer>{statementCitations.map(citation => <button key={citation.evidence_id} onClick={() => openCitation(citation)}>{citation.source_title} · L{citation.start_line}–{citation.end_line}</button>)}</footer>}</article>;
+    })}</div></>}</article>}
     {searched && <div className="results"><div className="section-heading"><div><span className="eyebrow">RAW RETRIEVAL</span><h2>{hits.length} evidence matches</h2></div><span className="mode-badge">{hits.some(hit => hit.retrieval_channels.includes("semantic")) ? "Hybrid · RRF" : "Lexical · FTS5"}</span></div>
       {hits.length === 0 ? <div className="empty-card">Insufficient evidence. Try another phrase or import a source.</div> : hits.map(hit => <article className="result-card" key={hit.chunk_id}><div className="result-meta"><span>{hit.source_title}</span><button onClick={() => onEvidence({id: hit.chunk_id, source_id: hit.source_id, source_version_id: hit.source_version_id, quote: hit.content, start_offset: hit.start_offset, end_offset: hit.end_offset, start_line: hit.start_line, end_line: hit.end_line}, hit.source_title)}>Lines {hit.start_line}–{hit.end_line}</button></div><p>{hit.content}</p></article>)}</div>}
   </section>;
+}
+
+function errorMessage(reason: unknown, fallback: string): string {
+  return reason instanceof Error && reason.message ? reason.message : fallback;
 }
 
 function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
