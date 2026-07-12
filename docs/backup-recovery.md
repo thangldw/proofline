@@ -69,6 +69,22 @@ The backup contains sensitive source text and may contain private staged retry
 payloads, request identifiers, and embeddings. File permissions are not
 encryption. Encrypt backups at rest, restrict access, and store keys separately.
 
+## Verify live provenance
+
+After restoring either format, run the read-only semantic verifier against the configured live
+database:
+
+```bash
+PROOFLINE_DATABASE_URL=sqlite:////absolute/proofline.db \
+  .venv/bin/proofline verify-integrity
+```
+
+Unlike `verify-backup`, which proves SQLite structure, foreign keys, schema, and migration state,
+this command also checks Proofline's provenance invariants: immutable version hashes and lengths,
+source/current-version coherence, exact chunk and evidence offsets and lines, evidence quote
+hashes, embedding ownership, and exact FTS row correspondence. It does not repair data or emit
+source content. A failure exits nonzero with a stable content-free code.
+
 ## Restore a verified local backup
 
 1. Verify the candidate with `proofline verify-backup` using the same Proofline

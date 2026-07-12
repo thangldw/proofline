@@ -74,7 +74,9 @@ Current and target boundaries are:
 - provider gateway plus safe model-run API and web diagnostics — implemented, with provider settings UI planned;
 - job status, retry, and source diagnostics — implemented; and
 - deletion impact/cascade plus portable export/import and SQLite backup services — implemented
-  locally; portable import is intentionally limited to an empty target.
+  locally; portable import is intentionally limited to an empty target; and
+- read-only semantic integrity verification — implemented for SQLite source/version, exact-span,
+  embedding-ownership, and FTS invariants.
 
 ### 4. Ingestion pipeline
 
@@ -352,8 +354,9 @@ GET    /api/v1/search
 POST   /api/v1/answers
 ```
 
-Portable JSON export/verification, strict empty-database import, and complete SQLite
-backup/verification are implemented as local CLI operations. Import preserves exported domain
+Portable JSON export/verification, strict empty-database import, complete SQLite
+backup/verification, and live semantic integrity verification are implemented as local CLI
+operations. Import preserves exported domain
 identity in one transaction, rebuilds chunks/FTS without extraction, and records the payload hash;
 merge, overwrite, and ID remapping are not implemented.
 
@@ -397,6 +400,7 @@ The local product needs useful diagnostics without exporting sensitive content:
 - provider health and capability checks;
 - retrieval channel scores and fusion rank in a debug view;
 - citation validation failures;
+- local provenance-integrity failures reported as stable content-free codes;
 - queue depth and dead-letter count; and
 - schema and migration version.
 

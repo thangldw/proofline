@@ -7,7 +7,15 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.1.0-alpha.4`.
+### Added
+
+- A read-only `proofline verify-integrity` command checks live SQLite provenance invariants and
+  emits only counts or stable content-free failure codes.
+
+### Fixed
+
+- Inference statements now require exact evidence IDs and use the same bounded repair path as
+  direct and synthesis statements.
 
 ## [0.1.0-alpha.4] - 2026-07-13
 

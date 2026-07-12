@@ -212,6 +212,7 @@ SQLite backup. Always verify the artifact after creating it:
 
 .venv/bin/proofline backup --output proofline-backup.db
 .venv/bin/proofline verify-backup proofline-backup.db
+.venv/bin/proofline verify-integrity
 ```
 
 Portable import accepts schema v1 only and restores into a completely empty initialized database.
@@ -223,6 +224,11 @@ the exact local recovery artifact and contains all local data, including sensiti
 and private staged retry inputs. See the
 [backup and recovery guide](docs/backup-recovery.md) before storing or restoring
 either artifact.
+
+`verify-integrity` performs a read-only semantic check of the configured live SQLite database. It
+validates source identities and immutable versions, exact chunk and evidence spans, evidence
+hashes, embedding ownership, and FTS rows. Success output contains counts only; failures return a
+stable code without source text. Run it after a restore and before creating a release artifact.
 
 Imported terminal ingestion diagnostics retain their historical `retryable` flag for payload
 fidelity, but their private staged input is intentionally absent. Retrying such a diagnostic fails

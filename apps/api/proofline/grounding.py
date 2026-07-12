@@ -112,8 +112,8 @@ def build_generation_request(question: str, hits: list[SearchHit]) -> Generation
                 role="system",
                 content=(
                     "Answer only from the supplied evidence. Return JSON matching the schema. "
-                    "Every direct or synthesis statement must cite one or more supplied "
-                    "evidence_id values. Label any reasoning beyond direct evidence as inference."
+                    "Every statement must cite one or more supplied evidence_id values. Label "
+                    "any reasoning beyond direct evidence as inference."
                 ),
             ),
             ChatMessage(role="user", content=prompt),
@@ -224,7 +224,7 @@ def answer_question(
         statements: list[AnswerStatement] = []
         validation_error: str | None = None
         for statement in draft.statements:
-            if statement.kind in {"direct", "synthesis"} and not statement.evidence_ids:
+            if not statement.evidence_ids:
                 validation_error = "grounding_missing_citation"
                 break
             unknown = [item for item in statement.evidence_ids if item not in hit_by_id]
