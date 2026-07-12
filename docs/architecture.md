@@ -181,7 +181,9 @@ receive at most one repair call with the same provider, model, evidence pack, in
 temperature zero. Initial and repair calls remain separate `ModelRun` records linked by
 `parent_run_id`; invalid output and validation details are neither persisted nor copied into the
 repair prompt. Transport retries and model-run dead-letter handling remain planned. Provider errors
-must not corrupt existing source or memory records.
+must not corrupt existing source or memory records. Safe list/detail endpoints expose run status,
+operation, provider, validation metadata, and parent/child repair lineage; they never expose source
+content, prompt messages, model output, or credentials.
 
 Model-assisted governed memory extraction is implemented as a separate source action for decisions,
 assumptions, constraints, and alternatives. Candidates must cite known chunks from the current
