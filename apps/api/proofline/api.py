@@ -13,9 +13,20 @@ from .ingestion import (
     delete_source,
     run_ingestion_job,
 )
-from .models import Chunk, Decision, Evidence, IngestionJob, Source, SourceVersion
+from .models import (
+    AuditEvent,
+    Chunk,
+    Decision,
+    Evidence,
+    IngestionJob,
+    Source,
+    SourceVersion,
+    utc_now,
+)
 from .schemas import (
+    AuditEventRead,
     DecisionRead,
+    DecisionUpdate,
     IngestionJobRead,
     Overview,
     SearchHit,
@@ -46,6 +57,16 @@ def decision_to_read(decision: Decision, source_title: str | None = None) -> Dec
     return DecisionRead.model_validate(decision).model_copy(
         update={"source_title": source_title, "evidence": decision.evidence}
     )
+
+
+def decision_snapshot(decision: Decision) -> dict[str, str | None]:
+    return {
+        "title": decision.title,
+        "statement": decision.statement,
+        "rationale": decision.rationale,
+        "status": decision.status,
+        "updated_at": decision.updated_at.isoformat(),
+    }
 
 
 @router.get("/overview", response_model=Overview)
@@ -226,6 +247,56 @@ def get_decision(decision_id: str, session: Session = Depends(get_session)) -> D
     if not row:
         raise HTTPException(status_code=404, detail="Decision not found")
     return decision_to_read(row[0], row[1])
+
+
+@router.patch("/decisions/{decision_id}", response_model=DecisionRead)
+def update_decision(
+    decision_id: str,
+    payload: DecisionUpdate,
+    session: Session = Depends(get_session),
+) -> DecisionRead:
+    decision = session.scalar(
+        select(Decision).where(Decision.id == decision_id).options(selectinload(Decision.evidence))
+    )
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=422, detail="No decision changes supplied")
+    before = decision_snapshot(decision)
+    for field, value in changes.items():
+        setattr(decision, field, value)
+    decision.updated_at = utc_now()
+    after = decision_snapshot(decision)
+    session.add(
+        AuditEvent(
+            actor="local_user",
+            action="decision.updated",
+            object_type="decision",
+            object_id=decision.id,
+            before_json=before,
+            after_json=after,
+        )
+    )
+    session.commit()
+    source_title = session.scalar(select(Source.title).where(Source.id == decision.source_id))
+    session.refresh(decision)
+    return decision_to_read(decision, source_title)
+
+
+@router.get("/audit-events", response_model=list[AuditEventRead])
+def list_audit_events(
+    object_type: str | None = None,
+    object_id: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    session: Session = Depends(get_session),
+) -> list[AuditEvent]:
+    query = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    if object_type:
+        query = query.where(AuditEvent.object_type == object_type)
+    if object_id:
+        query = query.where(AuditEvent.object_id == object_id)
+    return list(session.scalars(query).all())
 
 
 @router.get("/search", response_model=SearchResponse)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -85,6 +85,7 @@ class Decision(Base):
     valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     evidence: Mapped[list[Evidence]] = relationship(cascade="all, delete-orphan")
 
@@ -125,3 +126,16 @@ class IngestionJob(Base):
     retryable: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    actor: Mapped[str] = mapped_column(String(100), default="local_user")
+    action: Mapped[str] = mapped_column(String(80))
+    object_type: Mapped[str] = mapped_column(String(50), index=True)
+    object_id: Mapped[str] = mapped_column(String(36), index=True)
+    before_json: Mapped[dict] = mapped_column(JSON)
+    after_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)

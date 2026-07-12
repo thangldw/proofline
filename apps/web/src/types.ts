@@ -37,6 +37,8 @@ export type Decision = {
   status: string;
   confidence: number;
   extraction_method: string;
+  created_at: string;
+  updated_at: string;
   evidence: Evidence[];
 };
 

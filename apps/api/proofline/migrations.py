@@ -210,10 +210,34 @@ def _add_ingestion_jobs(connection: Connection) -> None:
     )
 
 
+def _add_memory_audit(connection: Connection) -> None:
+    decision_columns = {column["name"] for column in inspect(connection).get_columns("decisions")}
+    if "updated_at" not in decision_columns:
+        connection.exec_driver_sql("ALTER TABLE decisions ADD COLUMN updated_at DATETIME")
+        connection.exec_driver_sql("UPDATE decisions SET updated_at = created_at")
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS audit_events (
+            id VARCHAR(36) PRIMARY KEY,
+            actor VARCHAR(100) NOT NULL,
+            action VARCHAR(80) NOT NULL,
+            object_type VARCHAR(50) NOT NULL,
+            object_id VARCHAR(36) NOT NULL,
+            before_json TEXT NOT NULL,
+            after_json TEXT NOT NULL,
+            created_at DATETIME NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_audit_events_object "
+        "ON audit_events (object_type, object_id, created_at)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
     (3, "observable ingestion jobs", _add_ingestion_jobs),
+    (4, "governed memory audit trail", _add_memory_audit),
 )
 
 

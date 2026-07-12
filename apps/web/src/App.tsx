@@ -48,9 +48,19 @@ export function App() {
       <header className="topbar"><div><span className="eyebrow">EVIDENCE-FIRST MEMORY</span><h1>{view[0].toUpperCase() + view.slice(1)}</h1></div>
         <label className="import-button"><Upload size={16}/>{importing ? "Indexing…" : "Import Markdown"}<input type="file" accept=".md,.txt,text/markdown,text/plain" disabled={importing} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }}/></label>
       </header>
-      {view === "search" && <SearchView onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>} 
-      {view === "decisions" && <DecisionView decisions={decisions} onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>} 
-      {view === "sources" && <SourcesView sources={sources}/>} 
+      {view === "search" && (
+        <SearchView onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>
+      )}
+      {view === "decisions" && (
+        <DecisionView
+          decisions={decisions}
+          onChanged={refresh}
+          onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}
+        />
+      )}
+      {view === "sources" && (
+        <SourcesView sources={sources}/>
+      )}
     </main>
     {evidence && <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)}/>} 
   </div>;
@@ -71,9 +81,10 @@ function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) =
   </section>;
 }
 
-function DecisionView({decisions, onEvidence}: {decisions: Decision[]; onEvidence: (item: Evidence, title: string) => void}) {
+function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
+  async function setStatus(id: string, status: "accepted" | "rejected" | "obsolete") { await api.updateDecision(id, {status}); await onChanged(); }
   return <section className="content"><div className="section-heading"><div><span className="eyebrow">DECISION REGISTRY</span><h2>Recorded technical choices</h2></div><span className="mode-badge">{decisions.length} extracted</span></div>
-    {decisions.length === 0 ? <div className="empty-card">No decisions yet. Import a Markdown ADR containing a “Decision:” or “Quyết định:” section.</div> : <div className="decision-grid">{decisions.map(decision => <article className="decision-card" key={decision.id}><div className="decision-top"><span className={`status ${decision.status}`}>{decision.status}</span><span>{Math.round(decision.confidence * 100)}% · {decision.extraction_method}</span></div><h3>{decision.statement}</h3>{decision.rationale && <p>{decision.rationale}</p>}<footer><span>{decision.source_title}</span>{decision.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, decision.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>)}</div>}
+    {decisions.length === 0 ? <div className="empty-card">No decisions yet. Import a Markdown ADR containing a “Decision:” or “Quyết định:” section.</div> : <div className="decision-grid">{decisions.map(decision => <article className="decision-card" key={decision.id}><div className="decision-top"><span className={`status ${decision.status}`}>{decision.status}</span><span>{Math.round(decision.confidence * 100)}% · {decision.extraction_method}</span></div><h3>{decision.statement}</h3>{decision.rationale && <p>{decision.rationale}</p>}<div className="review-actions"><button onClick={() => void setStatus(decision.id, "accepted")}>Accept</button><button onClick={() => void setStatus(decision.id, "rejected")}>Reject</button><button onClick={() => void setStatus(decision.id, "obsolete")}>Mark obsolete</button></div><footer><span>{decision.source_title}</span>{decision.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, decision.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>)}</div>}
   </section>;
 }
 

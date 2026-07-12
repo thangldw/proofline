@@ -305,6 +305,18 @@ def run_ingestion_job(session: Session, payload: SourceCreate) -> tuple[Source, 
 
 def delete_source(session: Session, source: Source) -> None:
     session.execute(
+        text(
+            """DELETE FROM audit_events
+               WHERE object_type = 'decision'
+                 AND object_id IN (SELECT id FROM decisions WHERE source_id = :source)"""
+        ),
+        {"source": source.id},
+    )
+    session.execute(
+        text("DELETE FROM audit_events WHERE object_type = 'source' AND object_id = :source"),
+        {"source": source.id},
+    )
+    session.execute(
         text("DELETE FROM chunk_search WHERE source_id = :source"), {"source": source.id}
     )
     session.delete(source)
