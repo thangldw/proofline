@@ -171,6 +171,11 @@ class ModelRun(Base):
     operation: Mapped[str] = mapped_column(String(50))
     template_version: Mapped[str] = mapped_column(String(80))
     input_hashes: Mapped[list[str]] = mapped_column(JSON)
+    parent_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("model_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer, default=1)
+    repair_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
     status: Mapped[str] = mapped_column(String(30), index=True)
     validation_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

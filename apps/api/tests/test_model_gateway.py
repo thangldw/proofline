@@ -3,6 +3,7 @@ import json
 import httpx
 import pytest
 from proofline.model_gateway import (
+    MAX_STRUCTURED_OUTPUT_BYTES,
     ChatMessage,
     EmbeddingRequest,
     EmbeddingValidationError,
@@ -62,6 +63,21 @@ def test_invalid_structured_output_is_a_persisted_failure(session):
     assert run.status == "failed"
     assert run.validation_status == "invalid"
     assert run.error_code == "structured_output_invalid"
+
+
+def test_oversized_structured_output_fails_without_persisting_content(session):
+    sentinel = "PRIVATE-OVERSIZED-OUTPUT"
+    provider = FakeGenerationProvider(sentinel + ("x" * MAX_STRUCTURED_OUTPUT_BYTES))
+
+    with pytest.raises(StructuredOutputError) as raised:
+        run_generation(session, provider, request_with_secret(), DecisionOutput)
+
+    assert raised.value.error_code == "structured_output_too_large"
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.error_code == "structured_output_too_large"
+    assert sentinel not in " ".join(
+        str(getattr(run, column.name)) for column in ModelRun.__table__.columns
+    )
 
 
 def test_remote_provider_requires_explicit_egress_opt_in():

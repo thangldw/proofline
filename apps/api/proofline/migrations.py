@@ -341,6 +341,24 @@ def _generalize_governed_memory(connection: Connection) -> None:
     connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_decisions_kind ON decisions (kind)")
 
 
+def _add_model_run_repair_lineage(connection: Connection) -> None:
+    columns = {column["name"] for column in inspect(connection).get_columns("model_runs")}
+    additions = {
+        "parent_run_id": "VARCHAR(36) REFERENCES model_runs(id) ON DELETE SET NULL",
+        "attempt_number": "INTEGER NOT NULL DEFAULT 1",
+        "repair_reason": "VARCHAR(80)",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            connection.exec_driver_sql(f"ALTER TABLE model_runs ADD COLUMN {name} {definition}")
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_model_runs_parent_run_id ON model_runs (parent_run_id)"
+    )
+    connection.exec_driver_sql(
+        "UPDATE model_runs SET attempt_number = 1 WHERE attempt_number IS NULL"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -351,6 +369,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (7, "model-derived decision candidates", _link_decisions_to_model_runs),
     (8, "resumable atomic ingestion jobs", _add_resumable_ingestion_jobs),
     (9, "generalized governed memory kinds", _generalize_governed_memory),
+    (10, "bounded model output repair lineage", _add_model_run_repair_lineage),
 )
 
 

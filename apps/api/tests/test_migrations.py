@@ -16,7 +16,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert {
         "sources",
         "source_versions",
@@ -81,7 +81,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 10))
+    assert versions == list(range(1, 11))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -155,6 +155,67 @@ def test_v8_decisions_are_backfilled_as_decision_kind(tmp_path):
         indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list(decisions)")}
     assert dict(memory) == {"id": "decision-v8", "kind": "decision"}
     assert "ix_decisions_kind" in indexes
+    engine.dispose()
+
+
+def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v9-model-runs.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:9]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+        connection.execute(
+            text(
+                """INSERT INTO model_runs
+                   (id, provider_id, model_id, operation, template_version, input_hashes,
+                    status, validation_status, created_at)
+                   VALUES ('legacy-run', 'fake', 'legacy-model', 'generate', 'legacy-v1',
+                           '["hash"]', 'succeeded', 'valid', :now)"""
+            ),
+            {"now": "2026-07-12T00:00:00+00:00"},
+        )
+
+    initialize_database(engine)
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        run = (
+            connection.execute(
+                text(
+                    "SELECT id, parent_run_id, attempt_number, repair_reason "
+                    "FROM model_runs WHERE id = 'legacy-run'"
+                )
+            )
+            .mappings()
+            .one()
+        )
+        indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list(model_runs)")}
+        versions = (
+            connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            .scalars()
+            .all()
+        )
+    assert dict(run) == {
+        "id": "legacy-run",
+        "parent_run_id": None,
+        "attempt_number": 1,
+        "repair_reason": None,
+    }
+    assert "ix_model_runs_parent_run_id" in indexes
+    assert versions == list(range(1, 11))
     engine.dispose()
 
 

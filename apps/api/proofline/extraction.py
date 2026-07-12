@@ -8,9 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .model_gateway import (
+    MAX_GENERATION_ATTEMPTS,
+    REPAIRABLE_OUTPUT_CODES,
     ChatMessage,
     GenerationProvider,
     GenerationRequest,
+    StructuredOutputError,
+    build_repair_request,
     run_generation,
 )
 from .models import Chunk, Decision, Evidence, ModelRun, Source, SourceVersion
@@ -30,7 +34,7 @@ class MemoryCandidateDraft(BaseModel):
 
 
 class MemoryCandidateBatch(BaseModel):
-    candidates: list[MemoryCandidateDraft]
+    candidates: list[MemoryCandidateDraft] = Field(max_length=64)
 
 
 # Compatibility exports for integrations using the original decision-only schema names.
@@ -105,17 +109,56 @@ def extract_memory_candidates(
         ),
         input_hashes=[version.content_hash],
     )
-    _result, batch, run = run_generation(session, provider, request, MemoryCandidateBatch)
-    assert batch is not None
+    initial_request = request
+    parent_run_id: str | None = None
+    repair_reason: str | None = None
+    batch: MemoryCandidateBatch | None = None
+    run: ModelRun | None = None
+    for attempt_number in range(1, MAX_GENERATION_ATTEMPTS + 1):
+        try:
+            _result, batch, run = run_generation(
+                session,
+                provider,
+                request,
+                MemoryCandidateBatch,
+                parent_run_id=parent_run_id,
+                attempt_number=attempt_number,
+                repair_reason=repair_reason,
+            )
+        except StructuredOutputError as exc:
+            if (
+                attempt_number >= MAX_GENERATION_ATTEMPTS
+                or exc.error_code not in REPAIRABLE_OUTPUT_CODES
+            ):
+                raise
+            parent_run_id = exc.run_id
+            repair_reason = exc.error_code
+            request = build_repair_request(initial_request, repair_reason)
+            continue
 
-    if any(candidate.kind not in allowed_kinds for candidate in batch.candidates):
-        _mark_failed(session, run, "candidate_kind_not_allowed")
-        raise CandidateExtractionError(run.id, "candidate_kind_not_allowed")
-    for candidate in batch.candidates:
-        unknown = [item for item in candidate.evidence_ids if item not in chunk_by_id]
-        if unknown:
-            _mark_failed(session, run, "candidate_unknown_evidence")
-            raise CandidateExtractionError(run.id, "candidate_unknown_evidence")
+        assert batch is not None
+        validation_error: str | None = None
+        if any(candidate.kind not in allowed_kinds for candidate in batch.candidates):
+            validation_error = "candidate_kind_not_allowed"
+        elif any(
+            evidence_id not in chunk_by_id
+            for candidate in batch.candidates
+            for evidence_id in candidate.evidence_ids
+        ):
+            validation_error = "candidate_unknown_evidence"
+
+        if validation_error:
+            _mark_failed(session, run, validation_error)
+            if attempt_number >= MAX_GENERATION_ATTEMPTS:
+                raise CandidateExtractionError(run.id, validation_error)
+            parent_run_id = run.id
+            repair_reason = validation_error
+            request = build_repair_request(initial_request, repair_reason)
+            continue
+        break
+
+    if batch is None or run is None:
+        raise AssertionError("bounded generation loop exited without a result")
 
     memories: list[Decision] = []
     for candidate in batch.candidates:
