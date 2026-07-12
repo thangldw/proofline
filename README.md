@@ -60,7 +60,9 @@ reported for review rather than deleted automatically.
 
 Decisions can be accepted, rejected, corrected, or marked obsolete. Every change records a
 before/after audit event while retaining the original source evidence; complete source deletion
-also removes content-bearing audit records.
+also removes content-bearing audit records. `GET /api/v1/sources/{id}/deletion-impact` reports the
+versions, chunks, embeddings, decisions, evidence, jobs, audit events, and FTS rows affected before
+a caller confirms deletion.
 
 Configured generation providers can extract additional decision candidates from a source. Model
 output is schema-validated, must cite server-issued chunk IDs, remains `candidate` until human
@@ -91,7 +93,8 @@ the exact lines that support it.
 ### Source inventory
 
 The source inventory makes indexing observable: detected sources, searchable
-chunks, extracted decisions, source type, and per-source actions remain visible.
+chunks, extracted decisions, source type, latest job stage/attempt, safe failures,
+and per-source actions remain visible.
 
 ![Proofline source inventory showing indexing coverage and extracted objects](docs/images/proofline-screen-sources.jpg)
 

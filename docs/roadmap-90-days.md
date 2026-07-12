@@ -68,8 +68,10 @@ Before delivery work, record:
   concurrency, and larger legacy-database fixtures.
 - Harden the implemented FTS5 lexical search and exact-span contract.
 - Extend the implemented persisted ingestion job status with retries and dead-letter states.
-- Extend the implemented source/decision inventory UI with stage diagnostics.
-- Implement deletion preview and cascade behavior for derived data.
+- Extend the implemented source/decision inventory UI with stage diagnostics. Latest job state,
+  stage, attempts, retryability, and safe failure fields are now visible per source.
+- Implement deletion preview and cascade behavior for derived data. Source deletion impact and
+  complete tested cascade cleanup are implemented; missing-file confirmation remains open.
 
 ### Exit gate
 
