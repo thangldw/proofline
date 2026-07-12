@@ -5,6 +5,7 @@ on:
     paths:
       - "apps/api/**"
       - "apps/web/**"
+      - "evals/**"
       - "pyproject.toml"
       - "deploy/**"
       - ".github/workflows/api-ci.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "apps/api/**"
       - "apps/web/**"
+      - "evals/**"
       - "pyproject.toml"
       - "deploy/**"
       - ".github/workflows/api-ci.yml"
@@ -56,6 +58,11 @@ jobs:
       - name: Test API
         run: |
           pytest -q apps/api
+
+      - name: Retrieval evaluation gate
+        run: |
+          proofline eval --dataset evals/retrieval/seed-v1.json \
+            --min-recall 0.80 --min-ndcg 0.80
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

@@ -35,7 +35,8 @@ Before delivery work, record:
 - Maintain Python formatting/linting/tests and the web TypeScript production build; add migration
   tests, web behavior tests, and secret scanning.
 - Establish contracts for source identity, source versions, spans, jobs, and model runs.
-- Create sanitized Markdown/ADR fixtures, including CJK and revision cases.
+- Extend the implemented synthetic ADR retrieval corpus with CJK, revision cases, and a
+  permissioned real-question dataset.
 - Interview 5–10 engineers and classify questions by decision, rationale, ownership, change,
   incident, and validity intent.
 - Record a manual baseline: time and sources needed to answer each usable question today.

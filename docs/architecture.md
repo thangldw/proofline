@@ -337,6 +337,10 @@ contract and must not reproduce backend extraction rules.
 - End-to-end tests cover import -> inspect -> review -> ask -> open citation -> delete.
 - Evaluation results are versioned with dataset version, provider/model configuration, and code
   revision. Benchmark numbers without this context must not be published.
+- The implemented `seed-v1` retrieval gate runs real migrations, ingestion, and FTS5 retrieval for
+  15 synthetic questions. Its baseline Recall@10, nDCG@10, and MRR are `0.80`; three explicit
+  lexical misses document the semantic-retrieval gap. This is regression evidence, not pilot
+  evidence.
 
 ## Evolution after the vertical slice
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import uvicorn
 
 from .database import SessionLocal, initialize_database
+from .evaluation import evaluate_dataset
 from .ingestion import ingest_source
 from .schemas import SourceCreate
 
@@ -28,11 +30,21 @@ def main() -> None:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", default=8000, type=int)
     subcommands.add_parser("seed", help="Index the bundled example decision")
+    evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
+    evaluate.add_argument("--dataset", type=Path, required=True)
+    evaluate.add_argument("--k", type=int, default=10)
+    evaluate.add_argument("--min-recall", type=float, default=0)
+    evaluate.add_argument("--min-ndcg", type=float, default=0)
     args = parser.parse_args()
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
     elif args.command == "seed":
         seed_demo()
+    elif args.command == "eval":
+        report = evaluate_dataset(args.dataset, args.k)
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        if report.recall_at_k < args.min_recall or report.ndcg_at_k < args.min_ndcg:
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

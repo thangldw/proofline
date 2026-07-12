@@ -81,6 +81,7 @@ http://localhost:8000/docs. Common quality commands are:
 ```bash
 make test
 make check
+make eval
 ```
 
 AI is disabled by default. A local OpenAI-compatible endpoint can be configured with
