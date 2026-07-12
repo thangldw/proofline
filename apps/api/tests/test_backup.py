@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import stat
 
+import proofline.backup as backup_module
 import proofline.cli as cli_module
 import pytest
 from proofline.backup import BackupError, create_sqlite_backup, verify_sqlite_backup
@@ -196,6 +197,26 @@ def test_backup_publish_no_overwrite_force_permissions_and_temp_cleanup(session,
     create_sqlite_backup(session.get_bind(), output, force=True)
     assert output.read_bytes() != original
     assert stat.S_IMODE(output.stat().st_mode) == 0o600
+    assert not list(tmp_path.glob(".backup.db.*"))
+
+
+def test_backup_publish_failure_is_safe_and_preserves_existing_output(
+    session, tmp_path, monkeypatch
+):
+    raw_backup_fixture(session)
+    output = tmp_path / "backup.db"
+    create_sqlite_backup(session.get_bind(), output)
+    original = output.read_bytes()
+    monkeypatch.setattr(
+        backup_module.os,
+        "replace",
+        lambda *_args: (_ for _ in ()).throw(PermissionError("test-only failure")),
+    )
+
+    with pytest.raises(BackupError, match="backup_publish_failed"):
+        create_sqlite_backup(session.get_bind(), output, force=True)
+
+    assert output.read_bytes() == original
     assert not list(tmp_path.glob(".backup.db.*"))
 
 

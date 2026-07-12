@@ -85,15 +85,17 @@ def verify_sqlite_backup(path: Path) -> dict[str, int]:
 
 
 def _publish_backup(temporary: Path, output: Path, *, force: bool) -> None:
-    if force:
-        os.replace(temporary, output)
-    else:
-        try:
+    try:
+        if force:
+            os.replace(temporary, output)
+        else:
             os.link(temporary, output)
-        except FileExistsError as exc:
-            raise BackupError("output_exists") from exc
-        temporary.unlink()
-    os.chmod(output, 0o600)
+            temporary.unlink()
+        os.chmod(output, 0o600)
+    except FileExistsError as exc:
+        raise BackupError("output_exists") from exc
+    except OSError as exc:
+        raise BackupError("backup_publish_failed") from exc
 
 
 def create_sqlite_backup(engine: Engine, output: Path, *, force: bool = False) -> dict[str, int]:
