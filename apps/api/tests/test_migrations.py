@@ -1,6 +1,14 @@
+import hashlib
+
+from proofline.backup import create_sqlite_backup, verify_sqlite_backup
 from proofline.database import initialize_database, make_engine
+from proofline.ingestion import delete_source, source_deletion_impact
 from proofline.migrations import MIGRATIONS, _initial_schema
+from proofline.models import Source
+from proofline.portability import build_portable_export, verify_portable_export
+from proofline.retrieval import lexical_search
 from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
 
 
 def test_migrations_are_idempotent_and_recorded(tmp_path):
@@ -372,4 +380,198 @@ def test_populated_foundation_database_is_backfilled_without_changing_ids(tmp_pa
     assert dict(decision) == {"id": "decision-1", "kind": "decision"}
     assert len(evidence["quote_hash"]) == 64
     assert foreign_key_errors == []
+    engine.dispose()
+
+
+def test_large_foundation_fixture_migrates_with_exact_provenance_and_recovery(tmp_path):
+    """Exercise every v1 provenance relationship at a non-trivial local fixture size."""
+    source_count = 250
+    database_path = tmp_path / "large-legacy.db"
+    engine = make_engine(f"sqlite:///{database_path}")
+    now = "2026-07-12T00:00:00+00:00"
+    sources = []
+    chunks = []
+    decisions = []
+    evidence = []
+    fts_rows = []
+    contents: dict[str, str] = {}
+    for index in range(source_count):
+        source_id = f"legacy-source-{index:04d}"
+        content = (
+            f"Decision: Keep component {index:04d} local.\n"
+            f"Reason: migration sentinel legacytoken{index:04d}."
+        )
+        quote = f"Decision: Keep component {index:04d} local."
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        contents[source_id] = content
+        sources.append(
+            {
+                "id": source_id,
+                "title": f"Legacy ADR {index:04d}",
+                "uri": f"file:///legacy/{index:04d}.md",
+                "content": content,
+                "content_hash": content_hash,
+                "now": now,
+            }
+        )
+        chunks.append(
+            {
+                "id": f"legacy-chunk-{index:04d}",
+                "source_id": source_id,
+                "content": content,
+                "end_offset": len(content),
+            }
+        )
+        decisions.append(
+            {
+                "id": f"legacy-decision-{index:04d}",
+                "source_id": source_id,
+                "title": f"Keep component {index:04d} local",
+                "statement": f"Keep component {index:04d} local.",
+                "now": now,
+            }
+        )
+        evidence.append(
+            {
+                "id": f"legacy-evidence-{index:04d}",
+                "decision_id": f"legacy-decision-{index:04d}",
+                "source_id": source_id,
+                "quote": quote,
+                "end_offset": len(quote),
+            }
+        )
+        fts_rows.append(
+            {
+                "chunk_id": f"legacy-chunk-{index:04d}",
+                "source_id": source_id,
+                "content": content,
+            }
+        )
+
+    with engine.begin() as connection:
+        _initial_schema(connection)
+        connection.execute(
+            text(
+                """INSERT INTO sources
+                   (id, title, kind, uri, content, content_hash, status, created_at, indexed_at)
+                   VALUES (:id, :title, 'markdown', :uri, :content, :content_hash,
+                           'indexed', :now, :now)"""
+            ),
+            sources,
+        )
+        connection.execute(
+            text(
+                """INSERT INTO chunks
+                   (id, source_id, ordinal, content, start_offset, end_offset,
+                    start_line, end_line)
+                   VALUES (:id, :source_id, 0, :content, 0, :end_offset, 1, 2)"""
+            ),
+            chunks,
+        )
+        connection.execute(
+            text(
+                """INSERT INTO decisions
+                   (id, source_id, title, statement, rationale, status, confidence,
+                    extraction_method, valid_from, valid_to, created_at)
+                   VALUES (:id, :source_id, :title, :statement, NULL, 'active', 1.0,
+                           'deterministic', NULL, NULL, :now)"""
+            ),
+            decisions,
+        )
+        connection.execute(
+            text(
+                """INSERT INTO evidence
+                   (id, decision_id, source_id, quote, start_offset, end_offset,
+                    start_line, end_line)
+                   VALUES (:id, :decision_id, :source_id, :quote, 0, :end_offset, 1, 1)"""
+            ),
+            evidence,
+        )
+        connection.execute(
+            text(
+                """INSERT INTO chunk_search(chunk_id, source_id, content)
+                   VALUES (:chunk_id, :source_id, :content)"""
+            ),
+            fts_rows,
+        )
+
+    initialize_database(engine)
+
+    with Session(engine) as session:
+        counts = {
+            table: session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one()
+            for table in ("sources", "source_versions", "chunks", "decisions", "evidence")
+        }
+        assert counts == {table: source_count for table in counts}
+        for index in (0, source_count // 2, source_count - 1):
+            source_id = f"legacy-source-{index:04d}"
+            row = (
+                session.execute(
+                    text(
+                        """SELECT s.id, s.content_hash AS identity_hash, s.current_version_id,
+                                  v.content_hash, v.content, c.source_version_id AS chunk_version,
+                                  d.source_version_id AS memory_version, d.kind,
+                                  e.source_version_id AS evidence_version, e.quote, e.quote_hash,
+                                  e.start_offset, e.end_offset
+                           FROM sources s
+                           JOIN source_versions v ON v.id = s.current_version_id
+                           JOIN chunks c ON c.source_id = s.id
+                           JOIN decisions d ON d.source_id = s.id
+                           JOIN evidence e ON e.decision_id = d.id
+                           WHERE s.id = :source_id"""
+                    ),
+                    {"source_id": source_id},
+                )
+                .mappings()
+                .one()
+            )
+            content = contents[source_id]
+            assert (
+                row["identity_hash"] == hashlib.sha256(f"source:{source_id}".encode()).hexdigest()
+            )
+            assert row["content_hash"] == hashlib.sha256(content.encode("utf-8")).hexdigest()
+            assert row["content"] == content
+            assert row["chunk_version"] == row["current_version_id"]
+            assert row["memory_version"] == row["current_version_id"]
+            assert row["evidence_version"] == row["current_version_id"]
+            assert row["kind"] == "decision"
+            assert content[row["start_offset"] : row["end_offset"]] == row["quote"]
+            assert row["quote_hash"] == hashlib.sha256(row["quote"].encode("utf-8")).hexdigest()
+
+        hits = lexical_search(session, "legacytoken0249", limit=5)
+        assert [hit.source_id for hit in hits] == ["legacy-source-0249"]
+        export = build_portable_export(session)
+        assert verify_portable_export(export)["sources"] == source_count
+
+        deleted = session.get(Source, "legacy-source-0000")
+        assert deleted is not None
+        impact = source_deletion_impact(session, deleted)
+        impact_counts = (
+            impact.versions,
+            impact.chunks,
+            impact.memories,
+            impact.evidence,
+            impact.fts_rows,
+        )
+        assert impact_counts == (
+            1,
+            1,
+            1,
+            1,
+            1,
+        )
+        delete_source(session, deleted)
+
+    backup_path = tmp_path / "large-legacy-backup.db"
+    backup_report = create_sqlite_backup(engine, backup_path)
+    assert verify_sqlite_backup(backup_path) == backup_report
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall() == []
+        assert connection.execute(text("SELECT count(*) FROM sources")).scalar_one() == 249
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM chunk_search WHERE source_id = 'legacy-source-0000'")
+            ).scalar_one()
+            == 0
+        )
     engine.dispose()
