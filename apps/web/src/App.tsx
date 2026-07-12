@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Evidence, GroundedAnswer, IngestionJob, Memory, MemoryKind, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
+import type { Evidence, GroundedAnswer, IngestionJob, Memory, MemoryKind, Overview, SearchHit, SearchScope, Source, SourceDeletionImpact } from "./types";
 
 type View = "search" | "memories" | "sources";
 
@@ -62,7 +62,7 @@ export function App() {
         <label className="import-button"><Upload size={16}/>{importing ? "Indexing…" : "Import Markdown"}<input type="file" accept=".md,.txt,text/markdown,text/plain" disabled={importing} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }}/></label>
       </header>
       {view === "search" && (
-        <SearchView onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>
+        <SearchView sources={sources} onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>
       )}
       {view === "memories" && (
         <MemoryView
@@ -89,8 +89,11 @@ function Nav({icon, active, onClick, count, children}: {icon: React.ReactNode; a
   return <button className={active ? "nav-item active" : "nav-item"} onClick={onClick}>{icon}<span>{children}</span>{count !== undefined && <b>{count}</b>}</button>;
 }
 
-export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) => void}) {
+export function SearchView({onEvidence, sources = []}: {onEvidence: (item: Evidence, title: string) => void; sources?: Source[]}) {
   const [query, setQuery] = useState("");
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [ingestedFrom, setIngestedFrom] = useState("");
+  const [ingestedBefore, setIngestedBefore] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [answer, setAnswer] = useState<GroundedAnswer | null>(null);
   const [searched, setSearched] = useState(false);
@@ -100,6 +103,11 @@ export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: st
   async function run(event: React.FormEvent) {
     event.preventDefault();
     if (query.trim().length < 2) return;
+    const scope = buildSearchScope(selectedSourceIds, ingestedFrom, ingestedBefore);
+    if (scope.ingestedFrom && scope.ingestedBefore && scope.ingestedFrom >= scope.ingestedBefore) {
+      setSearchError("Indexed from must be earlier than indexed before.");
+      return;
+    }
     setBusy(true);
     setSearchError("");
     setAnswerError("");
@@ -107,7 +115,7 @@ export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: st
     setHits([]);
     setSearched(false);
     try {
-      const searchRequest = api.search(query).then(
+      const searchRequest = api.search(query, scope).then(
         nextHits => {
           setHits(nextHits);
           setSearched(true);
@@ -117,7 +125,7 @@ export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: st
           setSearched(true);
         },
       );
-      const answerRequest = api.answer(query).then(
+      const answerRequest = api.answer(query, scope).then(
         nextAnswer => {
           setAnswer(nextAnswer);
           if (nextAnswer.status === "provider_unavailable") {
@@ -154,8 +162,20 @@ export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: st
     : [];
   const integrityFailed = unresolvedEvidenceIds.length > 0;
   const contextBudgetExclusions = answer?.exclusions ?? [];
+  const selectedSources = selectedSourceIds.flatMap(sourceId => {
+    const source = sources.find(item => item.id === sourceId);
+    return source ? [source] : [];
+  });
+  const hasActiveScope = selectedSources.length > 0 || Boolean(ingestedFrom) || Boolean(ingestedBefore);
+  function toggleSource(sourceId: string) {
+    setSelectedSourceIds(current => current.includes(sourceId)
+      ? current.filter(item => item !== sourceId)
+      : [...current, sourceId]);
+  }
   return <section className="content search-view">
     <form className="search-box" onSubmit={run}><FileSearch/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search why a system was built this way…" aria-label="Search engineering memory"/><button disabled={busy}>{busy ? "Searching" : "Search"}</button></form>
+    <details className="search-scope"><summary>Search scope{hasActiveScope ? ` · ${activeScopeCount(selectedSources.length, ingestedFrom, ingestedBefore)} active` : " · all indexed sources"}</summary><div className="scope-controls"><fieldset><legend>Indexed sources</legend>{sources.length === 0 ? <p>No indexed sources are available.</p> : <div className="source-scope-options">{sources.map(source => <label key={source.id}><input type="checkbox" checked={selectedSourceIds.includes(source.id)} onChange={() => toggleSource(source.id)}/><span>{source.title}</span></label>)}</div>}</fieldset><fieldset className="time-scope"><legend>Ingestion / indexed time</legend><label>Indexed from<input type="datetime-local" value={ingestedFrom} onChange={event => setIngestedFrom(event.target.value)}/></label><label>Indexed before<input type="datetime-local" value={ingestedBefore} onChange={event => setIngestedBefore(event.target.value)}/></label><small>This filters when a source version was indexed, not when its events or decisions occurred.</small></fieldset><button type="button" disabled={!hasActiveScope} onClick={() => { setSelectedSourceIds([]); setIngestedFrom(""); setIngestedBefore(""); }}>Clear scope</button></div></details>
+    <div className={`scope-summary${hasActiveScope ? " active" : ""}`} aria-label="Active search scope"><strong>{hasActiveScope ? "Scoped search" : "Workspace search"}</strong><span>{selectedSources.length > 0 ? selectedSources.map(source => source.title).join(", ") : "All indexed sources"}</span><span>{formatTimeScope(ingestedFrom, ingestedBefore)}</span></div>
     {!searched && <div className="hero-empty"><div className="line-art">↳</div><h2>Follow every claim back to its source.</h2><p>Search technical decisions, rationale, and implementation context. Proofline returns inspectable evidence—not an uncited answer.</p></div>}
     {answerError && <div className="degraded-banner" role="status">{answerError}</div>}
     {searchError && <div className="error-banner inline-error" role="alert">{searchError}</div>}
@@ -170,6 +190,31 @@ export function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: st
     {searched && <div className="results"><div className="section-heading"><div><span className="eyebrow">RAW RETRIEVAL</span><h2>{hits.length} evidence matches</h2></div><span className="mode-badge">{hits.some(hit => hit.retrieval_channels.includes("semantic")) ? "Hybrid · RRF" : "Lexical · FTS5"}</span></div>
       {hits.length === 0 ? <div className="empty-card">Insufficient evidence. Try another phrase or import a source.</div> : hits.map(hit => <SearchHitCard hit={hit} onEvidence={onEvidence} key={hit.chunk_id}/>)}</div>}
   </section>;
+}
+
+function buildSearchScope(sourceIds: string[], ingestedFrom: string, ingestedBefore: string): SearchScope {
+  return {
+    sourceIds,
+    ingestedFrom: localDateTimeToIso(ingestedFrom),
+    ingestedBefore: localDateTimeToIso(ingestedBefore),
+  };
+}
+
+function localDateTimeToIso(value: string): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function activeScopeCount(sourceCount: number, ingestedFrom: string, ingestedBefore: string): number {
+  return sourceCount + Number(Boolean(ingestedFrom)) + Number(Boolean(ingestedBefore));
+}
+
+function formatTimeScope(ingestedFrom: string, ingestedBefore: string): string {
+  if (ingestedFrom && ingestedBefore) return `Indexed from ${ingestedFrom} until before ${ingestedBefore}`;
+  if (ingestedFrom) return `Indexed from ${ingestedFrom}`;
+  if (ingestedBefore) return `Indexed before ${ingestedBefore}`;
+  return "Any ingestion time";
 }
 
 function SearchHitCard({hit, onEvidence}: {hit: SearchHit; onEvidence: (item: Evidence, title: string) => void}) {

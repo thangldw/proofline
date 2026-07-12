@@ -1,3 +1,8 @@
+from datetime import UTC, datetime
+
+from proofline.models import SourceVersion
+
+
 def test_complete_workflow(client):
     content = (
         "# ADR-007\n\n"
@@ -129,6 +134,90 @@ def test_search_escapes_fts_syntax(client):
     response = client.get("/api/v1/search", params={"q": 'queues OR "workers" -broken'})
     assert response.status_code == 200
     assert response.json()["hits"]
+
+
+def test_search_and_answers_apply_source_and_ingestion_time_filters(client, session):
+    first = client.post(
+        "/api/v1/sources",
+        json={
+            "title": "Billing ADR",
+            "uri": "file:///billing.md",
+            "content": "Decision: use durable queues for billing events.",
+        },
+    ).json()
+    second = client.post(
+        "/api/v1/sources",
+        json={
+            "title": "Audit ADR",
+            "uri": "file:///audit.md",
+            "content": "Decision: use durable queues for audit events.",
+        },
+    ).json()
+    boundary = datetime(2026, 2, 1, tzinfo=UTC)
+    session.get(SourceVersion, first["current_version_id"]).created_at = datetime(
+        2026, 1, 1, tzinfo=UTC
+    )
+    session.get(SourceVersion, second["current_version_id"]).created_at = boundary
+    session.commit()
+
+    search = client.get(
+        "/api/v1/search",
+        params=[
+            ("q", "durable queues"),
+            ("source_id", first["id"]),
+            ("source_id", first["id"]),
+            ("source_id", "unknown-source"),
+        ],
+    )
+    answer = client.post(
+        "/api/v1/answers",
+        json={"question": "Why durable queues?", "source_ids": [second["id"]]},
+    )
+    empty = client.post(
+        "/api/v1/answers",
+        json={"question": "Why durable queues?", "source_ids": []},
+    )
+    from_boundary = client.get(
+        "/api/v1/search",
+        params={"q": "durable queues", "ingested_from": boundary.isoformat()},
+    )
+    before_boundary = client.post(
+        "/api/v1/answers",
+        json={
+            "question": "Why durable queues?",
+            "ingested_before": boundary.isoformat(),
+        },
+    )
+
+    assert {hit["source_id"] for hit in search.json()["hits"]} == {first["id"]}
+    assert answer.json()["status"] == "provider_unavailable"
+    assert {item["source_id"] for item in answer.json()["citations"]} == {second["id"]}
+    assert empty.json()["status"] == "insufficient_evidence"
+    assert empty.json()["citations"] == []
+    assert {hit["source_id"] for hit in from_boundary.json()["hits"]} == {second["id"]}
+    assert {item["source_id"] for item in before_boundary.json()["citations"]} == {first["id"]}
+
+
+def test_retrieval_windows_require_timezones_and_strict_order(client):
+    for params in (
+        {"q": "queues", "ingested_from": "2026-01-01T00:00:00"},
+        {
+            "q": "queues",
+            "ingested_from": "2026-02-01T00:00:00Z",
+            "ingested_before": "2026-02-01T00:00:00Z",
+        },
+    ):
+        assert client.get("/api/v1/search", params=params).status_code == 422
+
+    for payload in (
+        {"question": "Why queues?", "ingested_before": "2026-01-01T00:00:00"},
+        {
+            "question": "Why queues?",
+            "ingested_from": "2026-03-01T00:00:00Z",
+            "ingested_before": "2026-02-01T00:00:00Z",
+        },
+    ):
+        assert client.post("/api/v1/answers", json=payload).status_code == 422
 
 
 def test_retrieval_diversity_parameters_are_bounded(client):

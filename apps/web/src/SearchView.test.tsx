@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SearchView } from "./App";
-import type { GroundedAnswer, SearchHit } from "./types";
+import type { GroundedAnswer, SearchHit, Source } from "./types";
 
 const apiMock = vi.hoisted(() => ({
   search: vi.fn(),
@@ -62,6 +62,34 @@ const groundedAnswer: GroundedAnswer = {
   ],
 };
 
+const sources: Source[] = [{
+  id: "source-a",
+  title: "ADR-001",
+  kind: "markdown",
+  uri: "file:///adr-001.md",
+  status: "indexed",
+  created_at: "2026-07-10T00:00:00Z",
+  indexed_at: "2026-07-11T00:00:00Z",
+  current_version_id: "version-a",
+  version_count: 1,
+  chunk_count: 1,
+  decision_count: 1,
+  memory_count: 1,
+}, {
+  id: "source-b",
+  title: "Architecture notes",
+  kind: "markdown",
+  uri: "file:///architecture.md",
+  status: "indexed",
+  created_at: "2026-07-10T00:00:00Z",
+  indexed_at: "2026-07-12T00:00:00Z",
+  current_version_id: "version-b",
+  version_count: 1,
+  chunk_count: 1,
+  decision_count: 0,
+  memory_count: 0,
+}];
+
 function submitSearch() {
   fireEvent.change(screen.getByRole("textbox", { name: "Search engineering memory" }), {
     target: { value: "Why SQLite?" },
@@ -94,6 +122,69 @@ describe("SearchView provenance", () => {
 
     fireEvent.click(within(direct).getByRole("button", { name: "ADR-001 · L3–4" }));
     expect(onEvidence).toHaveBeenCalledWith(expect.objectContaining({ id: "evidence-a" }), "ADR-001");
+  });
+
+  it("passes one identical source and ingestion-time scope to search and answer", async () => {
+    apiMock.search.mockResolvedValue(hits);
+    apiMock.answer.mockResolvedValue(groundedAnswer);
+    render(<SearchView sources={sources} onEvidence={vi.fn()}/>);
+
+    fireEvent.click(screen.getByText("Search scope · all indexed sources"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "ADR-001" }));
+    fireEvent.change(screen.getByLabelText("Indexed from"), {
+      target: { value: "2026-07-10T09:30" },
+    });
+    fireEvent.change(screen.getByLabelText("Indexed before"), {
+      target: { value: "2026-07-12T18:00" },
+    });
+    submitSearch();
+
+    const expectedScope = {
+      sourceIds: ["source-a"],
+      ingestedFrom: new Date("2026-07-10T09:30").toISOString(),
+      ingestedBefore: new Date("2026-07-12T18:00").toISOString(),
+    };
+    await waitFor(() => expect(apiMock.search).toHaveBeenCalledWith("Why SQLite?", expectedScope));
+    expect(apiMock.answer).toHaveBeenCalledWith("Why SQLite?", expectedScope);
+    const summary = screen.getByLabelText("Active search scope");
+    expect(summary).toHaveTextContent("Scoped search");
+    expect(summary).toHaveTextContent("ADR-001");
+    expect(summary).toHaveTextContent("Indexed from 2026-07-10T09:30 until before 2026-07-12T18:00");
+  });
+
+  it("supports selecting multiple sources and clearing the complete scope", () => {
+    render(<SearchView sources={sources} onEvidence={vi.fn()}/>);
+    fireEvent.click(screen.getByText("Search scope · all indexed sources"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "ADR-001" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Architecture notes" }));
+    fireEvent.change(screen.getByLabelText("Indexed before"), {
+      target: { value: "2026-07-12T18:00" },
+    });
+
+    expect(screen.getByText("Search scope · 3 active")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear scope" }));
+
+    expect(screen.getByRole("checkbox", { name: "ADR-001" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Architecture notes" })).not.toBeChecked();
+    expect(screen.getByLabelText("Indexed before")).toHaveValue("");
+    expect(screen.getByLabelText("Active search scope")).toHaveTextContent("All indexed sources");
+    expect(screen.getByLabelText("Active search scope")).toHaveTextContent("Any ingestion time");
+  });
+
+  it("rejects an inverted indexed-time range before either request", async () => {
+    render(<SearchView sources={sources} onEvidence={vi.fn()}/>);
+    fireEvent.click(screen.getByText("Search scope · all indexed sources"));
+    fireEvent.change(screen.getByLabelText("Indexed from"), {
+      target: { value: "2026-07-13T09:00" },
+    });
+    fireEvent.change(screen.getByLabelText("Indexed before"), {
+      target: { value: "2026-07-12T09:00" },
+    });
+    submitSearch();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Indexed from must be earlier than indexed before");
+    expect(apiMock.search).not.toHaveBeenCalled();
+    expect(apiMock.answer).not.toHaveBeenCalled();
   });
 
   it("fails closed when a statement references an unresolved citation", async () => {

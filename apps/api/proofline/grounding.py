@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -137,6 +138,9 @@ def answer_question(
     limit: int = 8,
     max_per_source: int = 2,
     min_semantic_score: float = 0.0,
+    source_ids: list[str] | None = None,
+    ingested_from: datetime | None = None,
+    ingested_before: datetime | None = None,
 ) -> AnswerResponse:
     hits = hybrid_search(
         session,
@@ -145,6 +149,9 @@ def answer_question(
         limit,
         max_per_source=max_per_source,
         min_semantic_score=min_semantic_score,
+        source_ids=source_ids,
+        ingested_from=ingested_from,
+        ingested_before=ingested_before,
     )
     if not hits:
         return AnswerResponse(

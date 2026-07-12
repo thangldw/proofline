@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .model_gateway import EmbeddingProvider, EmbeddingRequest, run_embedding
-from .models import Chunk, ChunkEmbedding, Source
+from .models import Chunk, ChunkEmbedding, Source, SourceVersion
 from .retrieval import lexical_search
 from .schemas import SearchHit
 
@@ -116,19 +117,32 @@ def semantic_search(
     provider: EmbeddingProvider,
     limit: int = 10,
     min_semantic_score: float = 0.0,
+    source_ids: list[str] | None = None,
+    ingested_from: datetime | None = None,
+    ingested_before: datetime | None = None,
 ) -> list[SearchHit]:
     if not math.isfinite(min_semantic_score) or not 0 <= min_semantic_score <= 1:
         raise ValueError("min_semantic_score must be finite and between 0 and 1")
-    rows = session.execute(
+    if source_ids == []:
+        return []
+    statement = (
         select(ChunkEmbedding, Chunk, Source.title)
         .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
         .join(Source, Source.id == Chunk.source_id)
+        .join(SourceVersion, SourceVersion.id == Chunk.source_version_id)
         .where(
             ChunkEmbedding.provider_id == provider.id,
             ChunkEmbedding.model_id == provider.model,
             Chunk.source_version_id == Source.current_version_id,
         )
-    ).all()
+    )
+    if source_ids is not None:
+        statement = statement.where(Chunk.source_id.in_(source_ids))
+    if ingested_from is not None:
+        statement = statement.where(SourceVersion.created_at >= ingested_from)
+    if ingested_before is not None:
+        statement = statement.where(SourceVersion.created_at < ingested_before)
+    rows = session.execute(statement).all()
     if not rows:
         return []
     query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()
@@ -177,8 +191,18 @@ def hybrid_search(
     rrf_constant: int = 60,
     max_per_source: int = 2,
     min_semantic_score: float = 0.0,
+    source_ids: list[str] | None = None,
+    ingested_from: datetime | None = None,
+    ingested_before: datetime | None = None,
 ) -> list[SearchHit]:
-    lexical = lexical_search(session, query, max(limit * 3, limit))
+    lexical = lexical_search(
+        session,
+        query,
+        max(limit * 3, limit),
+        source_ids,
+        ingested_from,
+        ingested_before,
+    )
     lexical = [
         hit.model_copy(update={"lexical_rank": index, "retrieval_channels": ["lexical"]})
         for index, hit in enumerate(lexical, start=1)
@@ -190,6 +214,9 @@ def hybrid_search(
             provider,
             max(limit * 3, limit),
             min_semantic_score,
+            source_ids,
+            ingested_from,
+            ingested_before,
         )
         if provider
         else []

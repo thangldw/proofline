@@ -1,4 +1,5 @@
 import math
+from datetime import UTC, datetime
 
 import proofline.embeddings as embeddings_module
 import pytest
@@ -10,7 +11,7 @@ from proofline.embeddings import (
 )
 from proofline.ingestion import delete_source, ingest_source
 from proofline.model_gateway import FakeEmbeddingProvider
-from proofline.models import Chunk, ChunkEmbedding
+from proofline.models import Chunk, ChunkEmbedding, SourceVersion
 from proofline.schemas import SearchHit, SourceCreate
 from sqlalchemy import func, select
 
@@ -192,6 +193,58 @@ def test_lexical_match_survives_below_semantic_floor(session):
         chunk.start_offset,
         chunk.end_offset,
     )
+
+
+def test_hybrid_retrieval_filters_current_versions_by_source_and_ingestion_window(session):
+    first, _ = ingest_source(
+        session,
+        SourceCreate(
+            title="First queue ADR",
+            uri="file:///first-queue.md",
+            content="Decision: use durable queues for billing events.",
+        ),
+    )
+    second, _ = ingest_source(
+        session,
+        SourceCreate(
+            title="Second queue ADR",
+            uri="file:///second-queue.md",
+            content="Decision: use durable queues for audit events.",
+        ),
+    )
+    first_version = session.get(SourceVersion, first.current_version_id)
+    second_version = session.get(SourceVersion, second.current_version_id)
+    boundary = datetime(2026, 2, 1, tzinfo=UTC)
+    first_version.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    second_version.created_at = boundary
+    session.commit()
+
+    chunks = list(session.scalars(select(Chunk)).all())
+    vectors = {chunk.content: [1.0, 0.0] for chunk in chunks}
+    vectors["durable queues"] = [1.0, 0.0]
+    vectors["semantic-only queue lookup"] = [1.0, 0.0]
+    provider = FakeEmbeddingProvider(vectors)
+    index_current_embeddings(session, provider)
+
+    by_source = hybrid_search(session, "durable queues", provider, source_ids=[first.id], limit=10)
+    inclusive_start = hybrid_search(
+        session,
+        "semantic-only queue lookup",
+        provider,
+        ingested_from=boundary,
+        limit=10,
+    )
+    exclusive_end = hybrid_search(
+        session,
+        "semantic-only queue lookup",
+        provider,
+        ingested_before=boundary,
+        limit=10,
+    )
+
+    assert {hit.source_id for hit in by_source} == {first.id}
+    assert {hit.source_id for hit in inclusive_start} == {second.id}
+    assert {hit.source_id for hit in exclusive_end} == {first.id}
 
 
 def search_hit(chunk_id: str, source_id: str, rank: float = -1.0) -> SearchHit:

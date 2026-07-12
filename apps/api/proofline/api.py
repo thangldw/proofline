@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -66,6 +68,7 @@ from .schemas import (
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
+    normalize_retrieval_filters,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -680,8 +683,17 @@ def search(
         allow_inf_nan=False,
     ),
     hybrid: bool = True,
+    source_ids: list[str] | None = Query(default=None, alias="source_id"),
+    ingested_from: datetime | None = Query(default=None),
+    ingested_before: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> SearchResponse:
+    try:
+        source_ids, ingested_from, ingested_before = normalize_retrieval_filters(
+            source_ids, ingested_from, ingested_before
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
         embedding_provider = build_embedding_provider(get_settings()) if hybrid else None
     except ProviderConfigurationError as exc:
@@ -696,6 +708,9 @@ def search(
             limit,
             max_per_source=max_per_source,
             min_semantic_score=min_semantic_score,
+            source_ids=source_ids,
+            ingested_from=ingested_from,
+            ingested_before=ingested_before,
         )
     except (ProviderRequestError, EmbeddingValidationError) as exc:
         raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
@@ -720,6 +735,9 @@ def create_answer(
             payload.limit,
             payload.max_per_source,
             payload.min_semantic_score,
+            payload.source_ids,
+            payload.ingested_from,
+            payload.ingested_before,
         )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc

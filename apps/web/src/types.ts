@@ -1,5 +1,11 @@
 export type Overview = { sources: number; chunks: number; decisions: number; memories: number; evidence: number };
 
+export type SearchScope = {
+  sourceIds: string[];
+  ingestedFrom: string | null;
+  ingestedBefore: string | null;
+};
+
 export type Source = {
   id: string;
   title: string;
