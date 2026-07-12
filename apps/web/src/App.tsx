@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Decision, Evidence, GroundedAnswer, IngestionJob, Overview, SearchHit, Source } from "./types";
+import type { Decision, Evidence, GroundedAnswer, IngestionJob, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
 
 type View = "search" | "decisions" | "sources";
+
+type DeletionState = {
+  source: Source;
+  impact: SourceDeletionImpact | null;
+  loading: boolean;
+  pending: boolean;
+  error: string;
+};
 
 export function App() {
   const [view, setView] = useState<View>("search");
@@ -64,7 +72,13 @@ export function App() {
         />
       )}
       {view === "sources" && (
-        <SourcesView sources={sources} jobs={jobs} onChanged={refresh}/>
+        <SourcesView
+          sources={sources}
+          jobs={jobs}
+          onChanged={refresh}
+          onSourceDeleted={(sourceId) => setEvidence(current =>
+            current?.item.source_id === sourceId ? null : current)}
+        />
       )}
     </main>
     {evidence && <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)}/>} 
@@ -181,11 +195,13 @@ function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]
   </section>;
 }
 
-export function SourcesView({sources, jobs, onChanged}: {sources: Source[]; jobs: IngestionJob[]; onChanged: () => Promise<void>}) {
+export function SourcesView({sources, jobs, onChanged, onSourceDeleted}: {sources: Source[]; jobs: IngestionJob[]; onChanged: () => Promise<void>; onSourceDeleted?: (sourceId: string) => void}) {
   const [extractingSourceId, setExtractingSourceId] = useState<string | null>(null);
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [extractionErrors, setExtractionErrors] = useState<Record<string, string>>({});
   const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  const [deletion, setDeletion] = useState<DeletionState | null>(null);
+  const deleteTriggerRef = useRef<HTMLElement | null>(null);
   const jobsBySource = new Map(
     latestJobs(jobs).flatMap(job => job.source_id ? [[job.source_id, job] as const] : []),
   );
@@ -223,11 +239,71 @@ export function SourcesView({sources, jobs, onChanged}: {sources: Source[]; jobs
       setRetryingJobId(null);
     }
   }
+  async function openDeletion(source: Source) {
+    deleteTriggerRef.current = document.activeElement as HTMLElement | null;
+    setDeletion({ source, impact: null, loading: true, pending: false, error: "" });
+    try {
+      const impact = await api.deletionImpact(source.id);
+      setDeletion(current => current?.source.id === source.id
+        ? { ...current, impact, loading: false }
+        : current);
+    } catch (reason) {
+      setDeletion(current => current?.source.id === source.id
+        ? { ...current, loading: false, error: errorMessage(reason, "Deletion preview failed") }
+        : current);
+    }
+  }
+  function closeDeletion() {
+    if (deletion?.pending) return;
+    const trigger = deleteTriggerRef.current;
+    setDeletion(null);
+    queueMicrotask(() => trigger?.focus());
+  }
+  async function confirmDeletion() {
+    if (!deletion?.impact || deletion.pending) return;
+    const sourceId = deletion.source.id;
+    setDeletion(current => current ? { ...current, pending: true, error: "" } : current);
+    try {
+      await api.deleteSource(sourceId);
+      onSourceDeleted?.(sourceId);
+      await onChanged();
+      const trigger = deleteTriggerRef.current;
+      setDeletion(null);
+      queueMicrotask(() => trigger?.focus());
+    } catch (reason) {
+      setDeletion(current => current?.source.id === sourceId
+        ? { ...current, pending: false, error: errorMessage(reason, "Source deletion failed") }
+        : current);
+    }
+  }
   return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div>{orphanFailures.length > 0 && <section className="recent-failures" aria-labelledby="recent-ingestion-failures"><div className="section-heading"><div><span className="eyebrow">PIPELINE DIAGNOSTICS</span><h2 id="recent-ingestion-failures">Recent ingestion failures</h2></div><span className="mode-badge">{orphanFailures.length} orphaned</span></div><div className="failure-list">{orphanFailures.map(job => <article className={`failure-card ${job.state}`} key={job.id}><div className="failure-summary"><strong>Job {job.id.slice(0, 8)}</strong><span>{job.state} · {job.stage}</span></div><div className="failure-metadata"><span>Attempt {job.attempts}/{job.max_attempts}</span><span>Started {job.started_at ?? "not recorded"}</span><span>Finished {job.finished_at ?? "not recorded"}</span></div>{job.error_code && <code>{job.error_code}</code>}{job.error_detail && <p>{job.error_detail}</p>}{job.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion job ${job.id.slice(0, 8)}`}>{retryingJobId === job.id ? "Retrying…" : "Retry"}</button>}{retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}</article>)}</div></section>}<div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
     const job = jobsBySource.get(source.id);
     const extractionError = extractionErrors[source.id];
-    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts}/${job.max_attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions">{job?.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion for ${source.title}`}>{retryingJobId === job.id ? "Retrying…" : "Retry ingestion"}</button>}<button disabled={extractingSourceId === source.id || retryingJobId === job?.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button>{job && retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
-  })}</div></section>;
+    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts}/${job.max_attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions">{job?.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion for ${source.title}`}>{retryingJobId === job.id ? "Retrying…" : "Retry ingestion"}</button>}<button disabled={extractingSourceId === source.id || retryingJobId === job?.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button><button className="danger-action" onClick={() => void openDeletion(source)} aria-label={`Delete ${source.title}`}>Delete</button>{job && retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
+  })}</div>{deletion && <DeletionDialog state={deletion} onCancel={closeDeletion} onConfirm={() => void confirmDeletion()}/>}</section>;
+}
+
+function DeletionDialog({state, onCancel, onConfirm}: {state: DeletionState; onCancel: () => void; onConfirm: () => void}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!state.pending) cancelRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !state.pending) onCancel();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, state.pending]);
+  const impactCounts = state.impact ? [
+    ["Versions", state.impact.versions],
+    ["Chunks", state.impact.chunks],
+    ["Embeddings", state.impact.embeddings],
+    ["Decisions", state.impact.decisions],
+    ["Evidence", state.impact.evidence],
+    ["Jobs detached", state.impact.ingestion_jobs_to_detach],
+    ["Audit events", state.impact.audit_events_to_delete],
+    ["FTS rows", state.impact.fts_rows],
+  ] as const : [];
+  return <div className="dialog-backdrop"><section className="deletion-dialog" role="dialog" aria-modal="true" aria-labelledby="deletion-dialog-title"><span className="eyebrow">DELETION IMPACT</span><h2 id="deletion-dialog-title">Delete {state.source.title}?</h2><p>This permanently removes the source and its derived local data.</p>{state.loading && <div role="status">Loading deletion impact…</div>}{state.error && <div className="integrity-error" role="alert">{state.error}</div>}{state.impact && <><div className="deletion-identity"><span>Current version</span><code>{state.impact.current_version_id ?? "none"}</code></div><dl className="impact-counts">{impactCounts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl></>}<footer><button ref={cancelRef} disabled={state.pending} onClick={onCancel}>Cancel</button><button className="confirm-delete" disabled={!state.impact || state.pending} onClick={onConfirm}>{state.pending ? "Deleting…" : "Delete permanently"}</button></footer></section></div>;
 }
 
 function Metric({value,label}: {value: number; label: string}) { return <div className="metric"><strong>{value}</strong><span>{label}</span></div>; }

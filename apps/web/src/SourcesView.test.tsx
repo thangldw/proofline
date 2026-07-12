@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, SourcesView } from "./App";
 import type { IngestionJob, Source } from "./types";
@@ -10,6 +10,9 @@ const apiMock = vi.hoisted(() => ({
   jobs: vi.fn(),
   extractDecisions: vi.fn(),
   retryJob: vi.fn(),
+  deletionImpact: vi.fn(),
+  deleteSource: vi.fn(),
+  sourceVersion: vi.fn(),
 }));
 
 vi.mock("./api", () => ({ api: apiMock }));
@@ -49,6 +52,20 @@ function job(overrides: Partial<IngestionJob> = {}): IngestionJob {
     ...overrides,
   };
 }
+
+const deletionImpact = {
+  source_id: source.id,
+  title: source.title,
+  current_version_id: source.current_version_id,
+  versions: 2,
+  chunks: 4,
+  embeddings: 6,
+  decisions: 8,
+  evidence: 10,
+  ingestion_jobs_to_detach: 12,
+  audit_events_to_delete: 14,
+  fts_rows: 16,
+};
 
 describe("source ingestion diagnostics", () => {
   beforeEach(() => {
@@ -201,5 +218,127 @@ describe("source ingestion diagnostics", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry ingestion job retry-jo" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Retry is no longer available");
+  });
+
+  it("cancels deletion without mutating the source", async () => {
+    apiMock.deletionImpact.mockResolvedValue(deletionImpact);
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={vi.fn()}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete ADR-001" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete ADR-001?" });
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Delete permanently" })).toBeEnabled());
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(apiMock.deleteSource).not.toHaveBeenCalled();
+  });
+
+  it("shows the current version and every exact deletion count", async () => {
+    apiMock.deletionImpact.mockResolvedValue(deletionImpact);
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={vi.fn()}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete ADR-001" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete ADR-001?" });
+    expect(await within(dialog).findByText("version-1")).toBeInTheDocument();
+    for (const [label, count] of [
+      ["Versions", 2], ["Chunks", 4], ["Embeddings", 6], ["Decisions", 8],
+      ["Evidence", 10], ["Jobs detached", 12], ["Audit events", 14], ["FTS rows", 16],
+    ] as const) {
+      expect(within(dialog).getByText(label).nextElementSibling).toHaveTextContent(String(count));
+    }
+  });
+
+  it("confirms deletion through the correct endpoint and refreshes", async () => {
+    apiMock.deletionImpact.mockResolvedValue(deletionImpact);
+    apiMock.deleteSource.mockResolvedValue(undefined);
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={onChanged}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete ADR-001" }));
+    const confirm = await screen.findByRole("button", { name: "Delete permanently" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+    expect(apiMock.deletionImpact).toHaveBeenCalledWith(source.id);
+    expect(apiMock.deleteSource).toHaveBeenCalledWith(source.id);
+    expect(apiMock.deletionImpact.mock.invocationCallOrder[0])
+      .toBeLessThan(apiMock.deleteSource.mock.invocationCallOrder[0]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows preview errors and keeps confirmation disabled", async () => {
+    apiMock.deletionImpact.mockRejectedValue(new Error("Deletion impact is unavailable"));
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={vi.fn()}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete ADR-001" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete ADR-001?" });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Deletion impact is unavailable");
+    expect(within(dialog).getByRole("button", { name: "Delete permanently" })).toBeDisabled();
+    expect(apiMock.deleteSource).not.toHaveBeenCalled();
+  });
+
+  it("disables confirmation while deletion is pending", async () => {
+    apiMock.deletionImpact.mockResolvedValue(deletionImpact);
+    let resolveDelete: (() => void) | undefined;
+    apiMock.deleteSource.mockReturnValue(new Promise<void>(resolve => { resolveDelete = resolve; }));
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={onChanged}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete ADR-001" }));
+    const confirm = await screen.findByRole("button", { name: "Delete permanently" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
+
+    expect(await screen.findByRole("button", { name: "Deleting…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await act(async () => resolveDelete?.());
+    await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+  });
+
+  it("closes an evidence drawer that belongs to the deleted source", async () => {
+    apiMock.overview.mockResolvedValue({ sources: 1, chunks: 2, decisions: 1, evidence: 1 });
+    apiMock.sources.mockResolvedValue([source]);
+    apiMock.jobs.mockResolvedValue([job()]);
+    apiMock.decisions.mockResolvedValue([{
+      id: "decision-1",
+      source_id: source.id,
+      source_version_id: "version-1",
+      source_title: source.title,
+      title: "Queue decision",
+      statement: "Use SQLite",
+      rationale: null,
+      status: "active",
+      confidence: 1,
+      extraction_method: "deterministic",
+      created_at: "2026-07-12T10:00:00Z",
+      updated_at: "2026-07-12T10:00:00Z",
+      evidence: [{
+        id: "evidence-1",
+        source_id: source.id,
+        source_version_id: "version-1",
+        quote: "Decision: Use SQLite",
+        start_offset: 0,
+        end_offset: 20,
+        start_line: 1,
+        end_line: 1,
+      }],
+    }]);
+    apiMock.sourceVersion.mockResolvedValue({ content: "Decision: Use SQLite" });
+    apiMock.deletionImpact.mockResolvedValue(deletionImpact);
+    apiMock.deleteSource.mockResolvedValue(undefined);
+    render(<App/>);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Decisions/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "View proof · L1–1" }));
+    expect(screen.getByRole("button", { name: "Close evidence" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Sources/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete ADR-001" }));
+    const confirm = await screen.findByRole("button", { name: "Delete permanently" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Close evidence" })).not.toBeInTheDocument());
+    expect(apiMock.deleteSource).toHaveBeenCalledWith(source.id);
   });
 });

@@ -1,4 +1,4 @@
-import type { Decision, GroundedAnswer, IngestionJob, Overview, SearchHit, Source } from "./types";
+import type { Decision, GroundedAnswer, IngestionJob, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -15,6 +15,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
+  deletionImpact: (id: string) =>
+    request<SourceDeletionImpact>(`/api/v1/sources/${id}/deletion-impact`),
+  deleteSource: (id: string) =>
+    request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   jobs: () => request<IngestionJob[]>("/api/v1/jobs?limit=200"),
   retryJob: (id: string) =>
     request<IngestionJob>(`/api/v1/jobs/${id}/retry`, { method: "POST" }),

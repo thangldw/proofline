@@ -134,6 +134,104 @@
   opacity: 0.65;
 }
 
+.source-actions .danger-action {
+  background: #fff0ed;
+  color: #9e3525;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(23 32 29 / 48%);
+}
+
+.deletion-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border-radius: 12px;
+  background: #fbfcf8;
+  box-shadow: 0 20px 70px rgb(15 24 20 / 28%);
+  padding: 25px;
+}
+
+.deletion-dialog h2 {
+  margin: 7px 0 8px;
+}
+
+.deletion-dialog > p {
+  color: #63706a;
+}
+
+.deletion-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid #d8ddd5;
+  border-radius: 8px;
+}
+
+.deletion-identity span {
+  color: #748078;
+  font-size: 11px;
+}
+
+.deletion-identity code {
+  overflow-wrap: anywhere;
+}
+
+.impact-counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 15px 0;
+}
+
+.impact-counts div {
+  border: 1px solid #e1e5de;
+  border-radius: 7px;
+  padding: 9px;
+}
+
+.impact-counts dt {
+  color: #748078;
+  font-size: 10px;
+}
+
+.impact-counts dd {
+  margin: 4px 0 0;
+  font: 600 18px "IBM Plex Mono";
+}
+
+.deletion-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.deletion-dialog footer button {
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  padding: 9px 13px;
+}
+
+.deletion-dialog footer button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.deletion-dialog .confirm-delete {
+  background: #9e3525;
+  color: #fff;
+}
+
 .recent-failures {
   margin-bottom: 28px;
 }
@@ -204,5 +302,9 @@
 
   .failure-card {
     grid-template-columns: 1fr;
+  }
+
+  .impact-counts {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
