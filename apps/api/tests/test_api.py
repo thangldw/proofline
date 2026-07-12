@@ -168,3 +168,5 @@ def test_answer_endpoint_fails_safe_without_provider(client, monkeypatch):
     assert response.json()["status"] == "provider_unavailable"
     assert response.json()["statements"] == []
     assert response.json()["citations"]
+    source_id = client.get("/api/v1/sources").json()[0]["id"]
+    assert client.post(f"/api/v1/sources/{source_id}/extract-decisions").status_code == 409
