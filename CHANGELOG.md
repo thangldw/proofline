@@ -7,7 +7,20 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.1.0-alpha.1`.
+No changes have been recorded after `v0.1.0-alpha.2`.
+
+## [0.1.0-alpha.2] - 2026-07-13
+
+### Fixed
+
+- Release builds now install into the repository-local virtual environment expected by the
+  quality commands, then smoke-test the wheel in a second clean environment.
+- A manually dispatched recovery path rebuilds an existing immutable tag without moving it and
+  proves that the tag resolves to a commit contained in `main`.
+- Tagged-source secret scanning now receives the exact tagged SHA instead of relying on an empty
+  tag-push commit list.
+- Artifact verification/build runs with read-only repository access, while the separate publish
+  job receives the narrowly scoped release-write permission and an explicit repository target.
 
 ## [0.1.0-alpha.1] - 2026-07-13
 
@@ -69,5 +82,6 @@ No changes have been recorded after `v0.1.0-alpha.1`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.1
