@@ -285,6 +285,9 @@ class ModelRunRead(BaseModel):
     operation: str
     template_version: str
     input_hashes: list[str]
+    parent_run_id: str | None
+    attempt_number: int
+    repair_reason: str | None
     status: str
     validation_status: str | None
     latency_ms: int | None

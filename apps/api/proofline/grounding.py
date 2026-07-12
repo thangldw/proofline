@@ -8,10 +8,14 @@ from sqlalchemy.orm import Session
 
 from .embeddings import hybrid_search
 from .model_gateway import (
+    MAX_GENERATION_ATTEMPTS,
+    REPAIRABLE_OUTPUT_CODES,
     ChatMessage,
     EmbeddingProvider,
     GenerationProvider,
     GenerationRequest,
+    StructuredOutputError,
+    build_repair_request,
     run_generation,
 )
 from .models import ModelRun, SourceVersion
@@ -25,7 +29,10 @@ class DraftStatement(BaseModel):
 
 
 class GroundedDraft(BaseModel):
-    statements: list[DraftStatement] = Field(min_length=1)
+    statements: list[DraftStatement] = Field(min_length=1, max_length=32)
+
+
+GroundedAnswerDraft = GroundedDraft
 
 
 class EvidenceIntegrityError(RuntimeError):
@@ -124,29 +131,64 @@ def answer_question(
             )
         }
     )
-    _result, draft, run = run_generation(session, provider, request, GroundedDraft)
-    assert draft is not None
     hit_by_id = {hit.chunk_id: hit for hit in hits}
-    cited_ids: list[str] = []
-    statements: list[AnswerStatement] = []
-    for statement in draft.statements:
-        if statement.kind in {"direct", "synthesis"} and not statement.evidence_ids:
-            _fail_grounding(session, run, "grounding_missing_citation")
-            raise GroundingValidationError(run.id, "grounding_missing_citation")
-        unknown = [item for item in statement.evidence_ids if item not in hit_by_id]
-        if unknown:
-            _fail_grounding(session, run, "grounding_unknown_evidence")
-            raise GroundingValidationError(run.id, "grounding_unknown_evidence")
-        cited_ids.extend(statement.evidence_ids)
-        statements.append(AnswerStatement(**statement.model_dump()))
+    initial_request = request
+    parent_run_id: str | None = None
+    repair_reason: str | None = None
+    for attempt_number in range(1, MAX_GENERATION_ATTEMPTS + 1):
+        try:
+            _result, draft, run = run_generation(
+                session,
+                provider,
+                request,
+                GroundedDraft,
+                parent_run_id=parent_run_id,
+                attempt_number=attempt_number,
+                repair_reason=repair_reason,
+            )
+        except StructuredOutputError as exc:
+            if (
+                attempt_number >= MAX_GENERATION_ATTEMPTS
+                or exc.error_code not in REPAIRABLE_OUTPUT_CODES
+            ):
+                raise
+            parent_run_id = exc.run_id
+            repair_reason = exc.error_code
+            request = build_repair_request(initial_request, repair_reason)
+            continue
 
-    ordered_ids = list(dict.fromkeys(cited_ids))
-    citations = [AnswerCitation.from_hit(hit_by_id[item]) for item in ordered_ids]
-    answer = "\n\n".join(statement.text for statement in statements)
-    return AnswerResponse(
-        status="grounded",
-        answer=answer,
-        statements=statements,
-        citations=citations,
-        model_run_id=run.id,
-    )
+        assert draft is not None
+        cited_ids: list[str] = []
+        statements: list[AnswerStatement] = []
+        validation_error: str | None = None
+        for statement in draft.statements:
+            if statement.kind in {"direct", "synthesis"} and not statement.evidence_ids:
+                validation_error = "grounding_missing_citation"
+                break
+            unknown = [item for item in statement.evidence_ids if item not in hit_by_id]
+            if unknown:
+                validation_error = "grounding_unknown_evidence"
+                break
+            cited_ids.extend(statement.evidence_ids)
+            statements.append(AnswerStatement(**statement.model_dump()))
+
+        if validation_error:
+            _fail_grounding(session, run, validation_error)
+            if attempt_number >= MAX_GENERATION_ATTEMPTS:
+                raise GroundingValidationError(run.id, validation_error)
+            parent_run_id = run.id
+            repair_reason = validation_error
+            request = build_repair_request(initial_request, repair_reason)
+            continue
+
+        ordered_ids = list(dict.fromkeys(cited_ids))
+        citations = [AnswerCitation.from_hit(hit_by_id[item]) for item in ordered_ids]
+        answer = "\n\n".join(statement.text for statement in statements)
+        return AnswerResponse(
+            status="grounded",
+            answer=answer,
+            statements=statements,
+            citations=citations,
+            model_run_id=run.id,
+        )
+    raise AssertionError("bounded generation loop exited without a result")

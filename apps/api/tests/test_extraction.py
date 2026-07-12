@@ -7,10 +7,23 @@ from proofline.extraction import (
     extract_memory_candidates,
 )
 from proofline.ingestion import ingest_source
-from proofline.model_gateway import FakeGenerationProvider, StructuredOutputError
+from proofline.model_gateway import FakeGenerationProvider, GenerationResult, StructuredOutputError
 from proofline.models import Chunk, Decision, ModelRun
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
+
+
+class ScriptedGenerationProvider:
+    id = "scripted"
+    model = "scripted-memory-repair-test"
+
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        return GenerationResult(content=self.outcomes.pop(0))
 
 
 def source_and_chunk(session):
@@ -179,3 +192,40 @@ def test_legacy_decision_extraction_rejects_mixed_kinds_before_persistence(sessi
     assert run.status == "failed"
     assert run.validation_status == "grounding_invalid"
     assert run.error_code == "candidate_kind_not_allowed"
+
+
+def test_unknown_candidate_evidence_is_repaired_before_persistence(session):
+    source, chunk, content = source_and_chunk(session)
+    provider = ScriptedGenerationProvider(
+        [candidate_response("invented-id"), candidate_response(chunk.id)]
+    )
+
+    memories, run = extract_memory_candidates(session, source, provider)
+
+    assert len(provider.requests) == 2
+    assert len(memories) == 1
+    assert memories[0].model_run_id == run.id
+    assert (
+        content[memories[0].evidence[0].start_offset : memories[0].evidence[0].end_offset]
+        == memories[0].evidence[0].quote
+    )
+    runs = list(session.scalars(select(ModelRun).order_by(ModelRun.attempt_number)).all())
+    assert runs[0].status == "failed"
+    assert runs[0].error_code == "candidate_unknown_evidence"
+    assert runs[1].parent_run_id == runs[0].id
+    assert runs[1].attempt_number == 2
+    assert runs[1].repair_reason == "candidate_unknown_evidence"
+    assert memories[0].status == "candidate"
+
+
+def test_candidate_batch_is_bounded_to_64_items(session):
+    source, chunk, _content = source_and_chunk(session)
+    candidate = json.loads(candidate_response(chunk.id))["candidates"][0]
+    oversized = json.dumps({"candidates": [candidate] * 65})
+    provider = ScriptedGenerationProvider([oversized, oversized])
+
+    with pytest.raises(StructuredOutputError):
+        extract_memory_candidates(session, source, provider)
+
+    assert len(provider.requests) == 2
+    assert session.scalar(select(func.count()).select_from(Decision)) == 0
