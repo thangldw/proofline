@@ -3,8 +3,8 @@
 **Document status:** Proposed  
 **Start assumption:** Day 1 begins with the foundation repository  
 **Implementation status:** The internal local vertical-slice work through Phase 4 is substantially
-implemented. Phase 1 real-question/pilot evidence, real-model comparison, reranking, hosted CI-run
-evidence, and the Phase 5 external go/no-go gates remain open. Phase 5 portability, OSS governance,
+implemented. Phase 1 real-question/pilot evidence, real-model comparison, reranking, and the Phase
+5 external go/no-go gates remain open. Phase 5 portability, OSS governance, hosted CI evidence,
 credential-free platform-smoke, browser E2E, and loopback-container foundations are implemented.
 
 The roadmap is organized around validated outcomes. Dates may move; quality gates should not be
@@ -48,8 +48,8 @@ Before delivery work, record:
 ### Exit gate
 
 - A clean checkout can run `make setup`, then `make test` and `make check`.
-- The checked-in workflow needs no network model access; a successful hosted CI run remains an
-  external verification item rather than a documentation claim.
+- The checked-in workflow needs no network model access. The versioned receipt for revision
+  `0dde53f` records successful hosted API CI and Secret Scan runs.
 - At least 25 questions have source evidence and relevance judgments; 10 should exercise a
   decision changing over time.
 - Offset encoding and deletion semantics are explicitly decided and tested.
@@ -175,11 +175,11 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 
 - Complete end-to-end tests and supported-platform smoke tests. A credential-free script and
   Ubuntu/macOS workflow matrix are implemented for source installation, local evidence,
-  export/backup verification, and web build. This is configured coverage, not a claim that a
-  hosted run succeeded. A configured Ubuntu Chromium E2E job covers import, memory review and
+  export/backup verification, and web build. A hosted receipt for revision `0dde53f` records both
+  platform jobs succeeding. The Ubuntu Chromium E2E job covers import, memory review and
   correction, retrieval debug, exact evidence, and deletion while asserting hostile Markdown is
-  inert and external requests do not occur. Hosted CI receipts, Windows verification, and
-  production support remain open.
+  inert and external requests do not occur. Windows verification and production support remain
+  open.
 - Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
   local SQLite:** portable export/verification, online full backup/read-only verification, recovery
   provenance exercise, documented retention limits, and cascade deletion coverage. Portable import

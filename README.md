@@ -166,19 +166,19 @@ make eval
 npm run test:e2e
 ```
 
-The pre-alpha workflow is configured to run source-development smoke checks
+The pre-alpha workflow runs source-development smoke checks
 on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. Its checked-in script covers
 installation, local SQLite ingestion/search, exact evidence, portable export,
 raw backup verification, and an optimized web build without model
-credentials or external runtime services. This describes repository configuration and local
-test coverage, not evidence that a hosted CI run succeeded. It does not claim native desktop
-packaging, production deployment support, or verified Windows support.
+credentials or external runtime services. A successful hosted receipt for revision `0dde53f` is
+recorded under [`evals/platform/`](evals/platform/github-actions-0dde53f.json). It does not claim
+native desktop packaging, production deployment support, or verified Windows support.
 
 The configured Ubuntu browser job runs the credential-free import, memory review/correction,
 retrieval diagnostics, exact-evidence navigation, and deletion workflow in Chromium. Its hostile
 Markdown fixture verifies script/image payloads remain inert and records any non-loopback request
-as a failure. This is checked-in E2E coverage, not a hosted CI success receipt or production
-security qualification.
+as a failure. The recorded hosted run passed this job; it is not a production security
+qualification.
 
 The current credential-free retrieval gate is `evals/retrieval/seed-v2.json`: 26 synthetic queries
 cover Unicode lexical retrieval plus initial/current revisions and expected-empty superseded terms.
@@ -186,8 +186,8 @@ The deterministic extraction gate covers all four memory kinds and exact evidenc
 Both are regression contracts only; they do not establish real-model or pilot quality.
 
 Remaining release gates include real-model and external-pilot evidence, a repository security-
-plugin scan, hosted CI receipts, reranking, scalable vector indexing, Windows verification, and
-production qualification.
+plugin scan, reranking, scalable vector indexing, Windows verification, and production
+qualification.
 
 ### Data portability and recovery
 
