@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -8,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .ingestion import IngestionConflict, IngestionExecutionError, run_ingestion_job
-from .models import Source
+from .models import AuditEvent, Source, SourceVersion, utc_now
 from .schemas import (
     FolderScanFileResult,
     FolderScanRequest,
@@ -24,6 +26,15 @@ class FolderScanError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+@dataclass(frozen=True)
+class PreparedFile:
+    relative_path: str
+    uri: str
+    kind: str
+    content: str
+    content_hash: str
 
 
 def _is_within(path: Path, parent: Path) -> bool:
@@ -115,7 +126,7 @@ def _failed_file(relative_path: str, code: str, *, uri: str | None = None) -> Fo
     )
 
 
-def _ingest_file(session: Session, root: Path, candidate: Path) -> FolderScanFileResult:
+def _prepare_file(root: Path, candidate: Path) -> PreparedFile | FolderScanFileResult:
     relative_path = candidate.relative_to(root).as_posix()
     try:
         resolved = candidate.resolve(strict=True)
@@ -142,6 +153,19 @@ def _ingest_file(session: Session, root: Path, candidate: Path) -> FolderScanFil
     if not content:
         return _failed_file(relative_path, "file_empty", uri=uri)
 
+    return PreparedFile(
+        relative_path=relative_path,
+        uri=uri,
+        kind=SUPPORTED_SUFFIXES[candidate.suffix.casefold()],
+        content=content,
+        content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    )
+
+
+def _ingest_prepared_file(session: Session, prepared: PreparedFile) -> FolderScanFileResult:
+    relative_path = prepared.relative_path
+    uri = prepared.uri
+
     existing = session.scalar(select(Source).where(Source.uri == uri))
     previous_version_id = existing.current_version_id if existing else None
     try:
@@ -149,8 +173,8 @@ def _ingest_file(session: Session, root: Path, candidate: Path) -> FolderScanFil
             session,
             SourceCreate(
                 title=relative_path[:300],
-                content=content,
-                kind=SUPPORTED_SUFFIXES[candidate.suffix.casefold()],
+                content=prepared.content,
+                kind=prepared.kind,
                 uri=uri,
             ),
         )
@@ -178,6 +202,46 @@ def _ingest_file(session: Session, root: Path, candidate: Path) -> FolderScanFil
     )
 
 
+def _rename_source(
+    session: Session, source: Source, prepared: PreparedFile
+) -> FolderScanFileResult:
+    previous_uri = source.uri
+    before = {
+        "uri": source.uri,
+        "title": source.title,
+        "kind": source.kind,
+        "current_version_id": source.current_version_id,
+    }
+    source.uri = prepared.uri
+    source.title = prepared.relative_path[:300]
+    source.kind = prepared.kind
+    source.indexed_at = utc_now()
+    session.add(
+        AuditEvent(
+            action="source.renamed",
+            object_type="source",
+            object_id=source.id,
+            before_json=before,
+            after_json={
+                "uri": source.uri,
+                "title": source.title,
+                "kind": source.kind,
+                "current_version_id": source.current_version_id,
+            },
+        )
+    )
+    session.commit()
+    return FolderScanFileResult(
+        relative_path=prepared.relative_path,
+        uri=prepared.uri,
+        previous_uri=previous_uri,
+        status="renamed",
+        source_id=source.id,
+        source_version_id=source.current_version_id,
+        job_id=None,
+    )
+
+
 def scan_registered_folder(
     session: Session,
     payload: FolderScanRequest,
@@ -186,11 +250,47 @@ def scan_registered_folder(
     root = _select_root(registered_roots, payload.root)
     scan_path = _select_scan_path(root, payload.path)
     candidates = _discover_files(root, scan_path)
-    files = [_ingest_file(session, root, candidate) for candidate in candidates]
-    discovered_uris = {item.uri for item in files if item.uri is not None}
+    prepared_items = [_prepare_file(root, candidate) for candidate in candidates]
+    discovered_uris = {item.uri for item in prepared_items if item.uri is not None}
+
+    sources = list(session.scalars(select(Source).where(Source.uri.is_not(None))).all())
+    sources_by_uri: dict[str, list[Source]] = {}
+    missing_sources_by_hash: dict[str, list[Source]] = {}
+    for source in sources:
+        sources_by_uri.setdefault(source.uri, []).append(source)
+        source_path = _safe_file_uri(source.uri)
+        if not source_path or not _is_within(source_path, scan_path):
+            continue
+        if source.uri in discovered_uris:
+            continue
+        version = session.get(SourceVersion, source.current_version_id)
+        if version:
+            missing_sources_by_hash.setdefault(version.content_hash, []).append(source)
+
+    new_files_by_hash: dict[str, list[PreparedFile]] = {}
+    for item in prepared_items:
+        if isinstance(item, PreparedFile) and item.uri not in sources_by_uri:
+            new_files_by_hash.setdefault(item.content_hash, []).append(item)
+
+    rename_source_by_uri: dict[str, Source] = {}
+    for content_hash, new_files in new_files_by_hash.items():
+        missing_sources = missing_sources_by_hash.get(content_hash, [])
+        if len(new_files) == 1 and len(missing_sources) == 1:
+            rename_source_by_uri[new_files[0].uri] = missing_sources[0]
+
+    files: list[FolderScanFileResult] = []
+    for item in prepared_items:
+        if isinstance(item, FolderScanFileResult):
+            files.append(item)
+            continue
+        rename_source = rename_source_by_uri.get(item.uri)
+        files.append(
+            _rename_source(session, rename_source, item)
+            if rename_source
+            else _ingest_prepared_file(session, item)
+        )
 
     missing_source_ids: list[str] = []
-    sources = session.scalars(select(Source).where(Source.uri.is_not(None))).all()
     for source in sources:
         source_path = _safe_file_uri(source.uri)
         if source_path and _is_within(source_path, scan_path) and source.uri not in discovered_uris:
@@ -199,7 +299,7 @@ def scan_registered_folder(
 
     counts = {
         status: sum(item.status == status for item in files)
-        for status in ("created", "updated", "unchanged", "failed")
+        for status in ("created", "updated", "unchanged", "renamed", "failed")
     }
     return FolderScanResponse(
         root=str(root),
@@ -209,6 +309,7 @@ def scan_registered_folder(
         created_count=counts["created"],
         updated_count=counts["updated"],
         unchanged_count=counts["unchanged"],
+        renamed_count=counts["renamed"],
         failed_count=counts["failed"],
         missing_count=len(missing_source_ids),
         missing_source_ids=missing_source_ids,
