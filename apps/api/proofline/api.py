@@ -370,13 +370,30 @@ def index_embeddings(session: Session = Depends(get_session)) -> EmbeddingIndexR
 @router.get("/model/runs", response_model=list[ModelRunRead])
 def list_model_runs(
     run_status: str | None = Query(default=None, alias="status"),
+    operation: str | None = None,
+    provider_id: str | None = None,
+    parent_run_id: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> list[ModelRun]:
-    query = select(ModelRun).order_by(ModelRun.created_at.desc()).limit(limit)
+    query = select(ModelRun)
     if run_status:
         query = query.where(ModelRun.status == run_status)
-    return list(session.scalars(query).all())
+    if operation:
+        query = query.where(ModelRun.operation == operation)
+    if provider_id:
+        query = query.where(ModelRun.provider_id == provider_id)
+    if parent_run_id:
+        query = query.where(ModelRun.parent_run_id == parent_run_id)
+    return list(session.scalars(query.order_by(ModelRun.created_at.desc()).limit(limit)).all())
+
+
+@router.get("/model/runs/{run_id}", response_model=ModelRunRead)
+def get_model_run(run_id: str, session: Session = Depends(get_session)) -> ModelRun:
+    run = session.get(ModelRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Model run not found")
+    return run
 
 
 @router.get("/sources/{source_id}")

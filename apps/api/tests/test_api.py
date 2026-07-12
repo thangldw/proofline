@@ -153,6 +153,34 @@ def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypat
     assert client.post("/api/v1/model/embeddings/index").status_code == 409
 
 
+def test_model_provider_health_check_reports_provider_result(client, monkeypatch):
+    class HealthProvider:
+        id = "health-test"
+        model = "health-model"
+        healthy = False
+
+        def capabilities(self):
+            from proofline.model_gateway import ModelCapabilities
+
+            return ModelCapabilities()
+
+        def health(self):
+            return self.healthy
+
+    monkeypatch.setattr(
+        "proofline.api.build_generation_provider", lambda _settings: HealthProvider()
+    )
+
+    unchecked = client.get("/api/v1/model/provider").json()
+    unhealthy = client.get("/api/v1/model/provider", params={"check_health": True}).json()
+    HealthProvider.healthy = True
+    healthy = client.get("/api/v1/model/provider", params={"check_health": True}).json()
+
+    assert unchecked["healthy"] is None
+    assert unhealthy["healthy"] is False
+    assert healthy["healthy"] is True
+
+
 def test_answer_endpoint_fails_safe_without_provider(client, monkeypatch):
     monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
     client.post(
