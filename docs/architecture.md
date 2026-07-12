@@ -144,7 +144,11 @@ existing source or memory records.
 
 ### 7. Retrieval and answering
 
-Lexical FTS5 retrieval is implemented. The planned full retrieval path is:
+Lexical FTS5 retrieval and the guarded answer path are implemented. The current path builds a
+bounded evidence pack, requests typed statements plus evidence IDs, rejects unknown/missing IDs,
+resolves citations server-side, and revalidates exact spans against immutable source versions.
+When no provider is configured, it returns verified evidence without synthesizing claims. Semantic
+retrieval, fusion, reranking, and automated repair retries remain planned. The target full path is:
 
 1. normalize the question and optional filters;
 2. run lexical and semantic retrieval independently;

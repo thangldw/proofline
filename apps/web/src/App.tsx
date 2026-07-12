@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Decision, Evidence, Overview, SearchHit, Source } from "./types";
+import type { Decision, Evidence, GroundedAnswer, Overview, SearchHit, Source } from "./types";
 
 type View = "search" | "decisions" | "sources";
 
@@ -71,11 +71,40 @@ function Nav({icon, active, onClick, count, children}: {icon: React.ReactNode; a
 }
 
 function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) => void}) {
-  const [query, setQuery] = useState(""); const [hits, setHits] = useState<SearchHit[]>([]); const [searched, setSearched] = useState(false); const [busy, setBusy] = useState(false);
-  async function run(event: React.FormEvent) { event.preventDefault(); if (query.trim().length < 2) return; setBusy(true); try { setHits(await api.search(query)); setSearched(true); } finally { setBusy(false); } }
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [answer, setAnswer] = useState<GroundedAnswer | null>(null);
+  const [searched, setSearched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  async function run(event: React.FormEvent) {
+    event.preventDefault();
+    if (query.trim().length < 2) return;
+    setBusy(true);
+    try {
+      const [nextHits, nextAnswer] = await Promise.all([api.search(query), api.answer(query)]);
+      setHits(nextHits);
+      setAnswer(nextAnswer);
+      setSearched(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function openCitation(citation: GroundedAnswer["citations"][number]) {
+    onEvidence({
+      id: citation.evidence_id,
+      source_id: citation.source_id,
+      source_version_id: citation.source_version_id,
+      quote: citation.content,
+      start_offset: citation.start_offset,
+      end_offset: citation.end_offset,
+      start_line: citation.start_line,
+      end_line: citation.end_line,
+    }, citation.source_title);
+  }
   return <section className="content search-view">
     <form className="search-box" onSubmit={run}><FileSearch/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search why a system was built this way…" aria-label="Search engineering memory"/><button disabled={busy}>{busy ? "Searching" : "Search"}</button></form>
     {!searched && <div className="hero-empty"><div className="line-art">↳</div><h2>Follow every claim back to its source.</h2><p>Search technical decisions, rationale, and implementation context. Proofline returns inspectable evidence—not an uncited answer.</p></div>}
+    {answer && <article className="result-card"><div className="decision-top"><span className="mode-badge">{answer.status.replaceAll("_", " ")}</span>{answer.model_run_id && <span>Run {answer.model_run_id.slice(0, 8)}</span>}</div><h2>Evidence-backed answer</h2><p>{answer.answer}</p>{answer.statements.map((statement, index) => <p key={`${statement.kind}-${index}`}><strong>{statement.kind}</strong> · {statement.text}</p>)}<footer>{answer.citations.map(citation => <button key={citation.evidence_id} onClick={() => openCitation(citation)}>{citation.source_title} · L{citation.start_line}–{citation.end_line}</button>)}</footer></article>}
     {searched && <div className="results"><div className="section-heading"><div><span className="eyebrow">RAW RETRIEVAL</span><h2>{hits.length} evidence matches</h2></div><span className="mode-badge">Lexical · FTS5</span></div>
       {hits.length === 0 ? <div className="empty-card">Insufficient evidence. Try another phrase or import a source.</div> : hits.map(hit => <article className="result-card" key={hit.chunk_id}><div className="result-meta"><span>{hit.source_title}</span><button onClick={() => onEvidence({id: hit.chunk_id, source_id: hit.source_id, source_version_id: hit.source_version_id, quote: hit.content, start_offset: hit.start_offset, end_offset: hit.end_offset, start_line: hit.start_line, end_line: hit.end_line}, hit.source_title)}>Lines {hit.start_line}–{hit.end_line}</button></div><p>{hit.content}</p></article>)}</div>}
   </section>;
