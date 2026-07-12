@@ -100,8 +100,15 @@ def answer_question(
     provider: GenerationProvider | None,
     embedding_provider: EmbeddingProvider | None = None,
     limit: int = 8,
+    max_per_source: int = 2,
 ) -> AnswerResponse:
-    hits = hybrid_search(session, question, embedding_provider, limit)
+    hits = hybrid_search(
+        session,
+        question,
+        embedding_provider,
+        limit,
+        max_per_source=max_per_source,
+    )
     if not hits:
         return AnswerResponse(
             status="insufficient_evidence",

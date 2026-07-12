@@ -132,8 +132,7 @@ def semantic_search(
             (cosine_similarity(query_vector, embedding.vector_json), chunk, title)
             for embedding, chunk, title in rows
         ),
-        key=lambda item: item[0],
-        reverse=True,
+        key=lambda item: (-item[0], item[1].id),
     )[:limit]
     return [
         SearchHit(
@@ -161,6 +160,7 @@ def hybrid_search(
     provider: EmbeddingProvider | None,
     limit: int = 10,
     rrf_constant: int = 60,
+    max_per_source: int = 2,
 ) -> list[SearchHit]:
     lexical = lexical_search(session, query, max(limit * 3, limit))
     lexical = [
@@ -176,7 +176,29 @@ def hybrid_search(
         scores[chunk_id] = scores.get(chunk_id, 0) + 1 / (rrf_constant + rank)
     for chunk_id, rank in semantic_ranks.items():
         scores[chunk_id] = scores.get(chunk_id, 0) + 1 / (rrf_constant + rank)
-    ranked_ids = sorted(scores, key=scores.__getitem__, reverse=True)[:limit]
+    ranked_ids = sorted(
+        scores,
+        key=lambda chunk_id: (
+            -scores[chunk_id],
+            lexical_ranks.get(chunk_id, math.inf),
+            semantic_ranks.get(chunk_id, math.inf),
+            chunk_id,
+        ),
+    )
+    selected_ids: list[str] = []
+    deferred_ids: list[str] = []
+    source_counts: dict[str, int] = {}
+    for chunk_id in ranked_ids:
+        source_id = hits_by_id[chunk_id].source_id
+        if source_counts.get(source_id, 0) < max_per_source:
+            selected_ids.append(chunk_id)
+            source_counts[source_id] = source_counts.get(source_id, 0) + 1
+        else:
+            deferred_ids.append(chunk_id)
+        if len(selected_ids) == limit:
+            break
+    if len(selected_ids) < limit:
+        selected_ids.extend(deferred_ids[: limit - len(selected_ids)])
     return [
         hits_by_id[chunk_id].model_copy(
             update={
@@ -198,5 +220,5 @@ def hybrid_search(
                 ],
             }
         )
-        for chunk_id in ranked_ids
+        for chunk_id in selected_ids
     ]
