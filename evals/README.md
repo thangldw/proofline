@@ -39,3 +39,7 @@ This command records an environment-specific measurement; it does not enforce a 
 and is not evidence for the roadmap's 10,000-file scale target. Any published comparison must also
 record the Proofline revision, operating system, SQLite/Python versions, hardware, fixture arguments,
 and whether other workloads were active.
+
+Committed observations live in [`benchmarks/`](./benchmarks/) and include the exact Proofline
+revision, environment, command, fixture provenance, and qualification. They are receipts for a
+specific run, not portable performance guarantees.

@@ -76,7 +76,8 @@ idempotency keys, and startup recovery. It does **not** yet implement folder wat
 vector retrieval, generalized memory extraction, grounded-answer repair retries, or desktop
 packaging. Registered-root folder scans are available
 for explicit, on-demand Markdown/text import; missing files are previewed but never silently
-deleted. The current hybrid answer path combines
+deleted, and unambiguous same-content renames preserve source identity. The current hybrid answer
+path combines
 lexical and dense retrieval through RRF and enforces server-owned evidence IDs plus exact immutable
 citations. Dense scoring is intentionally bounded and not yet a large-vault performance claim.
 Generation providers can also create decision candidates, but only after structured-output and

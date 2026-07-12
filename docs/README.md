@@ -58,10 +58,13 @@ As of 2026-07-12:
 - Also implemented: schema-validated, evidence-grounded AI decision candidates linked to model
   runs and the existing human review/audit workflow.
 - Also implemented: registered-root folder scanning with traversal/symlink containment, per-file
-  results, immutable updates, and preview-only missing-file reporting.
+  results, immutable updates, audited unique-hash rename preservation, and preview-only missing-file
+  reporting.
 - Also implemented: metadata-only source deletion impact, verified cascade cleanup including
   embeddings/FTS/audits, and source-level ingestion job diagnostics in the web inventory.
 - Also implemented: web behavior tests, a repository threat model, and CI secret scanning.
+- Also implemented: deterministic local lexical benchmark reporting and a versioned environment-
+  qualified observation receipt; this is not a product performance guarantee.
 - Not yet implemented: scalable vector index, reranker, assumption/constraint extraction, model
   repair retries, desktop packaging, cloud services, or telemetry.
 

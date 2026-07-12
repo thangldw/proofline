@@ -139,6 +139,10 @@ order, rejects files larger than 5 MB, and feeds valid UTF-8 content through the
 ingestion jobs as uploads. Unchanged files retain their current immutable version; changed files
 create a new version under the stable resolved `file://` URI.
 
+When one new file and one missing source have the same current content hash, the scanner treats the
+change as a rename: it preserves the source/version/evidence identity and records a metadata-only
+`source.renamed` audit event. Multiple old or new matches are ambiguous and never auto-linked.
+
 The response reports every processed file and any source IDs whose files are missing. Missing-file
 deletion is preview-only even when `delete_missing=true`; no source is removed by a folder scan.
 

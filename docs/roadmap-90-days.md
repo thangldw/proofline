@@ -62,8 +62,8 @@ Before delivery work, record:
 ### Planned work
 
 - Harden Markdown/text upload and safe registered-root folder scanning. On-demand scanning,
-  containment checks, deterministic ordering, immutable updates, and missing-file preview are
-  implemented; watching and confirmed deletion remain open.
+  containment checks, deterministic ordering, immutable updates, audited unambiguous rename, and
+  missing-file preview are implemented; watching and confirmed missing-file deletion remain open.
 - Harden the implemented immutable source versioning and explicit SQLite migrations. Atomic crash
   rollback, v7-to-v8 backfill, startup recovery, idempotency, and stale-claim concurrency are
   tested; a larger legacy-database fixture remains open.
@@ -78,13 +78,14 @@ Before delivery work, record:
 
 ### Exit gate
 
-- Integration tests cover create, update, rename, duplicate content, delete, retry, and crash
-  recovery.
+- Integration tests now cover create, update, unambiguous and ambiguous rename, duplicate content,
+  delete, retry, stale concurrent claims, and crash recovery.
 - All golden source spans pass exact hash/offset validation.
 - Every discovered fixture reaches a visible `ready`, `failed`, or `dead_letter` state; retryable
   failures expose a retry control.
-- Lexical search p95 is measured against the documented local scale fixture; no unqualified
-  performance claim is published.
+- Lexical search p95 is measured against the documented local scale fixture; a qualified 1,000-
+  source/100-query receipt is committed under `evals/benchmarks/`. No unqualified performance
+  claim is published.
 
 ## Phase 3 — Days 36–56: Model gateway and governed extraction
 

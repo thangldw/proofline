@@ -1,3 +1,5 @@
+import hashlib
+
 import proofline.ingestion as ingestion_module
 import pytest
 from proofline.ingestion import (
@@ -101,6 +103,7 @@ def test_same_uri_creates_immutable_version_and_keeps_historical_evidence(sessio
     assert session.get(Decision, first_decision.id).statement == "Use SQLite"
     evidence = session.scalar(select(Evidence).where(Evidence.decision_id == first_decision.id))
     assert first_content[evidence.start_offset : evidence.end_offset] == evidence.quote
+    assert evidence.quote_hash == hashlib.sha256(evidence.quote.encode("utf-8")).hexdigest()
 
 
 def test_ingestion_failure_is_persisted_without_source_content(session, monkeypatch):
