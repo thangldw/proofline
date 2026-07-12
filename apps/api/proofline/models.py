@@ -48,7 +48,7 @@ class SourceVersion(Base):
     version_number: Mapped[int] = mapped_column(Integer)
     content_length: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(30), default="indexed")
-    parser_version: Mapped[str] = mapped_column(String(30), default="deterministic-v1")
+    parser_version: Mapped[str] = mapped_column(String(30), default="deterministic-v2")
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
 

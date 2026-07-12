@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from bisect import bisect_right
 from dataclasses import dataclass
 
 from sqlalchemy import func, select, text, update
@@ -109,34 +110,45 @@ def line_number(content: str, offset: int) -> int:
 
 
 def chunk_markdown(content: str, max_chars: int = 1600) -> list[TextSpan]:
+    if max_chars < 1:
+        raise ValueError("max_chars must be positive")
     paragraphs = list(re.finditer(r"\S(?:.|\n)*?(?=\n\s*\n|\Z)", content))
+    newline_offsets = [index for index, value in enumerate(content) if value == "\n"]
     spans: list[TextSpan] = []
     current_start: int | None = None
     current_end = 0
+
+    def append_span(raw_start: int, raw_end: int) -> None:
+        raw = content[raw_start:raw_end]
+        left = len(raw) - len(raw.lstrip())
+        right = len(raw.rstrip())
+        start = raw_start + left
+        end = raw_start + right
+        if end <= start:
+            return
+        spans.append(
+            TextSpan(
+                content[start:end],
+                start,
+                end,
+                bisect_right(newline_offsets, start - 1) + 1,
+                bisect_right(newline_offsets, max(start, end - 1)) + 1,
+            )
+        )
 
     def flush() -> None:
         nonlocal current_start, current_end
         if current_start is None:
             return
-        raw = content[current_start:current_end]
-        left = len(raw) - len(raw.lstrip())
-        right = len(raw.rstrip())
-        start = current_start + left
-        end = current_start + right
-        if end > start:
-            spans.append(
-                TextSpan(
-                    content[start:end],
-                    start,
-                    end,
-                    line_number(content, start),
-                    line_number(content, max(start, end - 1)),
-                )
-            )
+        append_span(current_start, current_end)
         current_start = None
 
     for paragraph in paragraphs:
-        if current_start is None:
+        if paragraph.end() - paragraph.start() > max_chars:
+            flush()
+            for start in range(paragraph.start(), paragraph.end(), max_chars):
+                append_span(start, min(start + max_chars, paragraph.end()))
+        elif current_start is None:
             current_start, current_end = paragraph.start(), paragraph.end()
         elif paragraph.end() - current_start <= max_chars:
             current_end = paragraph.end()
@@ -334,7 +346,7 @@ def ingest_source(
         version_number=version_number,
         content_length=len(payload.content),
         status="indexed",
-        parser_version="deterministic-v1",
+        parser_version="deterministic-v2",
     )
     session.add(version)
     session.flush()
