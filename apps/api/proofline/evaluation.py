@@ -31,12 +31,22 @@ class EvaluationSource(BaseModel):
     title: str
     uri: str
     content: str
+    revisions: list[str] = Field(default_factory=list)
 
 
 class EvaluationQuery(BaseModel):
     id: str
     question: str
     relevance: dict[str, int]
+    expected_empty: bool = False
+
+    @model_validator(mode="after")
+    def validate_relevance_contract(self) -> EvaluationQuery:
+        if self.expected_empty and self.relevance:
+            raise ValueError("expected-empty queries cannot declare relevant sources")
+        if not self.expected_empty and not any(grade > 0 for grade in self.relevance.values()):
+            raise ValueError("positive retrieval queries require graded relevance")
+        return self
 
 
 class RetrievalDataset(BaseModel):
@@ -46,6 +56,20 @@ class RetrievalDataset(BaseModel):
     sources: list[EvaluationSource] = Field(min_length=1)
     queries: list[EvaluationQuery] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def validate_dataset_references(self) -> RetrievalDataset:
+        uris = [source.uri for source in self.sources]
+        if len(set(uris)) != len(uris):
+            raise ValueError("retrieval evaluation source URIs must be unique")
+        known = set(uris)
+        referenced = {uri for query in self.queries for uri in query.relevance}
+        if referenced - known:
+            raise ValueError("retrieval relevance references unknown source URIs")
+        query_ids = [query.id for query in self.queries]
+        if len(set(query_ids)) != len(query_ids):
+            raise ValueError("retrieval evaluation query IDs must be unique")
+        return self
+
 
 class QueryMetrics(BaseModel):
     query_id: str
@@ -54,12 +78,17 @@ class QueryMetrics(BaseModel):
     reciprocal_rank: float
     ndcg_at_k: float
     retrieved_source_uris: list[str]
+    expected_empty: bool = False
+    empty_result_correct: bool | None = None
 
 
 class EvaluationReport(BaseModel):
     dataset_version: str
     dataset_provenance: str
     query_count: int
+    positive_query_count: int
+    expected_empty_query_count: int
+    expected_empty_accuracy: float
     k: int
     recall_at_k: float
     precision_at_k: float
@@ -330,8 +359,20 @@ def query_metrics(
     retrieved_uris: list[str],
     relevance: dict[str, int],
     k: int,
+    expected_empty: bool = False,
 ) -> QueryMetrics:
     ranked = retrieved_uris[:k]
+    if expected_empty:
+        return QueryMetrics(
+            query_id=query_id,
+            recall_at_k=0.0,
+            precision_at_k=0.0,
+            reciprocal_rank=0.0,
+            ndcg_at_k=0.0,
+            retrieved_source_uris=ranked,
+            expected_empty=True,
+            empty_result_correct=not ranked,
+        )
     relevant = {uri for uri, grade in relevance.items() if grade > 0}
     retrieved_relevant = [uri for uri in ranked if uri in relevant]
     recall = len(set(retrieved_relevant)) / len(relevant) if relevant else 1.0
@@ -365,15 +406,28 @@ def evaluate_dataset(dataset_path: Path, k: int = 10) -> EvaluationReport:
             ]
         engine.dispose()
     count = len(results)
+    positive_results = [result for result in results if not result.expected_empty]
+    empty_results = [result for result in results if result.expected_empty]
+    positive_count = len(positive_results)
+    if not positive_count:
+        raise ValueError("retrieval evaluation requires at least one positive query")
     return EvaluationReport(
         dataset_version=dataset.version,
         dataset_provenance=dataset.provenance,
         query_count=count,
+        positive_query_count=positive_count,
+        expected_empty_query_count=len(empty_results),
+        expected_empty_accuracy=(
+            sum(result.empty_result_correct is True for result in empty_results)
+            / len(empty_results)
+            if empty_results
+            else 1.0
+        ),
         k=k,
-        recall_at_k=sum(result.recall_at_k for result in results) / count,
-        precision_at_k=sum(result.precision_at_k for result in results) / count,
-        mrr=sum(result.reciprocal_rank for result in results) / count,
-        ndcg_at_k=sum(result.ndcg_at_k for result in results) / count,
+        recall_at_k=sum(result.recall_at_k for result in positive_results) / positive_count,
+        precision_at_k=sum(result.precision_at_k for result in positive_results) / positive_count,
+        mrr=sum(result.reciprocal_rank for result in positive_results) / positive_count,
+        ndcg_at_k=sum(result.ndcg_at_k for result in positive_results) / positive_count,
         queries=results,
     )
 
@@ -746,6 +800,11 @@ def _ingest_dataset(
             session,
             SourceCreate(title=item.title, uri=item.uri, content=item.content),
         )
+        for revision in item.revisions:
+            source, _created = ingest_source(
+                session,
+                SourceCreate(title=item.title, uri=item.uri, content=revision),
+            )
         source_uri_by_id[source.id] = item.uri
     return source_uri_by_id
 
@@ -824,7 +883,13 @@ def _evaluate_query(
             source_uri_by_id[hit.source_id] for hit in hits if hit.source_id in source_uri_by_id
         )
     )
-    return query_metrics(query.id, ranked_uris, query.relevance, k)
+    return query_metrics(
+        query.id,
+        ranked_uris,
+        query.relevance,
+        k,
+        expected_empty=query.expected_empty,
+    )
 
 
 def report_json(report: EvaluationReport) -> str:

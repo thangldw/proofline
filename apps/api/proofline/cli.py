@@ -60,8 +60,9 @@ def main(argv: list[str] | None = None) -> None:
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
     evaluate.add_argument("--k", type=int, default=10)
-    evaluate.add_argument("--min-recall", type=float, default=0)
-    evaluate.add_argument("--min-ndcg", type=float, default=0)
+    evaluate.add_argument("--min-recall", type=unit_interval, default=0)
+    evaluate.add_argument("--min-ndcg", type=unit_interval, default=0)
+    evaluate.add_argument("--min-expected-empty-accuracy", type=unit_interval, default=0)
     grounded = subcommands.add_parser(
         "eval-grounded", help="Run a versioned credential-free grounded-QA evaluation"
     )
@@ -106,7 +107,11 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "eval":
         report = evaluate_dataset(args.dataset, args.k)
         print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-        if report.recall_at_k < args.min_recall or report.ndcg_at_k < args.min_ndcg:
+        if (
+            report.recall_at_k < args.min_recall
+            or report.ndcg_at_k < args.min_ndcg
+            or report.expected_empty_accuracy < args.min_expected_empty_accuracy
+        ):
             raise SystemExit(1)
     elif args.command == "eval-grounded":
         report = evaluate_grounded_dataset(args.dataset, args.limit)
