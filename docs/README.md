@@ -40,8 +40,9 @@ As of 2026-07-12:
 - Implemented in `apps/web`: React/Vite local evidence console for Markdown upload, lexical
   search, source/decision browsing, overview counts, and evidence inspection.
 - Local container scaffolding and root setup/development/quality commands are present.
-- Not yet implemented: immutable source-version history, persisted ingestion jobs, model
-  providers, embeddings/hybrid retrieval, decision extraction/review, grounded answer
+- Also implemented: immutable source-version history and versioned SQLite migrations.
+- Not yet implemented: persisted ingestion jobs, model
+  providers, embeddings/hybrid retrieval, AI-derived decision review, grounded answer
   generation, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

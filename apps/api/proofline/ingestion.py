@@ -4,10 +4,10 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from .models import Chunk, Decision, Evidence, Source
+from .models import Chunk, Decision, Evidence, Source, SourceVersion, new_id, utc_now
 from .schemas import SourceCreate
 
 
@@ -18,6 +18,10 @@ class TextSpan:
     end_offset: int
     start_line: int
     end_line: int
+
+
+class IngestionConflict(ValueError):
+    """Raised when a stable source identity cannot be resolved safely."""
 
 
 DECISION_PREFIX = re.compile(
@@ -133,25 +137,11 @@ def extract_decisions(content: str) -> list[dict]:
     return results
 
 
-def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool]:
-    digest = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
-    existing = session.query(Source).filter(Source.content_hash == digest).one_or_none()
-    if existing:
-        return existing, False
-
-    source = Source(
-        title=payload.title,
-        kind=payload.kind,
-        uri=payload.uri,
-        content=payload.content,
-        content_hash=digest,
-    )
-    session.add(source)
-    session.flush()
-
-    for ordinal, span in enumerate(chunk_markdown(payload.content)):
+def _index_version(session: Session, source: Source, version: SourceVersion, content: str) -> None:
+    for ordinal, span in enumerate(chunk_markdown(content)):
         chunk = Chunk(
             source_id=source.id,
+            source_version_id=version.id,
             ordinal=ordinal,
             content=span.text,
             start_offset=span.start_offset,
@@ -169,22 +159,94 @@ def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool
             {"chunk": chunk.id, "source": source.id, "content": chunk.content},
         )
 
-    for extracted in extract_decisions(payload.content):
+    for extracted in extract_decisions(content):
         quote = extracted.pop("quote")
         span_fields = {
             key: extracted.pop(key)
             for key in ("start_offset", "end_offset", "start_line", "end_line")
         }
-        decision = Decision(source_id=source.id, **extracted)
+        decision = Decision(source_id=source.id, source_version_id=version.id, **extracted)
         session.add(decision)
         session.flush()
         session.add(
-            Evidence(decision_id=decision.id, source_id=source.id, quote=quote, **span_fields)
+            Evidence(
+                decision_id=decision.id,
+                source_id=source.id,
+                source_version_id=version.id,
+                quote=quote,
+                quote_hash=hashlib.sha256(quote.encode("utf-8")).hexdigest(),
+                **span_fields,
+            )
         )
+
+
+def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool]:
+    digest = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
+    source = None
+    if payload.uri:
+        matches = session.query(Source).filter(Source.uri == payload.uri).all()
+        if len(matches) > 1:
+            raise IngestionConflict(
+                "multiple sources already use this URI; resolve the duplicate identity first"
+            )
+        source = matches[0] if matches else None
+        if source:
+            current = session.get(SourceVersion, source.current_version_id)
+            if current and current.content_hash == digest:
+                return source, False
+    if source is None:
+        duplicate = (
+            session.query(Source)
+            .join(SourceVersion, Source.current_version_id == SourceVersion.id)
+            .filter(Source.uri.is_(None), SourceVersion.content_hash == digest)
+            .one_or_none()
+        )
+        if duplicate:
+            return duplicate, False
+
+    created = source is None
+    if created:
+        source_id = new_id()
+        source = Source(
+            id=source_id,
+            title=payload.title,
+            kind=payload.kind,
+            uri=payload.uri,
+            content=payload.content,
+            content_hash=hashlib.sha256(f"source:{source_id}".encode()).hexdigest(),
+        )
+        session.add(source)
+        session.flush()
+    else:
+        source.title = payload.title
+        source.kind = payload.kind
+        source.content = payload.content
+        source.status = "indexed"
+        source.indexed_at = utc_now()
+
+    version_number = (
+        session.query(func.max(SourceVersion.version_number))
+        .filter(SourceVersion.source_id == source.id)
+        .scalar()
+        or 0
+    ) + 1
+    version = SourceVersion(
+        source_id=source.id,
+        content_hash=digest,
+        content=payload.content,
+        version_number=version_number,
+        content_length=len(payload.content),
+        status="indexed",
+        parser_version="deterministic-v1",
+    )
+    session.add(version)
+    session.flush()
+    source.current_version_id = version.id
+    _index_version(session, source, version, payload.content)
 
     session.commit()
     session.refresh(source)
-    return source, True
+    return source, created
 
 
 def delete_source(session: Session, source: Source) -> None:

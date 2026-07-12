@@ -40,8 +40,9 @@ its processing state, and an answer citation resolves to the original source ver
 
 `apps/api` is a Python 3.11+ FastAPI service using Pydantic, SQLAlchemy, and SQLite. It currently
 owns configuration, Markdown chunking, content ingestion, source/decision/evidence persistence,
-deterministic marked-decision extraction, source retrieval and deletion, FTS5 search, overview
-counts, and health reporting. Local development runs through Uvicorn.
+deterministic marked-decision extraction, immutable source versions, committed schema migrations,
+source retrieval and deletion, FTS5 search, overview counts, and health reporting. Local
+development runs through Uvicorn.
 
 The current implementation is synchronous and intentionally has no model dependency. This is
 the executable evidence contract on which later extraction and answering will build.
@@ -51,8 +52,8 @@ the executable evidence contract on which later extraction and answering will bu
 `apps/web` is a React/Vite evidence console. It currently supports browser-side Markdown/text
 upload to the API, lexical search, source inventory, decision browsing, overview counts, and an
 evidence drawer. It is a pre-alpha inspection surface, not a rich editor. Memory correction,
-provider settings, grounded questions/answers, and robust citation navigation into immutable
-source versions remain planned. Desktop packaging is deferred.
+provider settings and grounded questions/answers remain planned. Evidence navigation already
+loads the immutable referenced source version. Desktop packaging is deferred.
 
 ### 3. Future application modules
 
@@ -69,11 +70,11 @@ Planned modules are:
 
 ### 4. Ingestion pipeline
 
-The implemented foundation ingests synchronously and deduplicates identical content by SHA-256
-hash. It does not update a mutable URI or preserve source-version history. Persisted, resumable
-jobs and immutable source versions are planned. In that planned pipeline, a source progresses
-through independently visible
-stages:
+The implemented foundation ingests synchronously. A URI identifies a stable source, SHA-256
+identifies an immutable version, unchanged content is a no-op, and changed content creates a new
+version while preserving historical evidence. URI-less repeated content remains idempotent.
+Persisted, resumable jobs remain planned. In that planned pipeline, a source progresses through
+independently visible stages:
 
 ```text
 discovered -> parsed -> indexed -> extracted -> ready
@@ -97,7 +98,8 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
-- Source versions, derived memory, jobs, and audit events are planned schema extensions.
+- Source versions and versioned schema migrations are implemented; generalized derived memory,
+  jobs, and audit events are planned schema extensions.
 - Embeddings are stored behind a repository interface. The first implementation may use a
   SQLite-compatible vector extension or a simple local vector table if dataset limits are
   documented and tested.
