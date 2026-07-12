@@ -109,6 +109,28 @@ def test_extracts_generalized_memory_kinds_with_exact_evidence(session):
         assert content[evidence.start_offset : evidence.end_offset] == evidence.quote
 
 
+def test_memory_heading_accepts_markdown_spacing_before_metadata(session):
+    content = (
+        "## Alternative: Run Kafka\n\n"
+        "Rationale: It remains viable for hosted scale.\n"
+        "Status: rejected\n\n"
+        "Unrelated paragraph."
+    )
+    source, _ = ingest_source(
+        session,
+        SourceCreate(title="Spaced ADR", content=content),
+    )
+
+    memory = source.decisions[0]
+    evidence = memory.evidence[0]
+    assert memory.kind == "alternative"
+    assert memory.rationale == "It remains viable for hosted scale."
+    assert memory.status == "rejected"
+    assert evidence.quote.endswith("Status: rejected")
+    assert "Unrelated paragraph" not in evidence.quote
+    assert content[evidence.start_offset : evidence.end_offset] == evidence.quote
+
+
 def test_ingestion_is_idempotent(session):
     payload = SourceCreate(title="ADR", content="Decision: Use SQLite\nReason: simple local setup")
     first, first_created = ingest_source(session, payload)
