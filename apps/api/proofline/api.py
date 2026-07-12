@@ -8,6 +8,7 @@ from .config import get_settings
 from .database import get_session
 from .embeddings import hybrid_search, index_current_embeddings
 from .extraction import CandidateExtractionError, extract_decision_candidates
+from .folder_scanning import FolderScanError, scan_registered_folder
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
@@ -41,6 +42,8 @@ from .schemas import (
     DecisionRead,
     DecisionUpdate,
     EmbeddingIndexResponse,
+    FolderScanRequest,
+    FolderScanResponse,
     IngestionJobRead,
     ModelRunRead,
     Overview,
@@ -139,6 +142,25 @@ def create_source(
         )
     )
     return source_to_read(hydrated)
+
+
+@router.post("/folder-scans", response_model=FolderScanResponse)
+def create_folder_scan(
+    payload: FolderScanRequest,
+    session: Session = Depends(get_session),
+) -> FolderScanResponse:
+    try:
+        return scan_registered_folder(session, payload, get_settings().import_roots)
+    except FolderScanError as exc:
+        status_code = (
+            status.HTTP_409_CONFLICT
+            if exc.code in {"import_roots_disabled", "import_root_unavailable"}
+            else status.HTTP_422_UNPROCESSABLE_CONTENT
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
 
 
 @router.get("/sources", response_model=list[SourceRead])

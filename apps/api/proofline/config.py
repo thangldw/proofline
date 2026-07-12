@@ -9,6 +9,7 @@ from pathlib import Path
 class Settings:
     database_url: str
     cors_origins: tuple[str, ...]
+    import_roots: tuple[Path, ...] = ()
     ai_provider: str = "disabled"
     ai_base_url: str | None = None
     ai_model: str | None = None
@@ -29,9 +30,18 @@ def get_settings() -> Settings:
         "true",
         "yes",
     }
+    configured_roots = os.getenv("PROOFLINE_IMPORT_ROOTS", "")
+    import_roots = tuple(
+        dict.fromkeys(
+            Path(value.strip()).expanduser().resolve()
+            for value in configured_roots.split(os.pathsep)
+            if value.strip()
+        )
+    )
     return Settings(
         database_url=database_url,
         cors_origins=tuple(origin.strip() for origin in origins.split(",") if origin.strip()),
+        import_roots=import_roots,
         ai_provider=os.getenv("PROOFLINE_AI_PROVIDER", "disabled"),
         ai_base_url=os.getenv("PROOFLINE_AI_BASE_URL"),
         ai_model=os.getenv("PROOFLINE_AI_MODEL"),

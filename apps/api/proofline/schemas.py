@@ -13,6 +13,38 @@ class SourceCreate(BaseModel):
     uri: str | None = None
 
 
+class FolderScanRequest(BaseModel):
+    root: str | None = Field(default=None, min_length=1, max_length=4_096)
+    path: str | None = Field(default=None, max_length=4_096)
+    delete_missing: bool = False
+
+
+class FolderScanFileResult(BaseModel):
+    relative_path: str
+    uri: str | None = None
+    status: Literal["created", "updated", "unchanged", "failed"]
+    source_id: str | None = None
+    source_version_id: str | None = None
+    job_id: str | None = None
+    error_code: str | None = None
+
+
+class FolderScanResponse(BaseModel):
+    root: str
+    path: str
+    delete_missing_requested: bool
+    deletion_mode: Literal["preview_only"] = "preview_only"
+    deleted_count: int = 0
+    discovered_count: int
+    created_count: int
+    updated_count: int
+    unchanged_count: int
+    failed_count: int
+    missing_count: int
+    missing_source_ids: list[str]
+    files: list[FolderScanFileResult]
+
+
 class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
