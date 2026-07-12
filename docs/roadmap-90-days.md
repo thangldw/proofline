@@ -114,8 +114,9 @@ Before delivery work, record:
 
 ### Planned work
 
-- Add embedding storage selected by the ADR benchmark spike.
-- Implement lexical and semantic retrieval, reciprocal-rank fusion, filters, and diversity.
+- Benchmark and replace the implemented bounded SQLite JSON embedding storage when scale requires.
+- Extend the implemented lexical/semantic retrieval and reciprocal-rank fusion with filters and
+  diversity control.
 - Add optional reranking behind a capability interface.
 - Extend the implemented bounded lexical evidence packs and grounded answer generation to hybrid
   retrieval and context diversity.

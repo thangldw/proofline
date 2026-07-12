@@ -7,6 +7,13 @@ from proofline.main import create_app
 from sqlalchemy.orm import Session, sessionmaker
 
 
+@pytest.fixture(autouse=True)
+def disabled_external_models(monkeypatch):
+    monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
+    monkeypatch.setenv("PROOFLINE_EMBEDDING_PROVIDER", "disabled")
+    monkeypatch.setenv("PROOFLINE_ALLOW_REMOTE_AI", "false")
+
+
 @pytest.fixture()
 def session(tmp_path) -> Generator[Session, None, None]:
     engine = make_engine(f"sqlite:///{tmp_path / 'test.db'}")

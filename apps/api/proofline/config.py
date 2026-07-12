@@ -13,6 +13,10 @@ class Settings:
     ai_base_url: str | None = None
     ai_model: str | None = None
     ai_api_key: str | None = None
+    embedding_provider: str = "disabled"
+    embedding_base_url: str | None = None
+    embedding_model: str | None = None
+    embedding_api_key: str | None = None
     allow_remote_ai: bool = False
 
 
@@ -32,5 +36,9 @@ def get_settings() -> Settings:
         ai_base_url=os.getenv("PROOFLINE_AI_BASE_URL"),
         ai_model=os.getenv("PROOFLINE_AI_MODEL"),
         ai_api_key=os.getenv("PROOFLINE_AI_API_KEY"),
+        embedding_provider=os.getenv("PROOFLINE_EMBEDDING_PROVIDER", "disabled"),
+        embedding_base_url=os.getenv("PROOFLINE_EMBEDDING_BASE_URL"),
+        embedding_model=os.getenv("PROOFLINE_EMBEDDING_MODEL"),
+        embedding_api_key=os.getenv("PROOFLINE_EMBEDDING_API_KEY"),
         allow_remote_ai=allow_remote_ai,
     )

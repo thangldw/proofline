@@ -49,7 +49,9 @@ As of 2026-07-12:
   exact citations, insufficient-evidence behavior, and fail-closed grounding validation.
 - Also implemented: a versioned synthetic retrieval corpus and CI gate for Recall@10,
   Precision@10, MRR, and nDCG@10. Real pilot judgments are still required.
-- Not yet implemented: resumable/retryable job execution, embeddings/hybrid retrieval,
+- Also implemented: separate OpenAI-compatible embedding provider, incremental versioned vectors,
+  dense cosine retrieval, and reciprocal-rank fusion with lexical results.
+- Not yet implemented: resumable/retryable job execution, scalable vector index, reranker,
   AI-derived decision review, repair retries, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

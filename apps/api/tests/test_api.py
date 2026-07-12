@@ -146,6 +146,10 @@ def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypat
         "error_code": "provider_disabled",
     }
     assert client.get("/api/v1/model/runs").json() == []
+    embedding = client.get("/api/v1/model/embedding-provider").json()
+    assert embedding["configured"] is False
+    assert embedding["error_code"] == "embedding_provider_disabled"
+    assert client.post("/api/v1/model/embeddings/index").status_code == 409
 
 
 def test_answer_endpoint_fails_safe_without_provider(client, monkeypatch):

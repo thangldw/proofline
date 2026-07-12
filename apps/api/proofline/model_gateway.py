@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
@@ -33,6 +34,17 @@ class GenerationResult(BaseModel):
     completion_tokens: int | None = None
 
 
+class EmbeddingRequest(BaseModel):
+    texts: list[str] = Field(min_length=1)
+    input_hashes: list[str] = Field(default_factory=list)
+    template_version: str = Field(default="embedding-v1", min_length=1, max_length=80)
+
+
+class EmbeddingResult(BaseModel):
+    vectors: list[list[float]]
+    prompt_tokens: int | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class ModelCapabilities:
     generation: bool = True
@@ -50,6 +62,15 @@ class GenerationProvider(Protocol):
     def generate(self, request: GenerationRequest) -> GenerationResult: ...
 
 
+class EmbeddingProvider(Protocol):
+    id: str
+    model: str
+
+    def health(self) -> bool: ...
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResult: ...
+
+
 class ProviderConfigurationError(ValueError):
     pass
 
@@ -62,6 +83,12 @@ class StructuredOutputError(RuntimeError):
     def __init__(self, run_id: str) -> None:
         self.run_id = run_id
         super().__init__(f"model run {run_id} returned invalid structured output")
+
+
+class EmbeddingValidationError(RuntimeError):
+    def __init__(self, run_id: str) -> None:
+        self.run_id = run_id
+        super().__init__(f"model run {run_id} returned invalid embeddings")
 
 
 class FakeGenerationProvider:
@@ -79,6 +106,20 @@ class FakeGenerationProvider:
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         return GenerationResult(content=self.content, prompt_tokens=1, completion_tokens=1)
+
+
+class FakeEmbeddingProvider:
+    id = "fake_embedding"
+
+    def __init__(self, vectors_by_text: dict[str, list[float]], model: str = "fake-embedding"):
+        self.vectors_by_text = vectors_by_text
+        self.model = model
+
+    def health(self) -> bool:
+        return True
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        return EmbeddingResult(vectors=[self.vectors_by_text[text] for text in request.texts])
 
 
 def is_loopback_url(url: str) -> bool:
@@ -153,6 +194,60 @@ class OpenAICompatibleProvider:
             raise ProviderRequestError("model provider request failed") from exc
 
 
+class OpenAICompatibleEmbeddingProvider:
+    id = "openai_compatible_embedding"
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        model: str,
+        api_key: str | None = None,
+        allow_remote: bool = False,
+        client: httpx.Client | None = None,
+    ) -> None:
+        if not is_loopback_url(base_url) and not allow_remote:
+            raise ProviderConfigurationError(
+                "remote AI is disabled; set PROOFLINE_ALLOW_REMOTE_AI=true explicitly"
+            )
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.api_key = api_key
+        self.client = client or httpx.Client(timeout=60)
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
+
+    def health(self) -> bool:
+        try:
+            response = self.client.get(f"{self.base_url}/models", headers=self._headers())
+            return response.is_success
+        except httpx.HTTPError:
+            return False
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        try:
+            response = self.client.post(
+                f"{self.base_url}/embeddings",
+                headers=self._headers(),
+                json={"model": self.model, "input": request.texts},
+            )
+            response.raise_for_status()
+            body = response.json()
+            vectors = [
+                item["embedding"] for item in sorted(body["data"], key=lambda item: item["index"])
+            ]
+            return EmbeddingResult(
+                vectors=vectors,
+                prompt_tokens=body.get("usage", {}).get("prompt_tokens"),
+            )
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            raise ProviderRequestError("embedding provider request failed") from exc
+
+
 def build_generation_provider(settings: Settings) -> GenerationProvider | None:
     if settings.ai_provider == "disabled":
         return None
@@ -170,6 +265,25 @@ def build_generation_provider(settings: Settings) -> GenerationProvider | None:
             allow_remote=settings.allow_remote_ai,
         )
     raise ProviderConfigurationError(f"unsupported AI provider: {settings.ai_provider}")
+
+
+def build_embedding_provider(settings: Settings) -> EmbeddingProvider | None:
+    if settings.embedding_provider == "disabled":
+        return None
+    if settings.embedding_provider == "openai_compatible":
+        if not settings.embedding_base_url or not settings.embedding_model:
+            raise ProviderConfigurationError(
+                "PROOFLINE_EMBEDDING_BASE_URL and PROOFLINE_EMBEDDING_MODEL are required"
+            )
+        return OpenAICompatibleEmbeddingProvider(
+            base_url=settings.embedding_base_url,
+            model=settings.embedding_model,
+            api_key=settings.embedding_api_key,
+            allow_remote=settings.allow_remote_ai,
+        )
+    raise ProviderConfigurationError(
+        f"unsupported embedding provider: {settings.embedding_provider}"
+    )
 
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -247,3 +361,58 @@ def run_generation(
     completed.finished_at = utc_now()
     session.commit()
     return result, parsed, completed
+
+
+def run_embedding(
+    session: Session,
+    provider: EmbeddingProvider,
+    request: EmbeddingRequest,
+) -> tuple[EmbeddingResult, ModelRun]:
+    run = ModelRun(
+        provider_id=provider.id,
+        model_id=provider.model,
+        operation="embed",
+        template_version=request.template_version,
+        input_hashes=request.input_hashes,
+        status="running",
+    )
+    session.add(run)
+    session.commit()
+    started = time.monotonic()
+    try:
+        result = provider.embed(request)
+    except Exception as exc:
+        session.rollback()
+        failed = session.get(ModelRun, run.id)
+        failed.status = "failed"
+        failed.error_code = (
+            "provider_request_failed"
+            if isinstance(exc, ProviderRequestError)
+            else "provider_internal_error"
+        )
+        failed.latency_ms = round((time.monotonic() - started) * 1000)
+        failed.finished_at = utc_now()
+        session.commit()
+        raise
+
+    dimensions = len(result.vectors[0]) if result.vectors else 0
+    valid = (
+        len(result.vectors) == len(request.texts)
+        and dimensions > 0
+        and all(len(vector) == dimensions for vector in result.vectors)
+        and all(math.isfinite(value) for vector in result.vectors for value in vector)
+    )
+    completed = session.get(ModelRun, run.id)
+    completed.latency_ms = round((time.monotonic() - started) * 1000)
+    completed.prompt_tokens = result.prompt_tokens
+    completed.finished_at = utc_now()
+    if not valid:
+        completed.status = "failed"
+        completed.validation_status = "invalid"
+        completed.error_code = "embedding_output_invalid"
+        session.commit()
+        raise EmbeddingValidationError(run.id)
+    completed.status = "succeeded"
+    completed.validation_status = "valid"
+    session.commit()
+    return result, completed

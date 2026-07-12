@@ -6,9 +6,12 @@ from pathlib import Path
 
 import uvicorn
 
+from .config import get_settings
 from .database import SessionLocal, initialize_database
+from .embeddings import index_current_embeddings
 from .evaluation import evaluate_dataset
 from .ingestion import ingest_source
+from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .schemas import SourceCreate
 
 
@@ -35,6 +38,7 @@ def main() -> None:
     evaluate.add_argument("--k", type=int, default=10)
     evaluate.add_argument("--min-recall", type=float, default=0)
     evaluate.add_argument("--min-ndcg", type=float, default=0)
+    subcommands.add_parser("embed", help="Incrementally embed current source chunks")
     args = parser.parse_args()
     if args.command == "serve":
         uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
@@ -45,6 +49,26 @@ def main() -> None:
         print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
         if report.recall_at_k < args.min_recall or report.ndcg_at_k < args.min_ndcg:
             raise SystemExit(1)
+    elif args.command == "embed":
+        initialize_database()
+        try:
+            provider = build_embedding_provider(get_settings())
+        except ProviderConfigurationError as exc:
+            raise SystemExit(str(exc)) from exc
+        if provider is None:
+            raise SystemExit("embedding provider is disabled")
+        with SessionLocal() as session:
+            report = index_current_embeddings(session, provider)
+        print(
+            json.dumps(
+                {
+                    "indexed": report.indexed,
+                    "skipped": report.skipped,
+                    "model_run_ids": report.model_run_ids,
+                },
+                indent=2,
+            )
+        )
 
 
 if __name__ == "__main__":

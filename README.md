@@ -90,6 +90,12 @@ AI is disabled by default. A local OpenAI-compatible endpoint can be configured 
 explicit `PROOFLINE_ALLOW_REMOTE_AI=true` setting. API keys are read from
 `PROOFLINE_AI_API_KEY` and are never persisted in model-run records.
 
+Embeddings use a separate model configuration: `PROOFLINE_EMBEDDING_PROVIDER`,
+`PROOFLINE_EMBEDDING_BASE_URL`, `PROOFLINE_EMBEDDING_MODEL`, and optionally
+`PROOFLINE_EMBEDDING_API_KEY`. After configuration, build the incremental index with
+`make embed` or `POST /api/v1/model/embeddings/index`. Search and grounded answers then fuse FTS5 and dense ranks
+with reciprocal-rank fusion; without an embedding provider or index they remain lexical-only.
+
 Run the local container stack with:
 
 ```bash

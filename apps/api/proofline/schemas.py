@@ -81,6 +81,11 @@ class SearchHit(BaseModel):
     start_line: int
     end_line: int
     rank: float
+    retrieval_channels: list[str] = Field(default_factory=lambda: ["lexical"])
+    lexical_rank: int | None = None
+    semantic_rank: int | None = None
+    semantic_score: float | None = None
+    fused_score: float | None = None
 
 
 class SearchResponse(BaseModel):
@@ -196,6 +201,12 @@ class ProviderStatus(BaseModel):
     remote_egress_allowed: bool = False
     healthy: bool | None = None
     error_code: str | None = None
+
+
+class EmbeddingIndexResponse(BaseModel):
+    indexed: int
+    skipped: int
+    model_run_ids: list[str]
 
 
 class ModelRunRead(BaseModel):

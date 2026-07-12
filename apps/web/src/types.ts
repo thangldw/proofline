@@ -53,6 +53,11 @@ export type SearchHit = {
   start_line: number;
   end_line: number;
   rank: number;
+  retrieval_channels: string[];
+  lexical_rank: number | null;
+  semantic_rank: number | null;
+  semantic_score: number | null;
+  fused_score: number | null;
 };
 
 export type AnswerCitation = {

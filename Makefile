@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed test eval check format
+.PHONY: setup dev dev-api dev-web seed embed test eval check format
 
 setup:
 	python3 -m venv .venv
@@ -16,6 +16,9 @@ dev-web:
 
 seed:
 	.venv/bin/proofline seed
+
+embed:
+	.venv/bin/proofline embed
 
 test:
 	.venv/bin/pytest -q

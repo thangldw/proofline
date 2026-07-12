@@ -4,11 +4,16 @@ import httpx
 import pytest
 from proofline.model_gateway import (
     ChatMessage,
+    EmbeddingRequest,
+    EmbeddingValidationError,
+    FakeEmbeddingProvider,
     FakeGenerationProvider,
     GenerationRequest,
+    OpenAICompatibleEmbeddingProvider,
     OpenAICompatibleProvider,
     ProviderConfigurationError,
     StructuredOutputError,
+    run_embedding,
     run_generation,
 )
 from proofline.models import ModelRun
@@ -94,3 +99,46 @@ def test_openai_compatible_adapter_normalizes_response_without_storing_key():
     assert result.prompt_tokens == 4
     assert result.completion_tokens == 3
     assert "test-key" not in result.model_dump_json()
+
+
+def test_invalid_embedding_dimensions_fail_and_persist_diagnostics(session):
+    provider = FakeEmbeddingProvider({"one": [1.0, 0.0], "two": [1.0]})
+
+    with pytest.raises(EmbeddingValidationError) as raised:
+        run_embedding(
+            session,
+            provider,
+            EmbeddingRequest(texts=["one", "two"], input_hashes=["1", "2"]),
+        )
+
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.status == "failed"
+    assert run.validation_status == "invalid"
+    assert run.error_code == "embedding_output_invalid"
+
+
+def test_openai_compatible_embedding_adapter_preserves_input_order():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/embeddings"
+        assert json.loads(request.content)["input"] == ["first", "second"]
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": 1, "embedding": [0.0, 1.0]},
+                    {"index": 0, "embedding": [1.0, 0.0]},
+                ],
+                "usage": {"prompt_tokens": 2},
+            },
+        )
+
+    provider = OpenAICompatibleEmbeddingProvider(
+        base_url="http://localhost:11434/v1",
+        model="embedding-model",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    result = provider.embed(EmbeddingRequest(texts=["first", "second"]))
+
+    assert result.vectors == [[1.0, 0.0], [0.0, 1.0]]
+    assert result.prompt_tokens == 2
