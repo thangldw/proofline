@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+MemoryKind = Literal["decision", "assumption", "constraint", "alternative"]
+
 
 class SourceCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -61,6 +63,7 @@ class SourceRead(BaseModel):
     version_count: int = 0
     chunk_count: int = 0
     decision_count: int = 0
+    memory_count: int = 0
 
 
 class SourceDeletionImpactRead(BaseModel):
@@ -71,6 +74,7 @@ class SourceDeletionImpactRead(BaseModel):
     chunks: int = Field(ge=0)
     embeddings: int = Field(ge=0)
     decisions: int = Field(ge=0)
+    memories: int = Field(ge=0)
     evidence: int = Field(ge=0)
     ingestion_jobs_to_detach: int = Field(ge=0)
     audit_events_to_delete: int = Field(ge=0)
@@ -98,6 +102,7 @@ class DecisionRead(BaseModel):
     source_id: str
     source_version_id: str
     source_title: str | None = None
+    kind: MemoryKind
     title: str
     statement: str
     rationale: str | None
@@ -117,6 +122,14 @@ class DecisionUpdate(BaseModel):
     statement: str | None = Field(default=None, min_length=1)
     rationale: str | None = None
     status: Literal["candidate", "active", "accepted", "rejected", "obsolete"] | None = None
+
+
+class MemoryRead(DecisionRead):
+    pass
+
+
+class MemoryUpdate(DecisionUpdate):
+    pass
 
 
 class SearchHit(BaseModel):
@@ -191,6 +204,7 @@ class Overview(BaseModel):
     sources: int
     chunks: int
     decisions: int
+    memories: int
     evidence: int
 
 

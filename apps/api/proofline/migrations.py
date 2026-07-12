@@ -331,6 +331,16 @@ def _add_resumable_ingestion_jobs(connection: Connection) -> None:
     )
 
 
+def _generalize_governed_memory(connection: Connection) -> None:
+    columns = {column["name"] for column in inspect(connection).get_columns("decisions")}
+    if "kind" not in columns:
+        connection.exec_driver_sql(
+            "ALTER TABLE decisions ADD COLUMN kind VARCHAR(30) NOT NULL DEFAULT 'decision'"
+        )
+    connection.exec_driver_sql("UPDATE decisions SET kind = 'decision' WHERE kind IS NULL")
+    connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_decisions_kind ON decisions (kind)")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -340,6 +350,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (6, "versioned chunk embeddings", _add_chunk_embeddings),
     (7, "model-derived decision candidates", _link_decisions_to_model_runs),
     (8, "resumable atomic ingestion jobs", _add_resumable_ingestion_jobs),
+    (9, "generalized governed memory kinds", _generalize_governed_memory),
 )
 
 

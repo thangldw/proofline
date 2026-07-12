@@ -106,6 +106,7 @@ def test_deletion_impact_matches_complete_cascade_and_detaches_jobs(client, sess
         "chunks": 2,
         "embeddings": 2,
         "decisions": 2,
+        "memories": 2,
         "evidence": 2,
         "ingestion_jobs_to_detach": 2,
         "audit_events_to_delete": 3,

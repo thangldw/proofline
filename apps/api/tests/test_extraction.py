@@ -1,9 +1,13 @@
 import json
 
 import pytest
-from proofline.extraction import CandidateExtractionError, extract_decision_candidates
+from proofline.extraction import (
+    CandidateExtractionError,
+    extract_decision_candidates,
+    extract_memory_candidates,
+)
 from proofline.ingestion import ingest_source
-from proofline.model_gateway import FakeGenerationProvider
+from proofline.model_gateway import FakeGenerationProvider, StructuredOutputError
 from proofline.models import Chunk, Decision, ModelRun
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
@@ -28,6 +32,7 @@ def candidate_response(evidence_id: str) -> str:
         {
             "candidates": [
                 {
+                    "kind": "decision",
                     "statement": "Use SQLite for local metadata",
                     "rationale": "Avoid operating another service",
                     "confidence": 0.91,
@@ -80,3 +85,97 @@ def test_repeated_candidate_extraction_is_idempotent_per_source_version(session)
 
     assert first[0].id == second[0].id
     assert session.scalar(select(func.count()).select_from(Decision)) == 1
+
+
+def test_model_memory_candidates_are_kind_scoped_and_candidate_only(session):
+    source, chunk, _content = source_and_chunk(session)
+    response = json.dumps(
+        {
+            "candidates": [
+                {
+                    "kind": "decision",
+                    "statement": "SQLite remains local",
+                    "rationale": None,
+                    "confidence": 0.9,
+                    "evidence_ids": [chunk.id],
+                },
+                {
+                    "kind": "assumption",
+                    "statement": "SQLite remains local",
+                    "rationale": None,
+                    "confidence": 0.8,
+                    "evidence_ids": [chunk.id],
+                },
+            ]
+        }
+    )
+    provider = FakeGenerationProvider(response)
+
+    first, run = extract_memory_candidates(session, source, provider)
+    second, _second_run = extract_memory_candidates(session, source, provider)
+
+    assert {memory.kind for memory in first} == {"decision", "assumption"}
+    assert all(memory.status == "candidate" for memory in first)
+    assert all(memory.model_run_id == run.id for memory in first)
+    assert {memory.id for memory in first} == {memory.id for memory in second}
+    assert session.scalar(select(func.count()).select_from(Decision)) == 2
+
+
+def test_invalid_model_memory_kind_is_rejected_before_persistence(session):
+    source, chunk, _content = source_and_chunk(session)
+    provider = FakeGenerationProvider(
+        json.dumps(
+            {
+                "candidates": [
+                    {
+                        "kind": "incident",
+                        "statement": "Unsupported kind",
+                        "confidence": 0.7,
+                        "evidence_ids": [chunk.id],
+                    }
+                ]
+            }
+        )
+    )
+
+    with pytest.raises(StructuredOutputError) as raised:
+        extract_memory_candidates(session, source, provider)
+
+    assert session.scalar(select(func.count()).select_from(Decision)) == 0
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.status == "failed"
+    assert run.error_code == "structured_output_invalid"
+
+
+def test_legacy_decision_extraction_rejects_mixed_kinds_before_persistence(session):
+    source, chunk, _content = source_and_chunk(session)
+    provider = FakeGenerationProvider(
+        json.dumps(
+            {
+                "candidates": [
+                    {
+                        "kind": "decision",
+                        "statement": "Use SQLite locally",
+                        "confidence": 0.9,
+                        "evidence_ids": [chunk.id],
+                    },
+                    {
+                        "kind": "assumption",
+                        "statement": "There is one writer",
+                        "confidence": 0.8,
+                        "evidence_ids": [chunk.id],
+                    },
+                ]
+            }
+        )
+    )
+
+    with pytest.raises(CandidateExtractionError) as raised:
+        extract_decision_candidates(session, source, provider)
+
+    assert raised.value.error_code == "candidate_kind_not_allowed"
+    assert session.scalar(select(func.count()).select_from(Decision)) == 0
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.status == "failed"
+    assert run.validation_status == "grounding_invalid"
+    assert run.error_code == "candidate_kind_not_allowed"
