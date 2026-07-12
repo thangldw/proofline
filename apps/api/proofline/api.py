@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -14,7 +14,7 @@ from .extraction import (
     extract_decision_candidates,
     extract_memory_candidates,
 )
-from .folder_scanning import FolderScanError, scan_registered_folder
+from .folder_scanning import FolderScanError
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
@@ -55,6 +55,7 @@ from .schemas import (
     EmbeddingIndexResponse,
     FolderScanRequest,
     FolderScanResponse,
+    FolderWatchStatus,
     IngestionJobRead,
     MemoryKind,
     MemoryRead,
@@ -223,10 +224,13 @@ def create_source(
 @router.post("/folder-scans", response_model=FolderScanResponse)
 def create_folder_scan(
     payload: FolderScanRequest,
+    request: Request,
     session: Session = Depends(get_session),
 ) -> FolderScanResponse:
     try:
-        return scan_registered_folder(session, payload, get_settings().import_roots)
+        return request.app.state.folder_scan_coordinator.scan(
+            session, payload, get_settings().import_roots
+        )
     except FolderScanError as exc:
         status_code = (
             status.HTTP_409_CONFLICT
@@ -244,6 +248,11 @@ def create_folder_scan(
             status_code=status_code,
             detail={"code": exc.code, "message": str(exc)},
         ) from exc
+
+
+@router.get("/folder-watch", response_model=FolderWatchStatus)
+def folder_watch_status(request: Request) -> FolderWatchStatus:
+    return FolderWatchStatus.model_validate(request.app.state.folder_watcher.snapshot())
 
 
 @router.get("/sources", response_model=list[SourceRead])

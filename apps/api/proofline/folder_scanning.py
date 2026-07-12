@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from urllib.parse import unquote, urlparse
 
 from sqlalchemy import select
@@ -31,6 +33,22 @@ class FolderScanError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+class FolderScanCoordinator:
+    """Serialize every scan owned by one API process, including manual scans."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+
+    def scan(
+        self,
+        session: Session,
+        payload: FolderScanRequest,
+        registered_roots: tuple[Path, ...],
+    ) -> FolderScanResponse:
+        with self._lock:
+            return scan_registered_folder(session, payload, registered_roots)
 
 
 @dataclass(frozen=True)
@@ -139,16 +157,23 @@ def _prepare_file(root: Path, candidate: Path) -> PreparedFile | FolderScanFileR
         return _failed_file(relative_path, "file_unavailable")
     if not _is_within(resolved, root):
         return _failed_file(relative_path, "file_symlink_escape")
-    if not resolved.is_file():
-        return _failed_file(relative_path, "file_not_regular")
-
     uri = resolved.as_uri()
     try:
-        if resolved.stat().st_size > MAX_IMPORT_BYTES:
+        before_read = resolved.stat()
+        if not stat.S_ISREG(before_read.st_mode):
+            return _failed_file(relative_path, "file_not_regular", uri=uri)
+        if before_read.st_size > MAX_IMPORT_BYTES:
             return _failed_file(relative_path, "file_too_large", uri=uri)
         raw_content = resolved.read_bytes()
     except OSError:
         return _failed_file(relative_path, "file_read_failed", uri=uri)
+    try:
+        after_read = resolved.stat()
+    except OSError:
+        return _failed_file(relative_path, "file_changed_during_read", uri=uri)
+    stable_fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+    if any(getattr(before_read, field) != getattr(after_read, field) for field in stable_fields):
+        return _failed_file(relative_path, "file_changed_during_read", uri=uri)
     if len(raw_content) > MAX_IMPORT_BYTES:
         return _failed_file(relative_path, "file_too_large", uri=uri)
     try:
@@ -171,8 +196,20 @@ def _ingest_prepared_file(session: Session, prepared: PreparedFile) -> FolderSca
     relative_path = prepared.relative_path
     uri = prepared.uri
 
-    existing = session.scalar(select(Source).where(Source.uri == uri))
+    existing_matches = list(session.scalars(select(Source).where(Source.uri == uri)).all())
+    existing = existing_matches[0] if len(existing_matches) == 1 else None
     previous_version_id = existing.current_version_id if existing else None
+    if existing and previous_version_id:
+        current_version = session.get(SourceVersion, previous_version_id)
+        if current_version and current_version.content_hash == prepared.content_hash:
+            return FolderScanFileResult(
+                relative_path=relative_path,
+                uri=uri,
+                status="unchanged",
+                source_id=existing.id,
+                source_version_id=previous_version_id,
+                job_id=None,
+            )
     try:
         source, created, job = run_ingestion_job(
             session,

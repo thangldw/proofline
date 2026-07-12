@@ -7,7 +7,17 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.1.0-alpha.3`.
+### Added
+
+- An opt-in single-process polling watcher scans explicitly registered folders immediately and at a
+  bounded interval, exposes content-free lifecycle counters, never confirms deletion, and shares a
+  coordinator with manual scans so ingestion cycles cannot overlap within the API process.
+
+### Fixed
+
+- Registered-folder scans no longer create ingestion jobs for unchanged files.
+- Files that change while being read fail explicitly and leave source versions, evidence, and jobs
+  untouched so a later stable scan can retry safely.
 
 ## [0.1.0-alpha.3] - 2026-07-13
 

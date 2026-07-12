@@ -156,6 +156,21 @@ preview-only unless a subsequent request sends `delete_missing=true` and the exa
 outside the selected registered-root scan, or any file/ingestion result failed. Confirmed deletion
 uses the same complete source cascade as the source deletion endpoint; it is never implicit.
 
+Set `PROOFLINE_FOLDER_WATCH_INTERVAL_SECONDS` to an integer from 1 through 3600 to opt into the
+single-process polling watcher (`0`, the default, disables it). It starts one immediate cycle and
+then scans each registered root sequentially at the configured interval, using a fresh database
+session per root. Watcher and manual scans share one process-local coordinator, never overlap, and
+watcher scans always submit `delete_missing=false`; missing sources are therefore only reported for
+later human-confirmed deletion. `GET /api/v1/folder-watch` exposes only ephemeral counters,
+timestamps, and stable error codes—not root paths, source contents, or exception messages. This
+pre-alpha implementation is not a multi-worker coordinator or native filesystem notification
+service; operators must enable it in at most one API process. Shutdown waits for an active scan to
+finish instead of abandoning its database transaction, so slow filesystems can delay termination.
+
+The shipped Compose file intentionally has no host-vault mount. Container deployments must add an
+explicit read-only bind mount and register its container path; setting a host path in the environment
+alone does not grant filesystem access.
+
 ### 6. Model gateway — implemented foundation
 
 The provider-neutral generation interface, deterministic fake provider, OpenAI-compatible

@@ -241,6 +241,26 @@ Only `.md`, `.markdown`, and `.txt` files are read. The first scan only previews
 Confirmed deletion requires `delete_missing=true` plus the exact `confirmed_missing_source_ids`
 from that preview and fails closed on drift or scan errors.
 
+An opt-in, single-process polling watcher can run the same deterministic scan immediately at API
+startup and then at a fixed interval. It is disabled by default; enable it with an integer from 1
+to 3600 seconds and inspect its content-free ephemeral status:
+
+```bash
+export PROOFLINE_FOLDER_WATCH_INTERVAL_SECONDS=30
+curl http://localhost:8000/api/v1/folder-watch
+```
+
+Watcher cycles and manual folder scans share one process-local coordinator, execute sequentially,
+and never overlap. Watcher roots use a fresh database session and always keep missing-file handling
+in preview-only mode; deletion still requires the separate confirmed request above. Run at most one
+enabled API worker against a vault. Clean shutdown waits for any active scan to finish, so a slow or
+unavailable filesystem can delay process termination.
+
+Docker Compose does not mount any host vault by default. To watch through Compose, add an explicit
+read-only bind mount in a local override (for example, `./docs:/vault:ro`) and register the matching
+container path (`PROOFLINE_IMPORT_ROOTS=/vault`). Do not register a host-only path that the container
+cannot access.
+
 Upload clients may send an `Idempotency-Key` header. Replaying the same key and payload returns the
 original successful job; reusing a key with different content is rejected. Failed retryable jobs
 can be resumed with `POST /api/v1/jobs/{job_id}/retry`.
