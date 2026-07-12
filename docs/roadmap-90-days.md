@@ -151,6 +151,10 @@ Before delivery work, record:
 - Unsupported statements are rejected, repaired, or clearly labeled as inference.
 - The system can return `insufficient evidence` without calling that state an error.
 
+The implemented semantic safety floor rejects invalid, zero-norm, non-finite, and negative cosine
+matches. Weak non-negative semantic relevance still requires provider-specific calibration on the
+pilot corpus, so this does not by itself close the insufficient-evidence quality gate.
+
 ## Phase 5 — Days 76–90: Pilot hardening and release decision
 
 ### Outcomes
