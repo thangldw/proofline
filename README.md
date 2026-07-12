@@ -60,9 +60,10 @@ exhausted jobs purge the staged payload.
 
 The API can also scan explicitly registered local roots for Markdown and UTF-8 text. Folder access
 is disabled by default, path traversal and symlink escapes are rejected, and missing files are
-reported for review rather than deleted automatically. A uniquely matched same-content file rename
-keeps the original source identity, immutable version history, chunks, and evidence; ambiguous
-matches are never guessed.
+reported for review. A caller may delete them only in a second scan by confirming the exact
+previewed ID set; deletion fails closed if the set drifted or any scan/ingestion result failed. A
+uniquely matched same-content file rename keeps the original source identity, immutable version
+history, chunks, and evidence; ambiguous matches are never guessed.
 
 Memories can be accepted, rejected, corrected, or marked obsolete. Every change records a
 before/after audit event while retaining the original source evidence; complete source deletion
@@ -80,7 +81,8 @@ transport failures are recorded and returned without an automatic repair or prov
 Safe run metadata can be inspected through `/api/v1/model/runs` and
 `/api/v1/model/runs/{id}`; filters expose a repair run's parent/child lineage without exposing
 source text, prompts, model output, or credentials.
-These diagnostics are API-only today; a dedicated model-run web view is not implemented.
+The Model runs web view lists and filters the same safe metadata and lets operators inspect
+parent/current/child repair lineage; it never renders input hashes or private model payloads.
 
 The answer endpoint builds a bounded hybrid evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
@@ -98,7 +100,9 @@ Search returns inspectable source spans even when no generation provider is
 configured. When a provider is available, it receives only the bounded evidence
 pack and can cite only server-issued evidence IDs. Retrieval applies deterministic
 RRF ordering and a soft per-source diversity cap; “Why this result?” exposes channel,
-rank, score, source-version, line, and offset metadata.
+rank, score, source-version, line, and offset metadata. Search and answer requests can be scoped
+to selected source IDs and an indexed-time interval; that interval describes ingestion time, not
+the time represented inside a source.
 
 Semantic retrieval uses a default cosine safety floor of `0.0`: invalid, zero-norm,
 non-finite, and negative-similarity vectors cannot suppress `insufficient_evidence`.
@@ -122,6 +126,12 @@ chunks, extracted memories, source type, latest job stage/attempt, safe failures
 and per-source actions remain visible.
 
 ![Proofline source inventory showing current ingestion health and extracted memories](docs/images/proofline-screen-sources-current.png)
+
+### Safe model-run diagnostics
+
+The Model runs view filters by status, operation, provider, and parent run. Its detail panel exposes
+validation, timing, token counts, safe error codes, and repair lineage without displaying source
+text, prompts, model output, credentials, or input hashes.
 
 ## Repository layout
 
@@ -153,6 +163,7 @@ http://localhost:8000/docs. Common quality commands are:
 make test
 make check
 make eval
+npm run test:e2e
 ```
 
 The pre-alpha workflow is configured to run source-development smoke checks
@@ -162,6 +173,21 @@ raw backup verification, and an optimized web build without model
 credentials or external runtime services. This describes repository configuration and local
 test coverage, not evidence that a hosted CI run succeeded. It does not claim native desktop
 packaging, production deployment support, or verified Windows support.
+
+The configured Ubuntu browser job runs the credential-free import, memory review/correction,
+retrieval diagnostics, exact-evidence navigation, and deletion workflow in Chromium. Its hostile
+Markdown fixture verifies script/image payloads remain inert and records any non-loopback request
+as a failure. This is checked-in E2E coverage, not a hosted CI success receipt or production
+security qualification.
+
+The current credential-free retrieval gate is `evals/retrieval/seed-v2.json`: 26 synthetic queries
+cover Unicode lexical retrieval plus initial/current revisions and expected-empty superseded terms.
+The deterministic extraction gate covers all four memory kinds and exact evidence/hash resolution.
+Both are regression contracts only; they do not establish real-model or pilot quality.
+
+Remaining release gates include real-model and external-pilot evidence, a repository security-
+plugin scan, hosted CI receipts, reranking, scalable vector indexing, Windows verification, and
+production qualification.
 
 ### Data portability and recovery
 
@@ -192,8 +218,9 @@ curl -X POST http://localhost:8000/api/v1/folder-scans \
   -d '{}'
 ```
 
-Only `.md`, `.markdown`, and `.txt` files are read. Missing files are reported for review and are
-not deleted by a scan.
+Only `.md`, `.markdown`, and `.txt` files are read. The first scan only previews missing IDs.
+Confirmed deletion requires `delete_missing=true` plus the exact `confirmed_missing_source_ids`
+from that preview and fails closed on drift or scan errors.
 
 Upload clients may send an `Idempotency-Key` header. Replaying the same key and payload returns the
 original successful job; reusing a key with different content is rejected. Failed retryable jobs

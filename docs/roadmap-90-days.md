@@ -5,7 +5,7 @@
 **Implementation status:** The internal local vertical-slice work through Phase 4 is substantially
 implemented. Phase 1 real-question/pilot evidence, real-model comparison, reranking, hosted CI-run
 evidence, and the Phase 5 external go/no-go gates remain open. Phase 5 portability, OSS governance,
-and credential-free platform-smoke workflow foundations are implemented.
+credential-free platform-smoke, browser E2E, and loopback-container foundations are implemented.
 
 The roadmap is organized around validated outcomes. Dates may move; quality gates should not be
 silently weakened to preserve a date.
@@ -39,8 +39,8 @@ Before delivery work, record:
   migration tests, and secret scanning. These automated foundations are implemented; corpus and
   pilot evidence remain open.
 - Establish contracts for source identity, source versions, spans, jobs, and model runs.
-- Extend the implemented synthetic ADR retrieval corpus with CJK, revision cases, and a
-  permissioned real-question dataset.
+- Maintain the implemented synthetic retrieval v2 corpus with 26 Unicode and
+  current/superseded-revision queries. A permissioned real-question dataset remains open.
 - Interview 5–10 engineers and classify questions by decision, rationale, ownership, change,
   incident, and validity intent.
 - Record a manual baseline: time and sources needed to answer each usable question today.
@@ -66,10 +66,11 @@ Before delivery work, record:
 
 - Harden Markdown/text upload and safe registered-root folder scanning. On-demand scanning,
   containment checks, deterministic ordering, immutable updates, audited unambiguous rename, and
-  missing-file preview are implemented; watching and confirmed missing-file deletion remain open.
+  missing-file preview plus exact-set confirmed deletion are implemented; watching remains open.
 - Harden the implemented immutable source versioning and explicit SQLite migrations. Atomic crash
   rollback, v7-to-v8 backfill, startup recovery, idempotency, and stale-claim concurrency are
-  tested; a larger legacy-database fixture remains open.
+  tested. A large legacy-database fixture now exercises provenance backfill, idempotent re-open,
+  current reads/search, deletion impact, and cascade deletion.
 - Harden the implemented FTS5 lexical search and exact-span contract.
 - Extend the implemented persisted ingestion job status with retries and dead-letter states.
   Bounded retry, private staged input, conditional claims, startup recovery, and UI controls are
@@ -77,7 +78,8 @@ Before delivery work, record:
 - Extend the implemented source/decision inventory UI with stage diagnostics. Latest job state,
   stage, attempts, retryability, and safe failure fields are now visible per source.
 - Implement deletion preview and cascade behavior for derived data. Source deletion impact and
-  complete tested cascade cleanup are implemented; missing-file confirmation remains open.
+  complete tested cascade cleanup are implemented, including fail-closed confirmed deletion for an
+  exact previewed missing-source set.
 
 ### Exit gate
 
@@ -108,12 +110,14 @@ Before delivery work, record:
   decision-only compatibility API are implemented.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
   Schema/size and evidence-ID repair is implemented as one additional call with secret-safe
-  `ModelRun` lineage. Safe list/detail API inspection and lineage filters are implemented; a
-  dedicated model-run web UI and broader extraction evaluation remain open.
+  `ModelRun` lineage. Safe list/detail API inspection, lineage filters, and the dedicated metadata-
+  only Model runs web UI are implemented.
 - Continue hardening the implemented generalized memory candidate queue and audit-backed review
   actions. The filterable memory registry and review API already cover decisions, assumptions,
   constraints, and alternatives.
-- Run extraction evaluation across at least one remote and one local/cheap model if available.
+- Maintain the implemented credential-free deterministic extraction gate for all four memory kinds,
+  exact evidence/hashes, multilingual markers, and negative prose. Evaluation across at least one
+  remote and one local/cheap model remains open.
 
 ### Exit gate
 
@@ -137,7 +141,7 @@ Before delivery work, record:
 - Benchmark and replace the implemented bounded SQLite JSON embedding storage when scale requires.
 - Extend the implemented lexical/semantic retrieval and reciprocal-rank fusion with filters and
   diversity control. A deterministic soft per-source cap with ranked backfill is implemented;
-  user-driven source/time filters remain open.
+  user-driven source-ID and indexed-time filters are implemented for search and answers.
 - Add optional reranking behind a capability interface.
 - Extend the implemented bounded lexical evidence packs and grounded answer generation to hybrid
   retrieval and context diversity. Hybrid retrieval, per-source diversity, 1,600-code-point chunk
@@ -172,14 +176,17 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 - Complete end-to-end tests and supported-platform smoke tests. A credential-free script and
   Ubuntu/macOS workflow matrix are implemented for source installation, local evidence,
   export/backup verification, and web build. This is configured coverage, not a claim that a
-  hosted run succeeded; packaged end-to-end testing, Windows verification, and production support
-  remain open.
+  hosted run succeeded. A configured Ubuntu Chromium E2E job covers import, memory review and
+  correction, retrieval debug, exact evidence, and deletion while asserting hostile Markdown is
+  inert and external requests do not occur. Hosted CI receipts, Windows verification, and
+  production support remain open.
 - Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
   local SQLite:** portable export/verification, online full backup/read-only verification, recovery
   provenance exercise, documented retention limits, and cascade deletion coverage. Portable import
   remains outside the implemented contract.
-- Run a lightweight security review of local API, path handling, dependency surface, egress,
-  logging, and imported content rendering.
+- Run a repository security-plugin scan. The checked-in threat model, secret scan, loopback Docker
+  binding, web asset egress check, and hostile-content browser regression are implemented, but they
+  do not substitute for that open review or production qualification.
 - Add contributor templates, code of conduct decision, security reporting process, and release
   notes. The repository now includes issue/PR templates, a Code of Conduct, private reporting
   guidance, and an Unreleased changelog; no supported release has been cut.

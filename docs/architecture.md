@@ -56,10 +56,11 @@ upload to the API, lexical and configured hybrid search, source/job inventory, f
 and correction for decisions, assumptions, constraints, and alternatives, reversible statuses,
 overview counts, source-deletion impact confirmation, and exact evidence navigation. Grounded
 answer statements retain their statement-level citation mapping; retrieval ranking and context-
-budget exclusions are inspectable; and an answer-provider failure does not discard lexical results.
-It is a pre-alpha inspection surface, not a rich editor. Provider configuration remains
-environment-based; there is no settings UI or dedicated model-run UI. Safe model-run status and
-repair lineage are currently inspected through API endpoints. Desktop packaging is deferred.
+budget exclusions plus source/indexed-time scopes are inspectable; and an answer-provider failure
+does not discard lexical results. It is a pre-alpha inspection surface, not a rich editor. Provider
+configuration remains environment-based and has no settings UI. A dedicated safe Model runs view
+filters run metadata and inspects parent/current/child repair lineage without rendering source
+text, prompts, model output, credentials, or input hashes. Desktop packaging is deferred.
 
 ### 3. Application boundaries and remaining modules
 
@@ -70,7 +71,7 @@ Current and target boundaries are:
 - source catalog and ingestion coordinator — implemented for upload and registered roots;
 - retrieval and answer service — implemented without reranking;
 - governed memory review service — implemented for four memory kinds;
-- provider gateway and safe model-run API diagnostics — implemented, with web settings/run UI planned;
+- provider gateway plus safe model-run API and web diagnostics — implemented, with provider settings UI planned;
 - job status, retry, and source diagnostics — implemented; and
 - deletion impact/cascade plus portable export and SQLite backup services — implemented locally,
   while portable import remains planned.
@@ -110,7 +111,8 @@ The foundation uses SQLite plus content uploaded from the browser or API:
   sends the content to the local API.
 - The API can scan explicitly registered local roots for Markdown and UTF-8 text. It resolves
   every selected path before reading, rejects traversal and symlink escape, and never accepts an
-  arbitrary unregistered root. Folder watching and automatic deletion remain unimplemented.
+  arbitrary unregistered root. Folder watching and implicit deletion remain unimplemented;
+  exact-set confirmed missing-source deletion is implemented as a separate fail-closed scan.
 - SQLite currently stores sources, raw Markdown/text, chunks, generalized governed memories, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
@@ -191,8 +193,9 @@ temperature zero. Initial and repair calls remain separate `ModelRun` records li
 repair prompt. Transport retries and model-run dead-letter handling remain planned. Provider errors
 must not corrupt existing source or memory records. Safe list/detail endpoints expose run status,
 operation, provider, validation metadata, and parent/child repair lineage; they never expose source
-content, prompt messages, model output, or credentials. These diagnostics are API-only; a dedicated
-model-run web view is not implemented.
+content, prompt messages, model output, or credentials. The web Model runs view consumes these safe
+endpoints, applies status/operation/provider/parent filters, and displays detail plus repair lineage
+without rendering input hashes or private payloads.
 
 Model-assisted governed memory extraction is implemented as a separate source action for decisions,
 assumptions, constraints, and alternatives. Candidates must cite known chunks from the current
@@ -203,10 +206,11 @@ any memory object is persisted. The legacy decision endpoint is decision-only be
 ### 7. Retrieval and answering
 
 Lexical FTS5 retrieval, dense cosine retrieval, reciprocal-rank fusion, and the guarded answer path
-are implemented. The current path builds a bounded evidence pack, requests typed statements plus
-evidence IDs, rejects unknown/missing IDs, resolves citations server-side, and revalidates exact
-spans against immutable source versions. When no provider is configured, it returns verified
-evidence without synthesizing claims. RRF ordering is deterministic and applies a soft two-hit
+are implemented. Search and answer accept optional source-ID and indexed-time filters; the latter
+is explicitly ingestion time, not event time inside a document. The current path builds a bounded
+evidence pack, requests typed statements plus evidence IDs, rejects unknown/missing IDs, resolves
+citations server-side, and revalidates exact spans against immutable source versions. When no
+provider is configured, it returns verified evidence without synthesizing claims. RRF ordering is deterministic and applies a soft two-hit
 per-source diversity cap before ranked backfill. New paragraphs are split into at most 1,600 code
 points with exact offsets; the answer runtime additionally caps serialized UTF-8 evidence at 64 KiB
 total and 8 KiB per item for legacy safety. Budget exclusions expose only evidence ID plus reason,
@@ -353,7 +357,9 @@ codes and a safe human-readable message.
 
 ## Security and privacy boundaries
 
-- Bind the local service to loopback by default.
+- Bind the local service to loopback by default. The checked-in Docker Compose port publishes to
+  `127.0.0.1` unless an operator explicitly overrides the bind address and supplies external
+  authentication/network controls.
 - Treat imported files, Markdown, provider output, and model-generated citations as untrusted.
 - Prevent path traversal by resolving all imported paths under registered roots.
 - Do not render imported HTML without sanitization.
@@ -417,18 +423,26 @@ contract and must not reproduce backend extraction rules.
 - Unit tests for offsets, hashes, schemas, status transitions, fusion, and citation validation.
 - Contract tests run against each model adapter using recorded or explicitly enabled live
   endpoints; default CI must not require paid credentials.
+- A repository security-plugin scan remains open; the threat model, secret scan, E2E hostile-input
+  check, and egress assertions are complementary regression evidence, not that external review.
 - Integration tests use a temporary workspace and real SQLite migrations.
+- Migration tests include a large legacy fixture with provenance-bearing rows, backfill checks,
+  idempotent re-open, current reads, search, deletion impact, and cascade deletion.
 - Golden fixtures include ADRs with CJK, emoji, CRLF, changed versions, contradictions, and
   superseding decisions.
-- API integration and web component tests cover the constituent
-  ingest -> inspect -> review -> ask -> open citation -> delete behaviors. A packaged end-to-end
-  test and production deployment qualification remain open.
+- API integration and web component tests cover constituent behavior. A credential-free Chromium
+  E2E test covers import -> review/correct -> search/debug -> open exact citation -> delete while
+  verifying hostile Markdown remains inert and no non-loopback request occurs. Its workflow is
+  configured; a hosted CI receipt, Windows run, and production qualification remain open.
 - Evaluation results are versioned with dataset version, provider/model configuration, and code
   revision. Benchmark numbers without this context must not be published.
-- The implemented `seed-v1` retrieval gate runs real migrations, ingestion, and FTS5 retrieval for
-  15 synthetic questions. Its baseline Recall@10, nDCG@10, and MRR are `0.80`; three explicit
-  lexical misses document the semantic-retrieval gap. This is regression evidence, not pilot
-  evidence.
+- The current `seed-v2` retrieval gate runs real migrations, ingestion, and FTS5 retrieval for 26
+  synthetic Unicode and version-aware queries. Initial/current revision pairs include positive
+  current-term and expected-empty superseded-term cases; expected-empty accuracy is reported
+  separately from positive-query ranking metrics.
+- The deterministic extraction gate covers all four memory kinds, exact evidence/hash resolution,
+  supported English/Vietnamese markers, CJK statements after markers, and negative prose. Neither
+  synthetic gate is real-model or pilot evidence.
 
 ## Evolution after the vertical slice
 
