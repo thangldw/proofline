@@ -233,11 +233,36 @@ def _add_memory_audit(connection: Connection) -> None:
     )
 
 
+def _add_model_runs(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS model_runs (
+            id VARCHAR(36) PRIMARY KEY,
+            provider_id VARCHAR(100) NOT NULL,
+            model_id VARCHAR(200) NOT NULL,
+            operation VARCHAR(50) NOT NULL,
+            template_version VARCHAR(80) NOT NULL,
+            input_hashes TEXT NOT NULL,
+            status VARCHAR(30) NOT NULL,
+            validation_status VARCHAR(30),
+            latency_ms INTEGER,
+            prompt_tokens INTEGER,
+            completion_tokens INTEGER,
+            error_code VARCHAR(80),
+            created_at DATETIME NOT NULL,
+            finished_at DATETIME
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_model_runs_status ON model_runs (status, created_at)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
     (3, "observable ingestion jobs", _add_ingestion_jobs),
     (4, "governed memory audit trail", _add_memory_audit),
+    (5, "provider-neutral model runs", _add_model_runs),
 )
 
 

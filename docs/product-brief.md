@@ -67,9 +67,10 @@ derived chunks, decisions, evidence, and FTS rows removed.
 
 Synchronous ingestion attempts persist inspectable success/failure jobs without storing source
 content in error records. Decisions support governed status/correction actions with an append-only
-before/after audit trail. It does **not** yet implement job retries, folder watching,
-provider/model integration, semantic retrieval, AI-derived candidate creation, grounded answer
-generation, or desktop packaging.
+before/after audit trail. A provider-neutral gateway supports fake and OpenAI-compatible generation
+with remote egress disabled by default and secret-safe model-run diagnostics. It does **not** yet
+implement job retries, folder watching, semantic retrieval, AI-derived candidate creation,
+grounded answer generation, or desktop packaging.
 
 ## MVP outcome
 

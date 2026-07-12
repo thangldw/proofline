@@ -79,6 +79,12 @@ make test
 make check
 ```
 
+AI is disabled by default. A local OpenAI-compatible endpoint can be configured with
+`PROOFLINE_AI_PROVIDER=openai_compatible`, `PROOFLINE_AI_BASE_URL`, and
+`PROOFLINE_AI_MODEL`. Sending content to a non-loopback endpoint additionally requires the
+explicit `PROOFLINE_ALLOW_REMOTE_AI=true` setting. API keys are read from
+`PROOFLINE_AI_API_KEY` and are never persisted in model-run records.
+
 Run the local container stack with:
 
 ```bash

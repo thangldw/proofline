@@ -128,3 +128,21 @@ def test_search_escapes_fts_syntax(client):
     response = client.get("/api/v1/search", params={"q": 'queues OR "workers" -broken'})
     assert response.status_code == 200
     assert response.json()["hits"]
+
+
+def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypatch):
+    monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
+    monkeypatch.setenv("PROOFLINE_ALLOW_REMOTE_AI", "false")
+    response = client.get("/api/v1/model/provider")
+    assert response.status_code == 200
+    assert response.json() == {
+        "configured": False,
+        "provider_id": None,
+        "model_id": None,
+        "generation": False,
+        "structured_output": False,
+        "remote_egress_allowed": False,
+        "healthy": None,
+        "error_code": "provider_disabled",
+    }
+    assert client.get("/api/v1/model/runs").json() == []
