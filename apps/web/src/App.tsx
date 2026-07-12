@@ -33,7 +33,9 @@ export function App() {
     finally { setImporting(false); }
   }
 
-  const indexDegraded = latestJobs(jobs).some(job => job.state === "failed");
+  const failedState = (job: IngestionJob) => ["failed", "dead_letter"].includes(job.state);
+  const indexDegraded = latestJobs(jobs).some(job => Boolean(job.source_id) && failedState(job))
+    || jobs.some(job => !job.source_id && failedState(job));
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -181,10 +183,16 @@ function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]
 
 export function SourcesView({sources, jobs, onChanged}: {sources: Source[]; jobs: IngestionJob[]; onChanged: () => Promise<void>}) {
   const [extractingSourceId, setExtractingSourceId] = useState<string | null>(null);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [extractionErrors, setExtractionErrors] = useState<Record<string, string>>({});
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
   const jobsBySource = new Map(
     latestJobs(jobs).flatMap(job => job.source_id ? [[job.source_id, job] as const] : []),
   );
+  const orphanFailures = [...jobs]
+    .filter(job => !job.source_id && ["failed", "dead_letter"].includes(job.state))
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
+    .slice(0, 5);
   async function extract(sourceId: string) {
     setExtractingSourceId(sourceId);
     setExtractionErrors(current => ({ ...current, [sourceId]: "" }));
@@ -200,10 +208,25 @@ export function SourcesView({sources, jobs, onChanged}: {sources: Source[]; jobs
       setExtractingSourceId(null);
     }
   }
-  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div><div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
+  async function retry(job: IngestionJob) {
+    setRetryingJobId(job.id);
+    setRetryErrors(current => ({ ...current, [job.id]: "" }));
+    try {
+      await api.retryJob(job.id);
+      await onChanged();
+    } catch (reason) {
+      setRetryErrors(current => ({
+        ...current,
+        [job.id]: errorMessage(reason, "Ingestion retry failed"),
+      }));
+    } finally {
+      setRetryingJobId(null);
+    }
+  }
+  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div>{orphanFailures.length > 0 && <section className="recent-failures" aria-labelledby="recent-ingestion-failures"><div className="section-heading"><div><span className="eyebrow">PIPELINE DIAGNOSTICS</span><h2 id="recent-ingestion-failures">Recent ingestion failures</h2></div><span className="mode-badge">{orphanFailures.length} orphaned</span></div><div className="failure-list">{orphanFailures.map(job => <article className={`failure-card ${job.state}`} key={job.id}><div className="failure-summary"><strong>Job {job.id.slice(0, 8)}</strong><span>{job.state} · {job.stage}</span></div><div className="failure-metadata"><span>Attempt {job.attempts}/{job.max_attempts}</span><span>Started {job.started_at ?? "not recorded"}</span><span>Finished {job.finished_at ?? "not recorded"}</span></div>{job.error_code && <code>{job.error_code}</code>}{job.error_detail && <p>{job.error_detail}</p>}{job.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion job ${job.id.slice(0, 8)}`}>{retryingJobId === job.id ? "Retrying…" : "Retry"}</button>}{retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}</article>)}</div></section>}<div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
     const job = jobsBySource.get(source.id);
     const extractionError = extractionErrors[source.id];
-    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions"><button disabled={extractingSourceId === source.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button>{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
+    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts}/${job.max_attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions">{job?.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion for ${source.title}`}>{retryingJobId === job.id ? "Retrying…" : "Retry ingestion"}</button>}<button disabled={extractingSourceId === source.id || retryingJobId === job?.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button>{job && retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
   })}</div></section>;
 }
 
