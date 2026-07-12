@@ -197,9 +197,14 @@ Lexical FTS5 retrieval, dense cosine retrieval, reciprocal-rank fusion, and the 
 are implemented. The current path builds a bounded evidence pack, requests typed statements plus
 evidence IDs, rejects unknown/missing IDs, resolves citations server-side, and revalidates exact
 spans against immutable source versions. When no provider is configured, it returns verified
-evidence without synthesizing claims. Cross-encoder reranking, diversity control, and automated
-semantic entailment checks remain planned. Grounded drafts are capped at 32 statements and receive
-at most one repair for invalid structured output or missing/unknown citations. The target full path is:
+evidence without synthesizing claims. RRF ordering is deterministic and applies a soft two-hit
+per-source diversity cap before ranked backfill. New paragraphs are split into at most 1,600 code
+points with exact offsets; the answer runtime additionally caps serialized UTF-8 evidence at 64 KiB
+total and 8 KiB per item for legacy safety. Budget exclusions expose only evidence ID plus reason,
+and an all-excluded pack returns insufficient evidence without model execution. Cross-encoder
+reranking and semantic entailment checks remain planned. Grounded drafts are capped at 32 statements
+and receive at most one repair for invalid structured output or missing/unknown citations. The target
+full path is:
 
 1. normalize the question and optional filters;
 2. run lexical and semantic retrieval independently;
