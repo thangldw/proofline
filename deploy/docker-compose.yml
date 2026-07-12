@@ -21,7 +21,7 @@ services:
       PROOFLINE_EMBEDDING_API_KEY: ${PROOFLINE_EMBEDDING_API_KEY:-}
       PROOFLINE_ALLOW_REMOTE_AI: ${PROOFLINE_ALLOW_REMOTE_AI:-false}
     ports:
-      - "${PROOFLINE_API_PORT:-8000}:8000"
+      - "${PROOFLINE_API_BIND:-127.0.0.1}:${PROOFLINE_API_PORT:-8000}:8000"
     init: true
     restart: unless-stopped
     volumes:

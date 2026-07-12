@@ -217,6 +217,11 @@ Run the local container stack with:
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
+Docker Compose publishes the unauthenticated pre-alpha API on `127.0.0.1` by
+default. `PROOFLINE_API_BIND` can override the host interface, but exposing it
+beyond loopback requires operator-supplied authentication and network controls;
+CORS is not an access-control boundary.
+
 ## Scope
 
 Proofline is not building a rich-text editor, canvas, generic agent builder,
