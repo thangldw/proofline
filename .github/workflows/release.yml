@@ -118,4 +118,5 @@ jobs:
           if [[ "$RELEASE_TAG" == *-* ]]; then
             args+=(--prerelease)
           fi
-          gh release create "$RELEASE_TAG" release-bundle/release-dist/* "${args[@]}"
+          gh release create "$RELEASE_TAG" release-bundle/release-dist/* \
+            --repo "$GITHUB_REPOSITORY" "${args[@]}"
