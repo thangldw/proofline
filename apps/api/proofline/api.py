@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .database import get_session
+from .embeddings import hybrid_search, index_current_embeddings
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
@@ -14,9 +15,11 @@ from .ingestion import (
     run_ingestion_job,
 )
 from .model_gateway import (
+    EmbeddingValidationError,
     ProviderConfigurationError,
     ProviderRequestError,
     StructuredOutputError,
+    build_embedding_provider,
     build_generation_provider,
 )
 from .models import (
@@ -30,13 +33,13 @@ from .models import (
     SourceVersion,
     utc_now,
 )
-from .retrieval import lexical_search
 from .schemas import (
     AnswerRequest,
     AnswerResponse,
     AuditEventRead,
     DecisionRead,
     DecisionUpdate,
+    EmbeddingIndexResponse,
     IngestionJobRead,
     ModelRunRead,
     Overview,
@@ -200,6 +203,54 @@ def model_provider_status(check_health: bool = False) -> ProviderStatus:
     )
 
 
+@router.get("/model/embedding-provider", response_model=ProviderStatus)
+def embedding_provider_status(check_health: bool = False) -> ProviderStatus:
+    settings = get_settings()
+    try:
+        provider = build_embedding_provider(settings)
+    except ProviderConfigurationError:
+        return ProviderStatus(
+            configured=False,
+            remote_egress_allowed=settings.allow_remote_ai,
+            error_code="embedding_provider_configuration_invalid",
+        )
+    if provider is None:
+        return ProviderStatus(
+            configured=False,
+            remote_egress_allowed=settings.allow_remote_ai,
+            error_code="embedding_provider_disabled",
+        )
+    return ProviderStatus(
+        configured=True,
+        provider_id=provider.id,
+        model_id=provider.model,
+        generation=False,
+        structured_output=False,
+        remote_egress_allowed=settings.allow_remote_ai,
+        healthy=provider.health() if check_health else None,
+    )
+
+
+@router.post("/model/embeddings/index", response_model=EmbeddingIndexResponse)
+def index_embeddings(session: Session = Depends(get_session)) -> EmbeddingIndexResponse:
+    try:
+        provider = build_embedding_provider(get_settings())
+        if provider is None:
+            raise HTTPException(status_code=409, detail="Embedding provider is disabled")
+        report = index_current_embeddings(session, provider)
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=409, detail="Embedding provider configuration is invalid"
+        ) from exc
+    except (ProviderRequestError, EmbeddingValidationError) as exc:
+        raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
+    return EmbeddingIndexResponse(
+        indexed=report.indexed,
+        skipped=report.skipped,
+        model_run_ids=report.model_run_ids,
+    )
+
+
 @router.get("/model/runs", response_model=list[ModelRunRead])
 def list_model_runs(
     run_status: str | None = Query(default=None, alias="status"),
@@ -355,9 +406,19 @@ def list_audit_events(
 def search(
     q: str = Query(min_length=2, max_length=500),
     limit: int = Query(default=10, ge=1, le=50),
+    hybrid: bool = True,
     session: Session = Depends(get_session),
 ) -> SearchResponse:
-    hits = lexical_search(session, q, limit)
+    try:
+        embedding_provider = build_embedding_provider(get_settings()) if hybrid else None
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=409, detail="Embedding provider configuration is invalid"
+        ) from exc
+    try:
+        hits = hybrid_search(session, q, embedding_provider, limit)
+    except (ProviderRequestError, EmbeddingValidationError) as exc:
+        raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
     return SearchResponse(query=q, hits=hits)
 
 
@@ -368,11 +429,20 @@ def create_answer(
     session: Session = Depends(get_session),
 ) -> AnswerResponse:
     try:
-        provider = build_generation_provider(get_settings())
-        answer = answer_question(session, payload.question, provider, payload.limit)
+        settings = get_settings()
+        provider = build_generation_provider(settings)
+        embedding_provider = build_embedding_provider(settings)
+        answer = answer_question(
+            session, payload.question, provider, embedding_provider, payload.limit
+        )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (ProviderRequestError, StructuredOutputError, GroundingValidationError) as exc:
+    except (
+        ProviderRequestError,
+        EmbeddingValidationError,
+        StructuredOutputError,
+        GroundingValidationError,
+    ) as exc:
         run_id = getattr(exc, "run_id", None)
         headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
         raise HTTPException(

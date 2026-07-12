@@ -6,14 +6,15 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from .embeddings import hybrid_search
 from .model_gateway import (
     ChatMessage,
+    EmbeddingProvider,
     GenerationProvider,
     GenerationRequest,
     run_generation,
 )
 from .models import ModelRun, SourceVersion
-from .retrieval import lexical_search
 from .schemas import AnswerCitation, AnswerResponse, AnswerStatement, SearchHit
 
 
@@ -90,9 +91,10 @@ def answer_question(
     session: Session,
     question: str,
     provider: GenerationProvider | None,
+    embedding_provider: EmbeddingProvider | None = None,
     limit: int = 8,
 ) -> AnswerResponse:
-    hits = lexical_search(session, question, limit)
+    hits = hybrid_search(session, question, embedding_provider, limit)
     if not hits:
         return AnswerResponse(
             status="insufficient_evidence",

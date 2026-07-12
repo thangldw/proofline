@@ -103,9 +103,10 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - Source versions, versioned schema migrations, synchronous ingestion job records, and decision
   audit events are implemented; generalized derived memory and resumable job execution are
   planned schema extensions.
-- Embeddings are stored behind a repository interface. The first implementation may use a
-  SQLite-compatible vector extension or a simple local vector table if dataset limits are
-  documented and tested.
+- Versioned chunk embeddings are implemented in a local SQLite table with provider/model,
+  dimensions, content hash, and immutable source-version ownership. Indexing is incremental.
+  Dense search currently uses bounded in-process cosine scoring; a SQLite vector extension or
+  dedicated local index must replace it before claiming the 10,000-file scale envelope.
 
 No graph database is planned for the MVP. Typed relations are represented as adjacency rows
 and queried through the domain repository.
@@ -144,11 +145,12 @@ existing source or memory records.
 
 ### 7. Retrieval and answering
 
-Lexical FTS5 retrieval and the guarded answer path are implemented. The current path builds a
-bounded evidence pack, requests typed statements plus evidence IDs, rejects unknown/missing IDs,
-resolves citations server-side, and revalidates exact spans against immutable source versions.
-When no provider is configured, it returns verified evidence without synthesizing claims. Semantic
-retrieval, fusion, reranking, and automated repair retries remain planned. The target full path is:
+Lexical FTS5 retrieval, dense cosine retrieval, reciprocal-rank fusion, and the guarded answer path
+are implemented. The current path builds a bounded evidence pack, requests typed statements plus
+evidence IDs, rejects unknown/missing IDs, resolves citations server-side, and revalidates exact
+spans against immutable source versions. When no provider is configured, it returns verified
+evidence without synthesizing claims. Cross-encoder reranking, diversity control, and automated
+repair retries remain planned. The target full path is:
 
 1. normalize the question and optional filters;
 2. run lexical and semantic retrieval independently;

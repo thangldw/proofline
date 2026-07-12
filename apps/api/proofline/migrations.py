@@ -257,12 +257,35 @@ def _add_model_runs(connection: Connection) -> None:
     )
 
 
+def _add_chunk_embeddings(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS chunk_embeddings (
+            id VARCHAR(36) PRIMARY KEY,
+            chunk_id VARCHAR(36) NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL REFERENCES source_versions(id) ON DELETE CASCADE,
+            provider_id VARCHAR(100) NOT NULL,
+            model_id VARCHAR(200) NOT NULL,
+            dimensions INTEGER NOT NULL,
+            vector_json TEXT NOT NULL,
+            content_hash VARCHAR(64) NOT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE(chunk_id, provider_id, model_id)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_chunk_embeddings_version "
+        "ON chunk_embeddings (source_version_id, provider_id, model_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
     (3, "observable ingestion jobs", _add_ingestion_jobs),
     (4, "governed memory audit trail", _add_memory_audit),
     (5, "provider-neutral model runs", _add_model_runs),
+    (6, "versioned chunk embeddings", _add_chunk_embeddings),
 )
 
 
