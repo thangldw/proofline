@@ -19,6 +19,8 @@ export const api = {
   sourceVersion: (sourceId: string, versionId: string) =>
     request<{ content: string }>(`/api/v1/sources/${sourceId}/versions/${versionId}`),
   decisions: () => request<Decision[]>("/api/v1/decisions"),
+  extractDecisions: (sourceId: string) =>
+    request<Decision[]>(`/api/v1/sources/${sourceId}/extract-decisions`, { method: "POST" }),
   updateDecision: (id: string, changes: { status?: "candidate" | "active" | "accepted" | "rejected" | "obsolete"; statement?: string; rationale?: string | null }) =>
     request<Decision>(`/api/v1/decisions/${id}`, {
       method: "PATCH",
