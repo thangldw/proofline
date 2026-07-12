@@ -86,6 +86,57 @@
   color: #6e3f78;
 }
 
+.retrieval-debug {
+  margin-top: 14px;
+  border-top: 1px solid #edf0eb;
+  padding-top: 10px;
+}
+
+.retrieval-debug summary {
+  width: fit-content;
+  color: #53605a;
+  cursor: pointer;
+  font: 500 11px "IBM Plex Mono";
+}
+
+.retrieval-debug[open] summary {
+  color: #365202;
+}
+
+.retrieval-debug dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 10px 0 0;
+}
+
+.retrieval-debug dl div {
+  min-width: 0;
+  border: 1px solid #e1e5de;
+  border-radius: 6px;
+  background: #fafbf8;
+  padding: 7px 8px;
+}
+
+.retrieval-debug dt {
+  color: #748078;
+  font: 500 9px "IBM Plex Mono";
+  text-transform: uppercase;
+}
+
+.retrieval-debug dd {
+  margin: 4px 0 0;
+  color: #33422e;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .retrieval-debug dl {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .registry-filters {
   display: grid;
   gap: 10px;

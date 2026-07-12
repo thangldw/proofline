@@ -128,4 +128,80 @@ describe("SearchView provenance", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Showing raw retrieval results");
     await waitFor(() => expect(screen.getByRole("button", { name: "Search" })).toBeEnabled());
   });
+
+  it("keeps lexical-only retrieval diagnostics collapsed and does not imply semantic data", async () => {
+    apiMock.search.mockResolvedValue(hits);
+    apiMock.answer.mockResolvedValue(groundedAnswer);
+    render(<SearchView onEvidence={vi.fn()}/>);
+
+    submitSearch();
+
+    await screen.findByText(hits[0].content);
+    const summary = screen.getByText("Why this result?");
+    expect(summary.tagName).toBe("SUMMARY");
+    const details = summary.closest("details");
+    expect(details).not.toHaveAttribute("open");
+    fireEvent.click(summary);
+    expect(details).toHaveAttribute("open");
+    expect(within(details!).getByText("lexical")).toBeInTheDocument();
+    expect(within(details!).getByText("#1")).toBeInTheDocument();
+    expect(within(details!).getByText("version-")).toHaveAttribute("title", "version-a");
+    expect(within(details!).getByText("Lines 3–4 · offsets 10:77")).toBeInTheDocument();
+    expect(within(details!).queryByText("Semantic rank")).not.toBeInTheDocument();
+    expect(within(details!).queryByText("Semantic score")).not.toBeInTheDocument();
+    expect(within(details!).queryByText("Fused RRF score")).not.toBeInTheDocument();
+  });
+
+  it("shows available hybrid ranks and scores without fabricating metadata", async () => {
+    const hybridHit: SearchHit = {
+      ...hits[0],
+      chunk_id: "hybrid-evidence",
+      source_version_id: "version-hybrid-1234",
+      retrieval_channels: ["lexical", "semantic"],
+      lexical_rank: 2,
+      semantic_rank: 1,
+      semantic_score: 0.8765,
+      fused_score: 0.0321,
+    };
+    apiMock.search.mockResolvedValue([hybridHit]);
+    apiMock.answer.mockResolvedValue(groundedAnswer);
+    render(<SearchView onEvidence={vi.fn()}/>);
+
+    submitSearch();
+
+    await screen.findByText(hybridHit.content);
+    const summary = screen.getByText("Why this result?");
+    fireEvent.click(summary);
+    const details = summary.closest("details")!;
+    expect(within(details).getByText("lexical + semantic")).toBeInTheDocument();
+    expect(within(details).getByText("Lexical rank").nextElementSibling).toHaveTextContent("#2");
+    expect(within(details).getByText("Semantic rank").nextElementSibling).toHaveTextContent("#1");
+    expect(within(details).getByText("Semantic score").nextElementSibling).toHaveTextContent("0.8765");
+    expect(within(details).getByText("Fused RRF score").nextElementSibling).toHaveTextContent("0.0321");
+    expect(within(details).getByText("version-")).toHaveAttribute("title", "version-hybrid-1234");
+  });
+
+  it("still opens the exact raw evidence span alongside retrieval diagnostics", async () => {
+    apiMock.search.mockResolvedValue(hits);
+    apiMock.answer.mockResolvedValue(groundedAnswer);
+    const onEvidence = vi.fn();
+    render(<SearchView onEvidence={onEvidence}/>);
+
+    submitSearch();
+    fireEvent.click(await screen.findByRole("button", { name: "Lines 3–4" }));
+
+    expect(onEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "evidence-a",
+        source_id: "source-a",
+        source_version_id: "version-a",
+        quote: hits[0].content,
+        start_offset: 10,
+        end_offset: 77,
+        start_line: 3,
+        end_line: 4,
+      }),
+      "ADR-001",
+    );
+  });
 });
