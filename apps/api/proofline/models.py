@@ -82,6 +82,7 @@ class Decision(Base):
     status: Mapped[str] = mapped_column(String(30), default="active")
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     extraction_method: Mapped[str] = mapped_column(String(40), default="deterministic")
+    model_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
