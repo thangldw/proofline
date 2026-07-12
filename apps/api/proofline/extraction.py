@@ -60,9 +60,7 @@ def extract_decision_candidates(
     prompt = json.dumps(
         {
             "source_title": source.title,
-            "evidence": [
-                {"evidence_id": chunk.id, "content": chunk.content} for chunk in chunks
-            ],
+            "evidence": [{"evidence_id": chunk.id, "content": chunk.content} for chunk in chunks],
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -136,4 +134,3 @@ def extract_decision_candidates(
     for decision in decisions:
         session.refresh(decision)
     return decisions, run
-
