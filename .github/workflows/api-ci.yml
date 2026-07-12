@@ -7,7 +7,10 @@ on:
       - "apps/web/**"
       - "evals/**"
       - "pyproject.toml"
+      - "package.json"
+      - "package-lock.json"
       - "deploy/**"
+      - "scripts/**"
       - ".github/workflows/api-ci.yml"
   push:
     branches:
@@ -17,7 +20,10 @@ on:
       - "apps/web/**"
       - "evals/**"
       - "pyproject.toml"
+      - "package.json"
+      - "package-lock.json"
       - "deploy/**"
+      - "scripts/**"
       - ".github/workflows/api-ci.yml"
   workflow_dispatch:
 
@@ -59,10 +65,13 @@ jobs:
         run: |
           pytest -q apps/api
 
-      - name: Retrieval evaluation gate
+      - name: Credential-free evaluation gates
         run: |
           proofline eval --dataset evals/retrieval/seed-v1.json \
             --min-recall 0.80 --min-ndcg 0.80
+          proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json \
+            --min-citation-resolution 1.0 --min-citation-precision 1.0 \
+            --min-grounded-success 1.0 --min-status-accuracy 1.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -88,3 +97,48 @@ jobs:
 
       - name: Build API image
         run: docker build --file deploy/docker/api.Dockerfile --tag proofline-api:ci .
+
+  platform-smoke:
+    name: Platform smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-14
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install API
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Run local evidence and recovery smoke
+        env:
+          PROOFLINE_AI_PROVIDER: disabled
+          PROOFLINE_EMBEDDING_PROVIDER: disabled
+          PROOFLINE_ALLOW_REMOTE_AI: "false"
+        run: python scripts/platform_smoke.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Build web application
+        run: |
+          npm ci
+          npm run build:web
