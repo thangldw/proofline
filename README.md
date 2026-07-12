@@ -81,9 +81,13 @@ Safe run metadata can be inspected through `/api/v1/model/runs` and
 `/api/v1/model/runs/{id}`; filters expose a repair run's parent/child lineage without exposing
 source text, prompts, model output, or credentials.
 
-The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
+The answer endpoint builds a bounded hybrid evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
 against the immutable source version; unknown, missing, or corrupted evidence fails closed.
+Newly ingested paragraphs are split into exact spans of at most 1,600 code points. The answer path
+also enforces a 64 KiB serialized UTF-8 evidence-pack ceiling and an 8 KiB item ceiling, so legacy
+oversized chunks cannot cause unbounded provider egress. Excluded evidence is reported by ID and
+reason; if no evidence fits, Proofline returns `insufficient_evidence` without calling a model.
 
 ## Product screens
 
@@ -91,9 +95,11 @@ against the immutable source version; unknown, missing, or corrupted evidence fa
 
 Search returns inspectable source spans even when no generation provider is
 configured. When a provider is available, it receives only the bounded evidence
-pack and can cite only server-issued evidence IDs.
+pack and can cite only server-issued evidence IDs. Retrieval applies deterministic
+RRF ordering and a soft per-source diversity cap; “Why this result?” exposes channel,
+rank, score, source-version, line, and offset metadata.
 
-![Proofline search showing an evidence-backed answer and exact retrieval matches](docs/images/proofline-screen-search.jpg)
+![Proofline search showing bounded evidence and inspectable retrieval ranking metadata](docs/images/proofline-screen-search-current.png)
 
 ### Governed memory registry
 
@@ -101,7 +107,7 @@ Deterministically extracted and AI-proposed decisions, assumptions, constraints,
 and alternatives share one filterable review surface. Each memory exposes its
 kind, confidence, extraction method, lifecycle controls, and exact supporting lines.
 
-![Proofline governed memory registry with reviewable engineering context and exact proof links](docs/images/proofline-screen-memories.png)
+![Proofline governed memory registry with reversible status controls, corrections, and exact proof links](docs/images/proofline-screen-memories-current.png)
 
 ### Source inventory
 
@@ -109,7 +115,7 @@ The source inventory makes indexing observable: detected sources, searchable
 chunks, extracted memories, source type, latest job stage/attempt, safe failures,
 and per-source actions remain visible.
 
-![Proofline source inventory showing indexing coverage and extracted objects](docs/images/proofline-screen-sources.jpg)
+![Proofline source inventory showing current ingestion health and extracted memories](docs/images/proofline-screen-sources-current.png)
 
 ## Repository layout
 

@@ -132,12 +132,15 @@ Before delivery work, record:
 
 - Benchmark and replace the implemented bounded SQLite JSON embedding storage when scale requires.
 - Extend the implemented lexical/semantic retrieval and reciprocal-rank fusion with filters and
-  diversity control.
+  diversity control. A deterministic soft per-source cap with ranked backfill is implemented;
+  user-driven source/time filters remain open.
 - Add optional reranking behind a capability interface.
 - Extend the implemented bounded lexical evidence packs and grounded answer generation to hybrid
-  retrieval and context diversity.
+  retrieval and context diversity. Hybrid retrieval, per-source diversity, 1,600-code-point chunk
+  bounds, and hard 64 KiB/8 KiB runtime context budgets are implemented.
 - Harden the implemented deterministic citation identifier and quoted-span validation.
-- Extend the implemented citation navigation with a retrieval debug view.
+- Extend the implemented citation navigation with a retrieval debug view. Raw results now expose
+  channel/rank/score, immutable source version, and exact line/offset diagnostics.
 - Add grounded-QA golden tests and evaluation harness.
 
 ### Exit gate
