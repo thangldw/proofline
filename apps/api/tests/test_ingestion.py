@@ -29,6 +29,25 @@ def test_chunks_preserve_exact_unicode_spans():
     assert spans[-1].end_line == 5
 
 
+def test_crlf_and_combining_characters_keep_exact_offsets_and_lines():
+    content = (
+        "# Cafe\u0301 architecture\r\n\r\n"
+        "Decision: Preserve code-point offsets 🧠\r\n"
+        "Reason: citations must survive CRLF.\r\n"
+    )
+
+    spans = chunk_markdown(content)
+    decisions = extract_decisions(content)
+
+    assert spans
+    assert all(content[item.start_offset : item.end_offset] == item.text for item in spans)
+    assert len(decisions) == 1
+    decision = decisions[0]
+    assert content[decision["start_offset"] : decision["end_offset"]] == decision["quote"]
+    assert decision["start_line"] == 3
+    assert decision["end_line"] == 4
+
+
 def test_extracts_decision_and_exact_evidence():
     content = (
         "# ADR\n\n## Quyết định: Dùng SQLite cho MVP\n"
