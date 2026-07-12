@@ -84,7 +84,9 @@ describe("MemoryView", () => {
     const onChanged = vi.fn().mockResolvedValue(undefined);
     render(<MemoryView memories={[candidate]} onEvidence={vi.fn()} onChanged={onChanged}/>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Accept assumption: assumption statement" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Status for assumption: assumption statement" }), {
+      target: { value: "accepted" },
+    });
 
     await waitFor(() => expect(apiMock.updateMemory).toHaveBeenCalledWith(
       candidate.id,
@@ -92,6 +94,103 @@ describe("MemoryView", () => {
     ));
     expect(onChanged).toHaveBeenCalledOnce();
   });
+
+  it("saves a governed statement and rationale correction", async () => {
+    const assumption = memories[1];
+    apiMock.updateMemory.mockResolvedValue({
+      ...assumption,
+      statement: "Corrected assumption",
+      rationale: "Updated rationale",
+    });
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<MemoryView memories={[assumption]} onEvidence={vi.fn()} onChanged={onChanged}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit assumption: assumption statement" }));
+    const form = screen.getByRole("form", { name: "Edit assumption memory" });
+    expect(within(form).getByRole("textbox", { name: "Statement" })).toHaveValue("assumption statement");
+    expect(within(form).getByRole("textbox", { name: "Rationale" })).toHaveValue("assumption rationale");
+    fireEvent.change(within(form).getByRole("textbox", { name: "Statement" }), {
+      target: { value: "  Corrected assumption  " },
+    });
+    fireEvent.change(within(form).getByRole("textbox", { name: "Rationale" }), {
+      target: { value: " Updated rationale " },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Save correction" }));
+
+    await waitFor(() => expect(apiMock.updateMemory).toHaveBeenCalledWith(assumption.id, {
+      statement: "Corrected assumption",
+      rationale: "Updated rationale",
+    }));
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a correction without mutating memory", () => {
+    const assumption = memories[1];
+    render(<MemoryView memories={[assumption]} onEvidence={vi.fn()} onChanged={vi.fn()}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit assumption: assumption statement" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Statement" }), {
+      target: { value: "Discard this edit" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("form", { name: "Edit assumption memory" })).not.toBeInTheDocument();
+    expect(screen.getByText("assumption statement")).toBeInTheDocument();
+    expect(apiMock.updateMemory).not.toHaveBeenCalled();
+  });
+
+  it("keeps the correction form and reports PATCH failures inline", async () => {
+    const assumption = memories[1];
+    apiMock.updateMemory.mockResolvedValue(assumption);
+    const onChanged = vi.fn().mockRejectedValue(new Error("Correction conflicted with a newer revision"));
+    render(<MemoryView memories={[assumption]} onEvidence={vi.fn()} onChanged={onChanged}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit assumption: assumption statement" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Statement" }), {
+      target: { value: "Uncommitted correction" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: "Edit assumption memory" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Correction conflicted with a newer revision");
+    expect(screen.getByRole("form", { name: "Edit assumption memory" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Statement" })).toHaveValue("Uncommitted correction");
+  });
+
+  it("validates a non-empty corrected statement before PATCH", async () => {
+    const assumption = memories[1];
+    render(<MemoryView memories={[assumption]} onEvidence={vi.fn()} onChanged={vi.fn()}/>);
+    fireEvent.click(screen.getByRole("button", { name: "Edit assumption: assumption statement" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Statement" }), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Statement is required");
+    expect(apiMock.updateMemory).not.toHaveBeenCalled();
+  });
+
+  it.each(["candidate", "active"] as const)(
+    "reverses an accepted memory back to %s",
+    async (nextStatus) => {
+      const accepted = memory("constraint", "accepted");
+      apiMock.updateMemory.mockResolvedValue({ ...accepted, status: nextStatus });
+      const onChanged = vi.fn().mockResolvedValue(undefined);
+      render(<MemoryView memories={[accepted]} onEvidence={vi.fn()} onChanged={onChanged}/>);
+      const status = screen.getByRole("combobox", {
+        name: "Status for constraint: constraint statement",
+      });
+      expect(within(status).getAllByRole("option").map(option => option.getAttribute("value")))
+        .toEqual(["candidate", "active", "accepted", "rejected", "obsolete"]);
+
+      fireEvent.change(status, { target: { value: nextStatus } });
+
+      await waitFor(() => expect(apiMock.updateMemory).toHaveBeenCalledWith(
+        accepted.id,
+        { status: nextStatus },
+      ));
+      expect(onChanged).toHaveBeenCalledOnce();
+    },
+  );
 
   it("opens the exact evidence span for any memory kind", () => {
     const assumption = memories[1];

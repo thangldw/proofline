@@ -195,29 +195,79 @@ type MemoryStatus = typeof memoryStatuses[number];
 export function MemoryView({memories, onEvidence, onChanged}: {memories: Memory[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
   const [kindFilter, setKindFilter] = useState<MemoryKind | "all">("all");
   const [statusFilter, setStatusFilter] = useState<MemoryStatus | "all">("all");
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
   const filtered = memories.filter(memory =>
     (kindFilter === "all" || memory.kind === kindFilter)
     && (statusFilter === "all" || memory.status === statusFilter));
-  async function setStatus(memory: Memory, status: "accepted" | "rejected" | "obsolete") {
-    setReviewingId(memory.id);
-    setReviewErrors(current => ({ ...current, [memory.id]: "" }));
+  return <section className="content"><div className="section-heading"><div><span className="eyebrow">MEMORY REGISTRY</span><h2>Reviewable engineering context</h2></div><span className="mode-badge">{filtered.length} of {memories.length}</span></div><div className="registry-filters"><fieldset><legend>Kind</legend><button aria-pressed={kindFilter === "all"} onClick={() => setKindFilter("all")}>All</button>{memoryKinds.map(kind => <button key={kind} aria-pressed={kindFilter === kind} onClick={() => setKindFilter(kind)}>{kind[0].toUpperCase() + kind.slice(1)}s</button>)}</fieldset><fieldset><legend>Status</legend><button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</button>{memoryStatuses.map(status => <button key={status} aria-pressed={statusFilter === status} onClick={() => setStatusFilter(status)}>{status}</button>)}</fieldset></div>
+    {filtered.length === 0 ? <div className="empty-card">No memories match these filters. Import an ADR or change the selected kind and status.</div> : <div className="decision-grid">{filtered.map(memory => <MemoryCard memory={memory} onEvidence={onEvidence} onChanged={onChanged} key={memory.id}/>)}</div>}
+  </section>;
+}
+
+function MemoryCard({memory, onEvidence, onChanged}: {memory: Memory; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
+  const [editing, setEditing] = useState(false);
+  const [statement, setStatement] = useState(memory.statement);
+  const [rationale, setRationale] = useState(memory.rationale ?? "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  function beginEdit() {
+    setStatement(memory.statement);
+    setRationale(memory.rationale ?? "");
+    setError("");
+    setEditing(true);
+  }
+  function cancelEdit() {
+    if (pending) return;
+    setStatement(memory.statement);
+    setRationale(memory.rationale ?? "");
+    setError("");
+    setEditing(false);
+  }
+  function saveCorrection(event: React.FormEvent) {
+    event.preventDefault();
+    const normalizedStatement = statement.trim();
+    if (!normalizedStatement) {
+      setError("Statement is required.");
+      return;
+    }
+    setPending(true);
+    setError("");
+    try {
+      const update = api.updateMemory(memory.id, {
+        statement: normalizedStatement,
+        rationale: rationale.trim() || null,
+      });
+      void update.then(
+        async () => {
+          await onChanged();
+          setEditing(false);
+        },
+        reason => {
+          setError(errorMessage(reason, "Memory correction failed"));
+        },
+      ).catch(reason => {
+        setError(errorMessage(reason, "Memory correction failed"));
+      }).finally(() => {
+        setPending(false);
+      });
+    } catch (reason) {
+      setError(errorMessage(reason, "Memory correction failed"));
+      setPending(false);
+    }
+  }
+  async function changeStatus(status: MemoryStatus) {
+    if (status === memory.status || pending) return;
+    setPending(true);
+    setError("");
     try {
       await api.updateMemory(memory.id, { status });
       await onChanged();
     } catch (reason) {
-      setReviewErrors(current => ({
-        ...current,
-        [memory.id]: errorMessage(reason, "Memory review failed"),
-      }));
+      setError(errorMessage(reason, "Memory review failed"));
     } finally {
-      setReviewingId(null);
+      setPending(false);
     }
   }
-  return <section className="content"><div className="section-heading"><div><span className="eyebrow">MEMORY REGISTRY</span><h2>Reviewable engineering context</h2></div><span className="mode-badge">{filtered.length} of {memories.length}</span></div><div className="registry-filters"><fieldset><legend>Kind</legend><button aria-pressed={kindFilter === "all"} onClick={() => setKindFilter("all")}>All</button>{memoryKinds.map(kind => <button key={kind} aria-pressed={kindFilter === kind} onClick={() => setKindFilter(kind)}>{kind[0].toUpperCase() + kind.slice(1)}s</button>)}</fieldset><fieldset><legend>Status</legend><button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</button>{memoryStatuses.map(status => <button key={status} aria-pressed={statusFilter === status} onClick={() => setStatusFilter(status)}>{status}</button>)}</fieldset></div>
-    {filtered.length === 0 ? <div className="empty-card">No memories match these filters. Import an ADR or change the selected kind and status.</div> : <div className="decision-grid">{filtered.map(memory => <article className="decision-card memory-card" aria-label={`${memory.kind} memory: ${memory.statement}`} key={memory.id}><div className="decision-top"><span className="memory-labels"><span className={`memory-kind ${memory.kind}`} aria-label={`Memory kind: ${memory.kind}`}>{memory.kind}</span><span className={`status ${memory.status}`}>{memory.status}</span></span><span>{Math.round(memory.confidence * 100)}% · {memory.extraction_method}</span></div><h3>{memory.statement}</h3>{memory.rationale && <p>{memory.rationale}</p>}<div className="review-actions"><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "accepted")} aria-label={`Accept ${memory.kind}: ${memory.statement}`}>Accept</button><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "rejected")} aria-label={`Reject ${memory.kind}: ${memory.statement}`}>Reject</button><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "obsolete")} aria-label={`Mark obsolete ${memory.kind}: ${memory.statement}`}>Mark obsolete</button></div>{reviewErrors[memory.id] && <div className="action-error" role="alert">{reviewErrors[memory.id]}</div>}<footer><span>{memory.source_title}</span>{memory.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, memory.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>)}</div>}
-  </section>;
+  return <article className="decision-card memory-card" aria-label={`${memory.kind} memory: ${memory.statement}`}><div className="decision-top"><span className="memory-labels"><span className={`memory-kind ${memory.kind}`} aria-label={`Memory kind: ${memory.kind}`}>{memory.kind}</span><span className={`status ${memory.status}`}>{memory.status}</span></span><span>{Math.round(memory.confidence * 100)}% · {memory.extraction_method}</span></div>{editing ? <form className="memory-edit-form" aria-label={`Edit ${memory.kind} memory`} onSubmit={(event) => void saveCorrection(event)}><label>Statement<textarea value={statement} aria-invalid={!statement.trim() && Boolean(error)} onChange={(event) => setStatement(event.target.value)}/></label><label>Rationale<textarea value={rationale} onChange={(event) => setRationale(event.target.value)}/></label><div className="edit-actions"><button type="button" disabled={pending} onClick={cancelEdit}>Cancel</button><button type="submit" disabled={pending}>{pending ? "Saving…" : "Save correction"}</button></div></form> : <><h3>{memory.statement}</h3>{memory.rationale && <p>{memory.rationale}</p>}</>}<div className="governance-actions"><label>Status<select aria-label={`Status for ${memory.kind}: ${memory.statement}`} value={memory.status} disabled={pending || editing} onChange={(event) => void changeStatus(event.target.value as MemoryStatus)}>{memoryStatuses.map(status => <option value={status} key={status}>{status}</option>)}</select></label><button disabled={pending || editing} onClick={beginEdit} aria-label={`Edit ${memory.kind}: ${memory.statement}`}>Edit</button></div>{error && <div className="action-error" role="alert">{error}</div>}<footer><span>{memory.source_title}</span>{memory.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, memory.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>;
 }
 
 export function SourcesView({sources, jobs, onChanged, onSourceDeleted}: {sources: Source[]; jobs: IngestionJob[]; onChanged: () => Promise<void>; onSourceDeleted?: (sourceId: string) => void}) {
