@@ -198,7 +198,7 @@ def extract_memories(content: str) -> list[dict]:
                 found_metadata = True
                 normalized = status_match.group(1).strip().lower()
                 status = (
-                    "superseded"
+                    "obsolete"
                     if normalized in {"superseded", "replaced", "obsolete"}
                     else normalized
                 )

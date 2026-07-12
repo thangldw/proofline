@@ -131,6 +131,12 @@ def test_memory_heading_accepts_markdown_spacing_before_metadata(session):
     assert content[evidence.start_offset : evidence.end_offset] == evidence.quote
 
 
+def test_superseded_source_status_normalizes_to_reviewable_obsolete():
+    for source_status in ("superseded", "replaced", "obsolete"):
+        [memory] = extract_memories(f"Decision: Retire the old queue\nStatus: {source_status}")
+        assert memory["status"] == "obsolete"
+
+
 def test_ingestion_is_idempotent(session):
     payload = SourceCreate(title="ADR", content="Decision: Use SQLite\nReason: simple local setup")
     first, first_created = ingest_source(session, payload)
