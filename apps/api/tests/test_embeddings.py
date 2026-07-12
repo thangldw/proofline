@@ -1,8 +1,9 @@
+import proofline.embeddings as embeddings_module
 from proofline.embeddings import hybrid_search, index_current_embeddings
 from proofline.ingestion import delete_source, ingest_source
 from proofline.model_gateway import FakeEmbeddingProvider
 from proofline.models import Chunk, ChunkEmbedding
-from proofline.schemas import SourceCreate
+from proofline.schemas import SearchHit, SourceCreate
 from sqlalchemy import func, select
 
 
@@ -86,3 +87,83 @@ def test_old_version_embeddings_are_excluded_from_semantic_search(session):
     hits = hybrid_search(session, "legacy streaming platform", provider, 5)
 
     assert all(hit.chunk_id != old_chunk.id for hit in hits)
+
+
+def search_hit(chunk_id: str, source_id: str, rank: float = -1.0) -> SearchHit:
+    content = f"exact content for {chunk_id}"
+    return SearchHit(
+        chunk_id=chunk_id,
+        source_id=source_id,
+        source_version_id=f"version-{source_id}",
+        source_title=f"Source {source_id}",
+        content=content,
+        start_offset=10,
+        end_offset=10 + len(content),
+        start_line=2,
+        end_line=2,
+        rank=rank,
+    )
+
+
+def test_lexical_diversity_cap_backfills_in_original_rank_order(monkeypatch, session):
+    ranked = [
+        search_hit("a-1", "a"),
+        search_hit("a-2", "a"),
+        search_hit("a-3", "a"),
+        search_hit("b-1", "b"),
+        search_hit("c-1", "c"),
+    ]
+    monkeypatch.setattr(embeddings_module, "lexical_search", lambda *_args: ranked)
+
+    hits = hybrid_search(session, "queue", None, limit=4, max_per_source=1)
+
+    assert [hit.chunk_id for hit in hits] == ["a-1", "b-1", "c-1", "a-2"]
+    assert [(hit.start_offset, hit.end_offset, hit.content) for hit in hits] == [
+        (item.start_offset, item.end_offset, item.content)
+        for item in [ranked[0], ranked[3], ranked[4], ranked[1]]
+    ]
+    assert [hit.lexical_rank for hit in hits] == [1, 4, 5, 2]
+
+
+def test_diversity_cap_does_not_drop_single_source_results(monkeypatch, session):
+    ranked = [search_hit(f"a-{index}", "a") for index in range(1, 6)]
+    monkeypatch.setattr(embeddings_module, "lexical_search", lambda *_args: ranked)
+
+    first = hybrid_search(session, "queue", None, limit=4, max_per_source=1)
+    second = hybrid_search(session, "queue", None, limit=4, max_per_source=1)
+
+    assert [hit.chunk_id for hit in first] == ["a-1", "a-2", "a-3", "a-4"]
+    assert [hit.chunk_id for hit in second] == [hit.chunk_id for hit in first]
+
+
+def test_hybrid_diversity_preserves_deterministic_rrf_metadata(monkeypatch, session):
+    lexical = [
+        search_hit("a-1", "a"),
+        search_hit("a-2", "a"),
+        search_hit("a-3", "a"),
+        search_hit("b-1", "b"),
+    ]
+    semantic = [
+        search_hit("a-1", "a").model_copy(
+            update={"semantic_score": 0.99, "retrieval_channels": ["semantic"]}
+        ),
+        search_hit("a-2", "a").model_copy(
+            update={"semantic_score": 0.98, "retrieval_channels": ["semantic"]}
+        ),
+        search_hit("c-1", "c").model_copy(
+            update={"semantic_score": 0.97, "retrieval_channels": ["semantic"]}
+        ),
+    ]
+    monkeypatch.setattr(embeddings_module, "lexical_search", lambda *_args: lexical)
+    monkeypatch.setattr(embeddings_module, "semantic_search", lambda *_args: semantic)
+
+    first = hybrid_search(session, "queue", object(), limit=4, max_per_source=1)
+    second = hybrid_search(session, "queue", object(), limit=4, max_per_source=1)
+
+    assert [hit.chunk_id for hit in first] == ["a-1", "c-1", "b-1", "a-2"]
+    assert [hit.chunk_id for hit in second] == [hit.chunk_id for hit in first]
+    assert first[0].retrieval_channels == ["lexical", "semantic"]
+    assert first[0].lexical_rank == 1
+    assert first[0].semantic_rank == 1
+    assert first[0].semantic_score == 0.99
+    assert first[0].fused_score == (1 / 61) + (1 / 61)

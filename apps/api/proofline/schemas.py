@@ -158,6 +158,7 @@ class SearchResponse(BaseModel):
 class AnswerRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2_000)
     limit: int = Field(default=8, ge=1, le=12)
+    max_per_source: int = Field(default=2, ge=1, le=12)
 
 
 class AnswerStatement(BaseModel):

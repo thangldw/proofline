@@ -131,6 +131,28 @@ def test_search_escapes_fts_syntax(client):
     assert response.json()["hits"]
 
 
+def test_retrieval_diversity_parameters_are_bounded(client):
+    assert (
+        client.get("/api/v1/search", params={"q": "queues", "max_per_source": 0}).status_code == 422
+    )
+    assert (
+        client.get("/api/v1/search", params={"q": "queues", "max_per_source": 51}).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/v1/answers", json={"question": "Why queues?", "max_per_source": 0}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/v1/answers", json={"question": "Why queues?", "max_per_source": 13}
+        ).status_code
+        == 422
+    )
+
+
 def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypatch):
     monkeypatch.setenv("PROOFLINE_AI_PROVIDER", "disabled")
     monkeypatch.setenv("PROOFLINE_ALLOW_REMOTE_AI", "false")

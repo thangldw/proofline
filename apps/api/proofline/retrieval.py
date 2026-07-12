@@ -46,7 +46,7 @@ def lexical_search(session: Session, query: str, limit: int = 10) -> list[Search
             JOIN sources s ON s.id = c.source_id
             WHERE chunk_search MATCH :query
               AND c.source_version_id = s.current_version_id
-            ORDER BY rank
+            ORDER BY rank, c.id
             LIMIT :limit
             """
         ),

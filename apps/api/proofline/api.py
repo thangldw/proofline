@@ -665,6 +665,7 @@ def list_audit_events(
 def search(
     q: str = Query(min_length=2, max_length=500),
     limit: int = Query(default=10, ge=1, le=50),
+    max_per_source: int = Query(default=2, ge=1, le=50),
     hybrid: bool = True,
     session: Session = Depends(get_session),
 ) -> SearchResponse:
@@ -675,7 +676,13 @@ def search(
             status_code=409, detail="Embedding provider configuration is invalid"
         ) from exc
     try:
-        hits = hybrid_search(session, q, embedding_provider, limit)
+        hits = hybrid_search(
+            session,
+            q,
+            embedding_provider,
+            limit,
+            max_per_source=max_per_source,
+        )
     except (ProviderRequestError, EmbeddingValidationError) as exc:
         raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
     return SearchResponse(query=q, hits=hits)
@@ -692,7 +699,12 @@ def create_answer(
         provider = build_generation_provider(settings)
         embedding_provider = build_embedding_provider(settings)
         answer = answer_question(
-            session, payload.question, provider, embedding_provider, payload.limit
+            session,
+            payload.question,
+            provider,
+            embedding_provider,
+            payload.limit,
+            payload.max_per_source,
         )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
