@@ -7,10 +7,16 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from .database import get_session
-from .ingestion import IngestionConflict, delete_source, ingest_source
-from .models import Chunk, Decision, Evidence, Source, SourceVersion
+from .ingestion import (
+    IngestionConflict,
+    IngestionExecutionError,
+    delete_source,
+    run_ingestion_job,
+)
+from .models import Chunk, Decision, Evidence, IngestionJob, Source, SourceVersion
 from .schemas import (
     DecisionRead,
+    IngestionJobRead,
     Overview,
     SearchHit,
     SearchResponse,
@@ -75,9 +81,16 @@ def create_source(
     payload: SourceCreate, response: Response, session: Session = Depends(get_session)
 ) -> SourceRead:
     try:
-        source, created = ingest_source(session, payload)
+        source, created, job = run_ingestion_job(session, payload)
     except IngestionConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IngestionExecutionError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="ingestion failed; inspect the persisted job",
+            headers={"X-Proofline-Job-ID": exc.job_id},
+        ) from exc
+    response.headers["X-Proofline-Job-ID"] = job.id
     if not created:
         response.status_code = status.HTTP_200_OK
     hydrated = session.scalar(
@@ -104,6 +117,26 @@ def list_sources(session: Session = Depends(get_session)) -> list[SourceRead]:
         .order_by(Source.indexed_at.desc())
     ).all()
     return [source_to_read(source) for source in sources]
+
+
+@router.get("/jobs", response_model=list[IngestionJobRead])
+def list_jobs(
+    job_state: str | None = Query(default=None, alias="state"),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> list[IngestionJob]:
+    query = select(IngestionJob).order_by(IngestionJob.updated_at.desc()).limit(limit)
+    if job_state:
+        query = query.where(IngestionJob.state == job_state)
+    return list(session.scalars(query).all())
+
+
+@router.get("/jobs/{job_id}", response_model=IngestionJobRead)
+def get_job(job_id: str, session: Session = Depends(get_session)) -> IngestionJob:
+    job = session.get(IngestionJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Ingestion job not found")
+    return job
 
 
 @router.get("/sources/{source_id}")

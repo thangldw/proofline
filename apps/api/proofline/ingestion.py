@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from .models import Chunk, Decision, Evidence, Source, SourceVersion, new_id, utc_now
+from .models import (
+    Chunk,
+    Decision,
+    Evidence,
+    IngestionJob,
+    Source,
+    SourceVersion,
+    new_id,
+    utc_now,
+)
 from .schemas import SourceCreate
 
 
@@ -22,6 +31,12 @@ class TextSpan:
 
 class IngestionConflict(ValueError):
     """Raised when a stable source identity cannot be resolved safely."""
+
+
+class IngestionExecutionError(RuntimeError):
+    def __init__(self, job_id: str) -> None:
+        self.job_id = job_id
+        super().__init__(f"ingestion job {job_id} failed")
 
 
 DECISION_PREFIX = re.compile(
@@ -247,6 +262,45 @@ def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool
     session.commit()
     session.refresh(source)
     return source, created
+
+
+def run_ingestion_job(session: Session, payload: SourceCreate) -> tuple[Source, bool, IngestionJob]:
+    """Run synchronous ingestion while persisting terminal success or failure."""
+    job = IngestionJob(state="running", stage="accepted", attempts=1, retryable=False)
+    session.add(job)
+    session.commit()
+    job_id = job.id
+    try:
+        job.stage = "indexing"
+        session.commit()
+        source, created = ingest_source(session, payload)
+    except Exception as exc:
+        session.rollback()
+        failed_job = session.get(IngestionJob, job_id)
+        failed_job.state = "failed"
+        failed_job.stage = "failed"
+        failed_job.error_code = (
+            "source_identity_conflict" if isinstance(exc, IngestionConflict) else "ingestion_error"
+        )
+        failed_job.error_detail = (
+            str(exc)
+            if isinstance(exc, IngestionConflict)
+            else f"ingestion failed with {type(exc).__name__}"
+        )
+        failed_job.updated_at = utc_now()
+        session.commit()
+        if isinstance(exc, IngestionConflict):
+            raise
+        raise IngestionExecutionError(job_id) from exc
+
+    succeeded_job = session.get(IngestionJob, job_id)
+    succeeded_job.source_id = source.id
+    succeeded_job.source_version_id = source.current_version_id
+    succeeded_job.state = "succeeded"
+    succeeded_job.stage = "ready"
+    succeeded_job.updated_at = utc_now()
+    session.commit()
+    return source, created, succeeded_job
 
 
 def delete_source(session: Session, source: Source) -> None:

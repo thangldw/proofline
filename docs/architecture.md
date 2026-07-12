@@ -73,8 +73,9 @@ Planned modules are:
 The implemented foundation ingests synchronously. A URI identifies a stable source, SHA-256
 identifies an immutable version, unchanged content is a no-op, and changed content creates a new
 version while preserving historical evidence. URI-less repeated content remains idempotent.
-Persisted, resumable jobs remain planned. In that planned pipeline, a source progresses through
-independently visible stages:
+Every synchronous ingestion attempt now persists a job with stage, terminal state, safe error
+code/detail, attempt count, and source/version references. Resumable execution and retries remain
+planned. In that planned pipeline, a source progresses through independently visible stages:
 
 ```text
 discovered -> parsed -> indexed -> extracted -> ready
@@ -98,8 +99,9 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 - SQLite currently stores sources, raw Markdown/text, chunks, deterministic decisions, evidence,
   character/line spans, and FTS rows through SQLAlchemy models plus an FTS5 virtual table.
 - SQLite FTS5 currently provides lexical search.
-- Source versions and versioned schema migrations are implemented; generalized derived memory,
-  jobs, and audit events are planned schema extensions.
+- Source versions, versioned schema migrations, and synchronous ingestion job records are
+  implemented; generalized derived memory, resumable job execution, and audit events are planned
+  schema extensions.
 - Embeddings are stored behind a repository interface. The first implementation may use a
   SQLite-compatible vector extension or a simple local vector table if dataset limits are
   documented and tested.

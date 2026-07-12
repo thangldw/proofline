@@ -106,3 +106,22 @@ class Evidence(Base):
     end_offset: Mapped[int] = mapped_column(Integer)
     start_line: Mapped[int] = mapped_column(Integer)
     end_line: Mapped[int] = mapped_column(Integer)
+
+
+class IngestionJob(Base):
+    __tablename__ = "ingestion_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sources.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    kind: Mapped[str] = mapped_column(String(30), default="source_ingestion")
+    state: Mapped[str] = mapped_column(String(30), default="running", index=True)
+    stage: Mapped[str] = mapped_column(String(30), default="accepted")
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    retryable: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)

@@ -1,5 +1,13 @@
-from proofline.ingestion import chunk_markdown, extract_decisions, ingest_source
-from proofline.models import Chunk, Decision, Evidence, Source, SourceVersion
+import proofline.ingestion as ingestion_module
+import pytest
+from proofline.ingestion import (
+    IngestionExecutionError,
+    chunk_markdown,
+    extract_decisions,
+    ingest_source,
+    run_ingestion_job,
+)
+from proofline.models import Chunk, Decision, Evidence, IngestionJob, Source, SourceVersion
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
 
@@ -66,3 +74,22 @@ def test_same_uri_creates_immutable_version_and_keeps_historical_evidence(sessio
     assert session.get(Decision, first_decision.id).statement == "Use SQLite"
     evidence = session.scalar(select(Evidence).where(Evidence.decision_id == first_decision.id))
     assert first_content[evidence.start_offset : evidence.end_offset] == evidence.quote
+
+
+def test_ingestion_failure_is_persisted_without_source_content(session, monkeypatch):
+    def fail_ingestion(*_args, **_kwargs):
+        raise RuntimeError("private source text must not be persisted in the job")
+
+    monkeypatch.setattr(ingestion_module, "ingest_source", fail_ingestion)
+    with pytest.raises(IngestionExecutionError) as raised:
+        run_ingestion_job(
+            session,
+            SourceCreate(title="Sensitive", content="private source text"),
+        )
+
+    job = session.get(IngestionJob, raised.value.job_id)
+    assert job.state == "failed"
+    assert job.error_code == "ingestion_error"
+    assert job.retryable is False
+    assert "private source text" not in job.error_detail
+    assert session.scalar(select(func.count()).select_from(Source)) == 0
