@@ -22,6 +22,8 @@ class SourceRead(BaseModel):
     status: str
     created_at: datetime
     indexed_at: datetime
+    current_version_id: str | None
+    version_count: int = 0
     chunk_count: int = 0
     decision_count: int = 0
 
@@ -31,7 +33,9 @@ class EvidenceRead(BaseModel):
 
     id: str
     source_id: str
+    source_version_id: str
     quote: str
+    quote_hash: str
     start_offset: int
     end_offset: int
     start_line: int
@@ -43,6 +47,7 @@ class DecisionRead(BaseModel):
 
     id: str
     source_id: str
+    source_version_id: str
     source_title: str | None = None
     title: str
     statement: str
@@ -59,6 +64,7 @@ class DecisionRead(BaseModel):
 class SearchHit(BaseModel):
     chunk_id: str
     source_id: str
+    source_version_id: str
     source_title: str
     content: str
     start_offset: int
@@ -78,3 +84,20 @@ class Overview(BaseModel):
     chunks: int
     decisions: int
     evidence: int
+
+
+class SourceVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_id: str
+    content_hash: str
+    version_number: int
+    content_length: int
+    status: str
+    parser_version: str
+    created_at: datetime
+
+
+class SourceVersionContentRead(SourceVersionRead):
+    content: str

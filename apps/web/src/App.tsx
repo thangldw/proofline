@@ -67,7 +67,7 @@ function SearchView({onEvidence}: {onEvidence: (item: Evidence, title: string) =
     <form className="search-box" onSubmit={run}><FileSearch/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search why a system was built this way…" aria-label="Search engineering memory"/><button disabled={busy}>{busy ? "Searching" : "Search"}</button></form>
     {!searched && <div className="hero-empty"><div className="line-art">↳</div><h2>Follow every claim back to its source.</h2><p>Search technical decisions, rationale, and implementation context. Proofline returns inspectable evidence—not an uncited answer.</p></div>}
     {searched && <div className="results"><div className="section-heading"><div><span className="eyebrow">RAW RETRIEVAL</span><h2>{hits.length} evidence matches</h2></div><span className="mode-badge">Lexical · FTS5</span></div>
-      {hits.length === 0 ? <div className="empty-card">Insufficient evidence. Try another phrase or import a source.</div> : hits.map(hit => <article className="result-card" key={hit.chunk_id}><div className="result-meta"><span>{hit.source_title}</span><button onClick={() => onEvidence({id: hit.chunk_id, source_id: hit.source_id, quote: hit.content, start_offset: hit.start_offset, end_offset: hit.end_offset, start_line: hit.start_line, end_line: hit.end_line}, hit.source_title)}>Lines {hit.start_line}–{hit.end_line}</button></div><p>{hit.content}</p></article>)}</div>}
+      {hits.length === 0 ? <div className="empty-card">Insufficient evidence. Try another phrase or import a source.</div> : hits.map(hit => <article className="result-card" key={hit.chunk_id}><div className="result-meta"><span>{hit.source_title}</span><button onClick={() => onEvidence({id: hit.chunk_id, source_id: hit.source_id, source_version_id: hit.source_version_id, quote: hit.content, start_offset: hit.start_offset, end_offset: hit.end_offset, start_line: hit.start_line, end_line: hit.end_line}, hit.source_title)}>Lines {hit.start_line}–{hit.end_line}</button></div><p>{hit.content}</p></article>)}</div>}
   </section>;
 }
 
@@ -85,7 +85,7 @@ function Metric({value,label}: {value: number; label: string}) { return <div cla
 
 function EvidenceDrawer({item, sourceTitle, onClose}: {item: Evidence; sourceTitle: string; onClose: () => void}) {
   const [sourceContent, setSourceContent] = useState("");
-  useEffect(() => { void api.source(item.source_id).then(source => setSourceContent(source.content)); }, [item.source_id]);
+  useEffect(() => { void api.sourceVersion(item.source_id, item.source_version_id).then(version => setSourceContent(version.content)); }, [item.source_id, item.source_version_id]);
   const quote = item.quote || sourceContent.slice(item.start_offset, item.end_offset);
   return <aside className="drawer"><header><div><span className="eyebrow">EXACT EVIDENCE</span><h2>{sourceTitle}</h2></div><button aria-label="Close evidence" onClick={onClose}><X/></button></header><div className="locator">Lines {item.start_line}–{item.end_line} <span>·</span> offsets {item.start_offset}:{item.end_offset}</div><blockquote>{quote}</blockquote><div className="integrity"><Database size={16}/><span><strong>Source-backed span</strong>This quote is stored with its exact source offsets.</span></div></aside>;
 }

@@ -3,7 +3,7 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 from proofline.database import get_session, initialize_database, make_engine
-from proofline.main import app
+from proofline.main import create_app
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -22,7 +22,8 @@ def client(session: Session) -> Generator[TestClient, None, None]:
     def override_session():
         yield session
 
-    app.dependency_overrides[get_session] = override_session
-    with TestClient(app) as test_client:
+    application = create_app(session.get_bind())
+    application.dependency_overrides[get_session] = override_session
+    with TestClient(application) as test_client:
         yield test_client
-    app.dependency_overrides.clear()
+    application.dependency_overrides.clear()

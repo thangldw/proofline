@@ -8,6 +8,8 @@ export type Source = {
   status: string;
   created_at: string;
   indexed_at: string;
+  current_version_id: string | null;
+  version_count: number;
   chunk_count: number;
   decision_count: number;
 };
@@ -15,7 +17,9 @@ export type Source = {
 export type Evidence = {
   id: string;
   source_id: string;
+  source_version_id: string;
   quote: string;
+  quote_hash?: string;
   start_offset: number;
   end_offset: number;
   start_line: number;
@@ -25,6 +29,7 @@ export type Evidence = {
 export type Decision = {
   id: string;
   source_id: string;
+  source_version_id: string;
   source_title: string;
   title: string;
   statement: string;
@@ -38,6 +43,7 @@ export type Decision = {
 export type SearchHit = {
   chunk_id: string;
   source_id: string;
+  source_version_id: string;
   source_title: string;
   content: string;
   start_offset: number;

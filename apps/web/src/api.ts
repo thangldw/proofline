@@ -16,6 +16,8 @@ export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
   source: (id: string) => request<Source & { content: string }>(`/api/v1/sources/${id}`),
+  sourceVersion: (sourceId: string, versionId: string) =>
+    request<{ content: string }>(`/api/v1/sources/${sourceId}/versions/${versionId}`),
   decisions: () => request<Decision[]>("/api/v1/decisions"),
   search: async (query: string) =>
     (await request<{ hits: SearchHit[] }>(`/api/v1/search?q=${encodeURIComponent(query)}`)).hits,
@@ -25,4 +27,3 @@ export const api = {
       body: JSON.stringify({ title, content, kind: "markdown", uri }),
     }),
 };
-

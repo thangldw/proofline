@@ -136,7 +136,6 @@ deterministic Markdown chunks and decisions with character/line locations, a Rea
 console, API tests, and root quality commands. Remaining validation before calling the complete
 MVP stack proven includes:
 
-- explicit committed migrations rather than only create-if-missing schema setup;
 - Unicode span round trips across the full golden fixture set;
 - a provider interface tested with a fake adapter; and
 - benchmark evidence for the selected vector implementation.

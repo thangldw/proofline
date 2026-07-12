@@ -60,8 +60,8 @@ Before delivery work, record:
 
 - Harden Markdown/text upload and add safe registered-root folder scanning only if required by
   the active milestone.
-- Extend implemented content hashing and deterministic chunking with immutable source versioning
-  and explicit SQLite migrations.
+- Harden the implemented immutable source versioning and explicit SQLite migrations with crash,
+  concurrency, and larger legacy-database fixtures.
 - Harden the implemented FTS5 lexical search and exact-span contract.
 - Implement persisted in-process jobs, retries, and dead-letter states.
 - Extend the implemented source/decision inventory UI with stage diagnostics.

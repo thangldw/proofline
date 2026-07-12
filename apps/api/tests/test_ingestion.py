@@ -1,5 +1,5 @@
 from proofline.ingestion import chunk_markdown, extract_decisions, ingest_source
-from proofline.models import Chunk, Decision, Evidence, Source
+from proofline.models import Chunk, Decision, Evidence, Source, SourceVersion
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
 
@@ -38,3 +38,31 @@ def test_ingestion_is_idempotent(session):
     assert session.scalar(select(func.count()).select_from(Decision)) == 1
     assert session.scalar(select(func.count()).select_from(Evidence)) == 1
     assert session.scalar(select(func.count()).select_from(Chunk)) == 1
+    assert session.scalar(select(func.count()).select_from(SourceVersion)) == 1
+
+
+def test_same_uri_creates_immutable_version_and_keeps_historical_evidence(session):
+    first_content = "Decision: Use SQLite\nReason: simple local setup"
+    second_content = "Decision: Use Postgres\nReason: shared hosted workload"
+    first, first_created = ingest_source(
+        session,
+        SourceCreate(title="ADR", uri="file:///adr.md", content=first_content),
+    )
+    first_version = first.current_version_id
+    first_decision = session.scalar(
+        select(Decision).where(Decision.source_version_id == first_version)
+    )
+
+    second, second_created = ingest_source(
+        session,
+        SourceCreate(title="ADR updated", uri="file:///adr.md", content=second_content),
+    )
+
+    assert first_created is True
+    assert second_created is False
+    assert second.id == first.id
+    assert second.current_version_id != first_version
+    assert session.scalar(select(func.count()).select_from(SourceVersion)) == 2
+    assert session.get(Decision, first_decision.id).statement == "Use SQLite"
+    evidence = session.scalar(select(Evidence).where(Evidence.decision_id == first_decision.id))
+    assert first_content[evidence.start_offset : evidence.end_offset] == evidence.quote

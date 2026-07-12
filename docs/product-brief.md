@@ -65,7 +65,7 @@ without a model and linked to exact evidence. A React/Vite console supports uplo
 source and decision browsing, and evidence inspection. The API supports source deletion with
 derived chunks, decisions, evidence, and FTS rows removed.
 
-It does **not** yet implement immutable source versions, folder watching, provider/model
+It does **not** yet implement folder watching, provider/model
 integration, semantic retrieval, AI-derived memory review, grounded answer generation, or
 desktop packaging.
 

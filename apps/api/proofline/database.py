@@ -42,17 +42,6 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def initialize_database(target: Engine = engine) -> None:
-    from . import models  # noqa: F401
+    from .migrations import run_migrations
 
-    Base.metadata.create_all(target)
-    with target.begin() as connection:
-        connection.exec_driver_sql(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS chunk_search USING fts5(
-                chunk_id UNINDEXED,
-                source_id UNINDEXED,
-                content,
-                tokenize = 'unicode61'
-            )
-            """
-        )
+    run_migrations(target)

@@ -7,9 +7,18 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from .database import get_session
-from .ingestion import delete_source, ingest_source
-from .models import Chunk, Decision, Evidence, Source
-from .schemas import DecisionRead, Overview, SearchHit, SearchResponse, SourceCreate, SourceRead
+from .ingestion import IngestionConflict, delete_source, ingest_source
+from .models import Chunk, Decision, Evidence, Source, SourceVersion
+from .schemas import (
+    DecisionRead,
+    Overview,
+    SearchHit,
+    SearchResponse,
+    SourceCreate,
+    SourceRead,
+    SourceVersionContentRead,
+    SourceVersionRead,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -17,8 +26,13 @@ router = APIRouter(prefix="/api/v1")
 def source_to_read(source: Source) -> SourceRead:
     return SourceRead(
         **{column.name: getattr(source, column.name) for column in Source.__table__.columns},
-        chunk_count=len(source.chunks),
-        decision_count=len(source.decisions),
+        version_count=len(source.versions),
+        chunk_count=sum(
+            chunk.source_version_id == source.current_version_id for chunk in source.chunks
+        ),
+        decision_count=sum(
+            decision.source_version_id == source.current_version_id for decision in source.decisions
+        ),
     )
 
 
@@ -30,14 +44,29 @@ def decision_to_read(decision: Decision, source_title: str | None = None) -> Dec
 
 @router.get("/overview", response_model=Overview)
 def overview(session: Session = Depends(get_session)) -> Overview:
-    def count(model) -> int:
-        return session.scalar(select(func.count()).select_from(model)) or 0
-
     return Overview(
-        sources=count(Source),
-        chunks=count(Chunk),
-        decisions=count(Decision),
-        evidence=count(Evidence),
+        sources=session.scalar(select(func.count()).select_from(Source)) or 0,
+        chunks=session.scalar(
+            select(func.count())
+            .select_from(Chunk)
+            .join(Source)
+            .where(Chunk.source_version_id == Source.current_version_id)
+        )
+        or 0,
+        decisions=session.scalar(
+            select(func.count())
+            .select_from(Decision)
+            .join(Source)
+            .where(Decision.source_version_id == Source.current_version_id)
+        )
+        or 0,
+        evidence=session.scalar(
+            select(func.count())
+            .select_from(Evidence)
+            .join(Source)
+            .where(Evidence.source_version_id == Source.current_version_id)
+        )
+        or 0,
     )
 
 
@@ -45,13 +74,20 @@ def overview(session: Session = Depends(get_session)) -> Overview:
 def create_source(
     payload: SourceCreate, response: Response, session: Session = Depends(get_session)
 ) -> SourceRead:
-    source, created = ingest_source(session, payload)
+    try:
+        source, created = ingest_source(session, payload)
+    except IngestionConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not created:
         response.status_code = status.HTTP_200_OK
     hydrated = session.scalar(
         select(Source)
         .where(Source.id == source.id)
-        .options(selectinload(Source.chunks), selectinload(Source.decisions))
+        .options(
+            selectinload(Source.versions),
+            selectinload(Source.chunks),
+            selectinload(Source.decisions),
+        )
     )
     return source_to_read(hydrated)
 
@@ -60,7 +96,11 @@ def create_source(
 def list_sources(session: Session = Depends(get_session)) -> list[SourceRead]:
     sources = session.scalars(
         select(Source)
-        .options(selectinload(Source.chunks), selectinload(Source.decisions))
+        .options(
+            selectinload(Source.versions),
+            selectinload(Source.chunks),
+            selectinload(Source.decisions),
+        )
         .order_by(Source.indexed_at.desc())
     ).all()
     return [source_to_read(source) for source in sources]
@@ -80,7 +120,40 @@ def get_source(source_id: str, session: Session = Depends(get_session)) -> dict:
         "status": source.status,
         "created_at": source.created_at,
         "indexed_at": source.indexed_at,
+        "current_version_id": source.current_version_id,
     }
+
+
+@router.get("/sources/{source_id}/versions", response_model=list[SourceVersionRead])
+def list_source_versions(
+    source_id: str, session: Session = Depends(get_session)
+) -> list[SourceVersion]:
+    if not session.get(Source, source_id):
+        raise HTTPException(status_code=404, detail="Source not found")
+    return list(
+        session.scalars(
+            select(SourceVersion)
+            .where(SourceVersion.source_id == source_id)
+            .order_by(SourceVersion.created_at.desc())
+        ).all()
+    )
+
+
+@router.get(
+    "/sources/{source_id}/versions/{version_id}",
+    response_model=SourceVersionContentRead,
+)
+def get_source_version(
+    source_id: str, version_id: str, session: Session = Depends(get_session)
+) -> SourceVersion:
+    version = session.scalar(
+        select(SourceVersion).where(
+            SourceVersion.id == version_id, SourceVersion.source_id == source_id
+        )
+    )
+    if not version:
+        raise HTTPException(status_code=404, detail="Source version not found")
+    return version
 
 
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -100,6 +173,7 @@ def list_decisions(
     query = (
         select(Decision, Source.title)
         .join(Source)
+        .where(Decision.source_version_id == Source.current_version_id)
         .options(selectinload(Decision.evidence))
         .order_by(Decision.created_at.desc())
     )
@@ -134,12 +208,14 @@ def search(
     rows = session.execute(
         text(
             """
-            SELECT c.id, c.source_id, s.title, c.content, c.start_offset, c.end_offset,
-                   c.start_line, c.end_line, bm25(chunk_search) AS rank
+            SELECT c.id, c.source_id, c.source_version_id, s.title, c.content,
+                   c.start_offset, c.end_offset, c.start_line, c.end_line,
+                   bm25(chunk_search) AS rank
             FROM chunk_search
             JOIN chunks c ON c.id = chunk_search.chunk_id
             JOIN sources s ON s.id = c.source_id
             WHERE chunk_search MATCH :query
+              AND c.source_version_id = s.current_version_id
             ORDER BY rank
             LIMIT :limit
             """
@@ -150,13 +226,14 @@ def search(
         SearchHit(
             chunk_id=row[0],
             source_id=row[1],
-            source_title=row[2],
-            content=row[3],
-            start_offset=row[4],
-            end_offset=row[5],
-            start_line=row[6],
-            end_line=row[7],
-            rank=row[8],
+            source_version_id=row[2],
+            source_title=row[3],
+            content=row[4],
+            start_offset=row[5],
+            end_offset=row[6],
+            start_line=row[7],
+            end_line=row[8],
+            rank=row[9],
         )
         for row in rows
     ]

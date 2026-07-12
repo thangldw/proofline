@@ -32,10 +32,11 @@ The initial executable slice deliberately excludes LLM generation:
 
 1. ingest a Markdown source;
 2. preserve its content hash and source locations;
-3. split it into deterministic, addressable evidence chunks;
-4. extract explicitly marked English/Vietnamese decisions without an AI model;
-5. index the chunks locally with SQLite FTS5;
-6. search, browse decisions, and inspect exact evidence in the web UI.
+3. preserve immutable versions when the same source URI changes;
+4. split it into deterministic, addressable evidence chunks;
+5. extract explicitly marked English/Vietnamese decisions without an AI model;
+6. index the current version locally with SQLite FTS5;
+7. search, browse decisions, and inspect exact historical evidence in the web UI.
 
 This establishes the evidence contract that decision extraction, hybrid
 retrieval, and grounded answers will build on.
