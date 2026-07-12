@@ -166,7 +166,10 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 ### Planned work
 
 - Complete end-to-end tests and supported-platform smoke tests.
-- Add export, backup guidance, recovery exercises, and a complete deletion test.
+- Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
+  local SQLite:** portable export/verification, online full backup/read-only verification, recovery
+  provenance exercise, documented retention limits, and cascade deletion coverage. Portable import
+  remains outside the implemented contract.
 - Run a lightweight security review of local API, path handling, dependency surface, egress,
   logging, and imported content rendering.
 - Add contributor templates, code of conduct decision, security reporting process, and release

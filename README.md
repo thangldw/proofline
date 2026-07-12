@@ -154,6 +154,25 @@ make check
 make eval
 ```
 
+### Data portability and recovery
+
+Proofline can write an inspectable portable JSON snapshot or a complete local
+SQLite backup. Always verify the artifact after creating it:
+
+```bash
+.venv/bin/proofline export --output proofline-export.json
+.venv/bin/proofline verify-export proofline-export.json
+
+.venv/bin/proofline backup --output proofline-backup.db
+.venv/bin/proofline verify-backup proofline-backup.db
+```
+
+Portable import is not implemented, so the JSON artifact is not a restorable
+backup. The SQLite backup contains all local data, including sensitive source
+contents and private staged retry inputs. See the
+[backup and recovery guide](docs/backup-recovery.md) before storing or restoring
+either artifact.
+
 Folder access is disabled unless roots are explicitly registered. Use the operating-system path
 separator (`:` on Unix-like systems, `;` on Windows), restart the API, then request a scan:
 
