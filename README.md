@@ -12,6 +12,16 @@ as an unstructured collection of vector chunks.
 > Project status: pre-alpha. The first runnable vertical slice is implemented,
 > but it is not ready for production data.
 
+![Proofline architecture: sources flow through ingestion, immutable versions, hybrid retrieval, grounded answers, and human review](docs/images/proofline-architecture.png)
+
+## How Proofline works
+
+Proofline treats provenance as part of the data model, not a decoration added
+after generation. Sources are versioned immutably, retrieval returns exact
+spans, and generated output can only cite evidence IDs issued by the server.
+
+![Proofline evidence-first trust model: exact source spans become facts, synthesis, inference, or insufficient evidence while unknown citations are rejected](docs/images/proofline-evidence-first.png)
+
 ## Product principles
 
 - **Evidence first:** derived information must remain traceable to an exact
@@ -55,6 +65,31 @@ review, records its model run, and is idempotent within an immutable source vers
 The answer endpoint builds a bounded lexical evidence pack and lets the model reference only
 server-issued evidence IDs. Proofline resolves citations itself and verifies every quoted span
 against the immutable source version; unknown, missing, or corrupted evidence fails closed.
+
+## Product screens
+
+### Evidence-backed search
+
+Search returns inspectable source spans even when no generation provider is
+configured. When a provider is available, it receives only the bounded evidence
+pack and can cite only server-issued evidence IDs.
+
+![Proofline search showing an evidence-backed answer and exact retrieval matches](docs/images/proofline-screen-search.jpg)
+
+### Decision registry
+
+Deterministically extracted and AI-proposed decisions share one review surface.
+Each decision exposes its confidence, extraction method, lifecycle controls, and
+the exact lines that support it.
+
+![Proofline decision registry with candidate, accepted, and active technical decisions](docs/images/proofline-screen-decisions.jpg)
+
+### Source inventory
+
+The source inventory makes indexing observable: detected sources, searchable
+chunks, extracted decisions, source type, and per-source actions remain visible.
+
+![Proofline source inventory showing indexing coverage and extracted objects](docs/images/proofline-screen-sources.jpg)
 
 ## Repository layout
 
