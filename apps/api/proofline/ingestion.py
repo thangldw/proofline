@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import func, text, update
+from sqlalchemy import func, select, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -12,6 +14,7 @@ from .models import (
     Decision,
     Evidence,
     IngestionJob,
+    IngestionJobInput,
     Source,
     SourceVersion,
     new_id,
@@ -44,11 +47,42 @@ class SourceDeletionImpact:
 class IngestionConflict(ValueError):
     """Raised when a stable source identity cannot be resolved safely."""
 
+    def __init__(self, message: str, job_id: str | None = None) -> None:
+        self.job_id = job_id
+        super().__init__(message)
+
 
 class IngestionExecutionError(RuntimeError):
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
         super().__init__(f"ingestion job {job_id} failed")
+
+
+class IngestionJobNotFound(LookupError):
+    pass
+
+
+class IngestionRetryConflict(RuntimeError):
+    def __init__(self, job_id: str, reason: str) -> None:
+        self.job_id = job_id
+        self.reason = reason
+        super().__init__(reason)
+
+
+class IngestionIdempotencyConflict(IngestionConflict):
+    def __init__(self, job_id: str, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason, job_id=job_id)
+
+
+SAFE_ERROR_DETAILS = {
+    "source_identity_conflict": "source identity conflicts with existing records",
+    "ingestion_error": "ingestion failed during deterministic processing",
+    "ingestion_interrupted": "ingestion was interrupted before reaching a terminal state",
+    "ingestion_input_missing": "staged ingestion input is unavailable",
+    "ingestion_input_invalid": "staged ingestion input failed integrity validation",
+}
+DEFAULT_MAX_ATTEMPTS = 3
 
 
 DECISION_PREFIX = re.compile(
@@ -207,7 +241,9 @@ def _index_version(session: Session, source: Source, version: SourceVersion, con
         )
 
 
-def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool]:
+def ingest_source(
+    session: Session, payload: SourceCreate, *, commit: bool = True
+) -> tuple[Source, bool]:
     digest = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
     source = None
     if payload.uri:
@@ -271,48 +307,289 @@ def ingest_source(session: Session, payload: SourceCreate) -> tuple[Source, bool
     source.current_version_id = version.id
     _index_version(session, source, version, payload.content)
 
-    session.commit()
-    session.refresh(source)
+    if commit:
+        session.commit()
+        session.refresh(source)
     return source, created
 
 
-def run_ingestion_job(session: Session, payload: SourceCreate) -> tuple[Source, bool, IngestionJob]:
-    """Run synchronous ingestion while persisting terminal success or failure."""
-    job = IngestionJob(state="running", stage="accepted", attempts=1, retryable=False)
+def ingestion_request_hash(payload: SourceCreate) -> tuple[str, str]:
+    content_hash = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
+    canonical = json.dumps(
+        {
+            "content_hash": content_hash,
+            "kind": payload.kind,
+            "title": payload.title,
+            "uri": payload.uri,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest(), content_hash
+
+
+def _existing_idempotent_result(
+    session: Session,
+    idempotency_key: str,
+    request_hash: str,
+) -> tuple[Source, bool, IngestionJob]:
+    job = session.scalar(
+        select(IngestionJob).where(IngestionJob.idempotency_key == idempotency_key)
+    )
+    if not job:
+        raise IngestionIdempotencyConflict("unknown", "idempotency key could not be resolved")
+    if job.request_hash != request_hash:
+        raise IngestionIdempotencyConflict(
+            job.id, "idempotency key was already used for a different request"
+        )
+    if job.state != "succeeded" or not job.source_id:
+        raise IngestionIdempotencyConflict(
+            job.id, "idempotent request has no reusable succeeded result; inspect or retry its job"
+        )
+    source = session.get(Source, job.source_id)
+    if not source:
+        raise IngestionIdempotencyConflict(
+            job.id, "idempotent request result is no longer available"
+        )
+    return source, False, job
+
+
+def _stage_ingestion_job(
+    session: Session,
+    payload: SourceCreate,
+    *,
+    idempotency_key: str | None,
+    max_attempts: int,
+) -> tuple[IngestionJob, bool]:
+    request_hash, content_hash = ingestion_request_hash(payload)
+    normalized_key = idempotency_key.strip() if idempotency_key else None
+    if normalized_key:
+        existing = session.scalar(
+            select(IngestionJob).where(IngestionJob.idempotency_key == normalized_key)
+        )
+        if existing:
+            _existing_idempotent_result(session, normalized_key, request_hash)
+            return existing, True
+    now = utc_now()
+    job = IngestionJob(
+        state="running",
+        stage="accepted",
+        attempts=1,
+        request_hash=request_hash,
+        idempotency_key=normalized_key,
+        max_attempts=max_attempts,
+        retryable=False,
+        started_at=now,
+        updated_at=now,
+    )
     session.add(job)
-    session.commit()
-    job_id = job.id
+    session.flush()
+    session.add(
+        IngestionJobInput(
+            job_id=job.id,
+            title=payload.title,
+            kind=payload.kind,
+            uri=payload.uri,
+            content=payload.content,
+            content_hash=content_hash,
+        )
+    )
     try:
-        job.stage = "indexing"
         session.commit()
-        source, created = ingest_source(session, payload)
-    except Exception as exc:
+    except IntegrityError:
         session.rollback()
-        failed_job = session.get(IngestionJob, job_id)
-        failed_job.state = "failed"
-        failed_job.stage = "failed"
-        failed_job.error_code = (
+        if normalized_key:
+            _existing_idempotent_result(session, normalized_key, request_hash)
+            existing = session.scalar(
+                select(IngestionJob).where(IngestionJob.idempotency_key == normalized_key)
+            )
+            return existing, True
+        raise
+    return job, False
+
+
+def _record_ingestion_failure(
+    session: Session,
+    job_id: str,
+    error_code: str,
+    *,
+    force_dead_letter: bool = False,
+    permanent: bool = False,
+) -> IngestionJob:
+    session.rollback()
+    job = session.get(IngestionJob, job_id)
+    if not job:
+        raise IngestionJobNotFound(job_id)
+    staged_input = session.get(IngestionJobInput, job_id)
+    exhausted = (
+        force_dead_letter or permanent or job.attempts >= job.max_attempts or staged_input is None
+    )
+    job.state = "dead_letter" if exhausted else "failed"
+    job.error_code = "ingestion_input_missing" if staged_input is None else error_code
+    job.error_detail = SAFE_ERROR_DETAILS[job.error_code]
+    job.retryable = not exhausted
+    job.finished_at = utc_now()
+    job.updated_at = job.finished_at
+    if exhausted and staged_input is not None:
+        session.delete(staged_input)
+    session.commit()
+    return job
+
+
+def _execute_staged_ingestion(session: Session, job_id: str) -> tuple[Source, bool, IngestionJob]:
+    job = session.get(IngestionJob, job_id)
+    staged_input = session.get(IngestionJobInput, job_id)
+    if not job:
+        raise IngestionJobNotFound(job_id)
+    if not staged_input:
+        _record_ingestion_failure(session, job_id, "ingestion_input_missing")
+        raise IngestionRetryConflict(job_id, "staged ingestion input is unavailable")
+    staged_content_hash = hashlib.sha256(staged_input.content.encode("utf-8")).hexdigest()
+    if staged_content_hash != staged_input.content_hash:
+        _record_ingestion_failure(
+            session,
+            job_id,
+            "ingestion_input_invalid",
+            force_dead_letter=True,
+        )
+        raise IngestionRetryConflict(job_id, "staged ingestion input failed integrity validation")
+
+    job.stage = "indexing"
+    job.updated_at = utc_now()
+    session.commit()
+    try:
+        payload = SourceCreate(
+            title=staged_input.title,
+            kind=staged_input.kind,
+            uri=staged_input.uri,
+            content=staged_input.content,
+        )
+        source, created = ingest_source(session, payload, commit=False)
+        job = session.get(IngestionJob, job_id)
+        staged_input = session.get(IngestionJobInput, job_id)
+        job.source_id = source.id
+        job.source_version_id = source.current_version_id
+        job.state = "succeeded"
+        job.stage = "ready"
+        job.retryable = False
+        job.error_code = None
+        job.error_detail = None
+        job.finished_at = utc_now()
+        job.updated_at = job.finished_at
+        session.delete(staged_input)
+        session.commit()
+    except Exception as exc:
+        error_code = (
             "source_identity_conflict" if isinstance(exc, IngestionConflict) else "ingestion_error"
         )
-        failed_job.error_detail = (
-            str(exc)
-            if isinstance(exc, IngestionConflict)
-            else f"ingestion failed with {type(exc).__name__}"
+        _record_ingestion_failure(
+            session,
+            job_id,
+            error_code,
+            permanent=isinstance(exc, IngestionConflict),
         )
-        failed_job.updated_at = utc_now()
-        session.commit()
         if isinstance(exc, IngestionConflict):
-            raise
+            raise IngestionConflict(
+                SAFE_ERROR_DETAILS["source_identity_conflict"], job_id=job_id
+            ) from exc
         raise IngestionExecutionError(job_id) from exc
+    session.refresh(source)
+    session.refresh(job)
+    return source, created, job
 
-    succeeded_job = session.get(IngestionJob, job_id)
-    succeeded_job.source_id = source.id
-    succeeded_job.source_version_id = source.current_version_id
-    succeeded_job.state = "succeeded"
-    succeeded_job.stage = "ready"
-    succeeded_job.updated_at = utc_now()
+
+def run_ingestion_job(
+    session: Session,
+    payload: SourceCreate,
+    *,
+    idempotency_key: str | None = None,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+) -> tuple[Source, bool, IngestionJob]:
+    """Stage input, then atomically commit domain writes with terminal job success."""
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least one")
+    request_hash, _content_hash = ingestion_request_hash(payload)
+    normalized_key = idempotency_key.strip() if idempotency_key else None
+    if normalized_key:
+        existing = session.scalar(
+            select(IngestionJob).where(IngestionJob.idempotency_key == normalized_key)
+        )
+        if existing:
+            return _existing_idempotent_result(session, normalized_key, request_hash)
+    job, reused = _stage_ingestion_job(
+        session,
+        payload,
+        idempotency_key=normalized_key,
+        max_attempts=max_attempts,
+    )
+    if reused:
+        return _existing_idempotent_result(session, normalized_key, request_hash)
+    return _execute_staged_ingestion(session, job.id)
+
+
+def retry_ingestion_job(session: Session, job_id: str) -> IngestionJob:
+    job = session.get(IngestionJob, job_id)
+    if not job:
+        raise IngestionJobNotFound(job_id)
+    expected_attempts = job.attempts
+    now = utc_now()
+    claimed = session.execute(
+        update(IngestionJob)
+        .where(
+            IngestionJob.id == job_id,
+            IngestionJob.state == "failed",
+            IngestionJob.retryable.is_(True),
+            IngestionJob.attempts == expected_attempts,
+            IngestionJob.attempts < IngestionJob.max_attempts,
+        )
+        .values(
+            state="running",
+            stage="accepted",
+            attempts=expected_attempts + 1,
+            retryable=False,
+            error_code=None,
+            error_detail=None,
+            started_at=now,
+            finished_at=None,
+            updated_at=now,
+        )
+    )
+    if claimed.rowcount != 1:
+        session.rollback()
+        raise IngestionRetryConflict(job_id, "ingestion job is not claimable for retry")
     session.commit()
-    return source, created, succeeded_job
+    _source, _created, completed_job = _execute_staged_ingestion(session, job_id)
+    return completed_job
+
+
+def recover_orphaned_ingestion_jobs(session: Session) -> int:
+    jobs = list(session.scalars(select(IngestionJob).where(IngestionJob.state == "running")).all())
+    for job in jobs:
+        staged_input = session.get(IngestionJobInput, job.id)
+        exhausted = job.attempts >= job.max_attempts or staged_input is None
+        input_invalid = (
+            staged_input is not None
+            and hashlib.sha256(staged_input.content.encode("utf-8")).hexdigest()
+            != staged_input.content_hash
+        )
+        job.error_code = (
+            "ingestion_input_missing"
+            if staged_input is None
+            else "ingestion_input_invalid"
+            if input_invalid
+            else "ingestion_interrupted"
+        )
+        exhausted = exhausted or input_invalid
+        job.state = "dead_letter" if exhausted else "failed"
+        job.retryable = not exhausted
+        job.error_detail = SAFE_ERROR_DETAILS[job.error_code]
+        job.finished_at = utc_now()
+        job.updated_at = job.finished_at
+        if exhausted and staged_input is not None:
+            session.delete(staged_input)
+    session.commit()
+    return len(jobs)
 
 
 def source_deletion_impact(session: Session, source: Source) -> SourceDeletionImpact:

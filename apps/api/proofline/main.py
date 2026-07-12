@@ -5,16 +5,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from .api import router
 from .config import get_settings
 from .database import engine, initialize_database
+from .ingestion import recover_orphaned_ingestion_jobs
 
 
 def create_app(database_engine: Engine = engine) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         initialize_database(database_engine)
+        with Session(database_engine) as recovery_session:
+            recover_orphaned_ingestion_jobs(recovery_session)
         yield
 
     application = FastAPI(
