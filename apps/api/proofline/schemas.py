@@ -140,3 +140,33 @@ class AuditEventRead(BaseModel):
     before_json: dict
     after_json: dict
     created_at: datetime
+
+
+class ProviderStatus(BaseModel):
+    configured: bool
+    provider_id: str | None = None
+    model_id: str | None = None
+    generation: bool = False
+    structured_output: bool = False
+    remote_egress_allowed: bool = False
+    healthy: bool | None = None
+    error_code: str | None = None
+
+
+class ModelRunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    provider_id: str
+    model_id: str
+    operation: str
+    template_version: str
+    input_hashes: list[str]
+    status: str
+    validation_status: str | None
+    latency_ms: int | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    error_code: str | None
+    created_at: datetime
+    finished_at: datetime | None

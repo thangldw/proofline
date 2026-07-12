@@ -86,8 +86,8 @@ Before delivery work, record:
 
 ### Planned work
 
-- Implement fake, OpenAI-compatible, and local-runtime adapters.
-- Add explicit remote-egress configuration and secret-safe diagnostics.
+- Harden the implemented fake/OpenAI-compatible gateway across selected remote and local runtimes.
+- Extend the implemented explicit remote-egress configuration and secret-safe diagnostics.
 - Version extraction prompts and output schemas.
 - Add validation, bounded repair retries, confidence metadata, and dead-letter inspection.
 - Extend the implemented decision review actions and append-only audit trail into an

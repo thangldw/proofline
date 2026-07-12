@@ -139,3 +139,22 @@ class AuditEvent(Base):
     before_json: Mapped[dict] = mapped_column(JSON)
     after_json: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
+class ModelRun(Base):
+    __tablename__ = "model_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    provider_id: Mapped[str] = mapped_column(String(100))
+    model_id: Mapped[str] = mapped_column(String(200))
+    operation: Mapped[str] = mapped_column(String(50))
+    template_version: Mapped[str] = mapped_column(String(80))
+    input_hashes: Mapped[list[str]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    validation_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)

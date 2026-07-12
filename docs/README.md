@@ -43,8 +43,10 @@ As of 2026-07-12:
 - Also implemented: immutable source-version history and versioned SQLite migrations.
 - Also implemented: persisted terminal status for synchronous ingestion jobs.
 - Also implemented: governed decision updates and append-only before/after audit events.
-- Not yet implemented: resumable/retryable job execution, model
-  providers, embeddings/hybrid retrieval, AI-derived decision review, grounded answer
+- Also implemented: provider-neutral generation gateway, fake/OpenAI-compatible adapters,
+  explicit remote egress, structured-output validation, and persisted model-run diagnostics.
+- Not yet implemented: resumable/retryable job execution, embeddings/hybrid retrieval,
+  AI-derived decision review, grounded answer
   generation, desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

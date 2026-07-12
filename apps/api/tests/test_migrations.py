@@ -16,7 +16,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == [1, 2, 3, 4]
+    assert versions == [1, 2, 3, 4, 5]
     assert {
         "sources",
         "source_versions",
@@ -25,6 +25,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "evidence",
         "ingestion_jobs",
         "audit_events",
+        "model_runs",
     } <= tables
     engine.dispose()
 

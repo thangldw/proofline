@@ -110,25 +110,30 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 No graph database is planned for the MVP. Typed relations are represented as adjacency rows
 and queried through the domain repository.
 
-### 6. Model gateway — planned
+### 6. Model gateway — implemented foundation
 
-All model calls pass through capability-based interfaces:
+The provider-neutral generation interface, deterministic fake provider, OpenAI-compatible
+adapter, structured-output validation, explicit remote-egress gate, provider status API, and
+persisted secret-safe model-run diagnostics are implemented. OpenAI-compatible endpoints cover
+Qwen, DeepSeek, Ollama, vLLM, and similar providers when their selected model implements the
+required chat and structured-output behavior. All model calls pass through capability-based
+interfaces:
 
 ```python
 class GenerationProvider(Protocol):
     @property
     def id(self) -> str: ...
-    async def capabilities(self) -> ModelCapabilities: ...
-    async def generate(self, request: GenerateRequest) -> GenerateResult: ...
+    def capabilities(self) -> ModelCapabilities: ...
+    def generate(self, request: GenerateRequest) -> GenerateResult: ...
 
 class EmbeddingProvider(Protocol):
     @property
     def id(self) -> str: ...
-    async def dimensions(self, model: str) -> int: ...
-    async def embed(self, request: EmbedRequest) -> EmbeddingResult: ...
+    def dimensions(self, model: str) -> int: ...
+    def embed(self, request: EmbedRequest) -> EmbeddingResult: ...
 ```
 
-Provider adapters normalize OpenAI-compatible remote endpoints and a local runtime endpoint.
+Provider adapters normalize OpenAI-compatible remote endpoints and local runtime endpoints.
 Domain code requests a capability, not a vendor. Persisted model runs record provider, model,
 prompt/template version, input content hashes, latency, token counts when available, and
 validation outcome. Secrets must never be written to logs or model-run records.
@@ -158,8 +163,8 @@ then return a qualified failure rather than ungrounded prose.
 
 The names below describe the target MVP. Current SQLAlchemy models and SQLite setup in `apps/api`
 remain the source of truth for implemented records. `Source`, `Chunk`, `Decision`, and `Evidence`
-exist now; `SourceVersion`, generalized `MemoryObject`, `Relation`, `ModelRun`, `Job`, and
-`AuditEvent` are planned.
+exist now; `SourceVersion`, `ModelRun`, and `AuditEvent` are also implemented. Generalized
+`MemoryObject`, `Relation`, and resumable `Job` execution remain planned.
 
 ```text
 Workspace
