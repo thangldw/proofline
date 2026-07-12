@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from . import __version__
 from .api import router
 from .config import get_settings
 from .database import engine, initialize_database
@@ -23,7 +24,7 @@ def create_app(database_engine: Engine = engine) -> FastAPI:
 
     application = FastAPI(
         title="Proofline API",
-        version="0.1.0",
+        version=__version__,
         description="Evidence-first engineering decision memory",
         lifespan=lifespan,
     )

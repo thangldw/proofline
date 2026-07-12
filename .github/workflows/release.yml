@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require tag commit on main
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Scan tagged source for credentials
+        uses: trufflesecurity/trufflehog@v3.93.6
+        with:
+          base: ""
+          head: ${{ github.sha }}
+          extra_args: --results=verified,unknown --fail-on-scan-errors
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Verify release metadata
+        run: python scripts/release_check.py --tag "$GITHUB_REF_NAME"
+
+      - name: Run release gates
+        run: |
+          make test
+          make check
+          npm run test:e2e
+
+      - name: Build release assets
+        run: |
+          python -m build --outdir release-dist
+          npm run build:web
+          tar -czf "release-dist/proofline-web-${GITHUB_REF_NAME}.tar.gz" -C apps/web/dist .
+          cd release-dist
+          sha256sum proofline-* > SHA256SUMS
+
+      - name: Smoke test clean wheel install
+        run: |
+          python -m venv /tmp/proofline-release-smoke
+          /tmp/proofline-release-smoke/bin/pip install release-dist/*.whl
+          /tmp/proofline-release-smoke/bin/proofline --version
+          PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-release-smoke.db \
+            /tmp/proofline-release-smoke/bin/proofline seed
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "proofline-${{ github.ref_name }}"
+          path: |
+            release-dist/*
+            docs/releases/${{ github.ref_name }}.md
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: "proofline-${{ github.ref_name }}"
+          path: release-bundle
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file "release-bundle/docs/releases/$GITHUB_REF_NAME.md")
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" release-bundle/release-dist/* "${args[@]}"

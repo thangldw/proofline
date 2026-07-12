@@ -9,13 +9,14 @@ calibration are documented in [the security threat model](docs/security-threat-m
 
 ## Supported versions
 
-Proofline has not published a supported release. Security fixes currently target
-the default branch only; there are no maintenance or backport commitments.
+Proofline publishes experimental pre-releases. Security fixes target the default branch and the
+latest pre-release on a best-effort basis; there are no maintenance or backport commitments.
 
 | Version | Support status |
 | --- | --- |
 | Default branch | Best-effort pre-alpha fixes |
-| Tags and local forks | Not supported |
+| `v0.1.0-alpha.1` | Best effort until the next pre-release |
+| Older tags and local forks | Not supported |
 
 ## Report a vulnerability privately
 

@@ -185,9 +185,18 @@ cover Unicode lexical retrieval plus initial/current revisions and expected-empt
 The deterministic extraction gate covers all four memory kinds and exact evidence/hash resolution.
 Both are regression contracts only; they do not establish real-model or pilot quality.
 
-Remaining release gates include real-model and external-pilot evidence, a repository security-
-plugin scan, reranking, scalable vector indexing, Windows verification, and production
-qualification.
+Remaining beta/production qualification gates include real-model and external-pilot evidence, a
+repository security-plugin scan, reranking, scalable vector indexing, Windows verification, and
+production qualification. They do not block an explicitly experimental pre-alpha tag.
+
+## Releases
+
+`v0.1.0-alpha.1` is the first experimental pre-release. Release assets include the local API/CLI
+wheel and source distribution plus an optimized, unhosted web archive for integrators. The web
+archive is not a standalone server: deploy it behind a same-origin reverse proxy that forwards
+`/api` and `/health` to the loopback-bound Proofline API, or use the proven two-process development
+workflow above. See the [release notes](docs/releases/v0.1.0-alpha.1.md) and verify `SHA256SUMS`
+before installation.
 
 ### Data portability and recovery
 

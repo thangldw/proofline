@@ -2,10 +2,14 @@
 
 Notable user-visible and operator-visible changes will be recorded in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Proofline is pre-alpha, has no supported release, and does not yet promise
-semantic-versioning compatibility.
+Proofline is pre-alpha, has no stable supported release, and does not yet promise
+semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
+
+No changes have been recorded after `v0.1.0-alpha.1`.
+
+## [0.1.0-alpha.1] - 2026-07-13
 
 ### Added
 
@@ -35,8 +39,8 @@ semantic-versioning compatibility.
 - Credential-free deterministic extraction and retrieval v2 regression gates. Retrieval v2 covers
   26 Unicode and current/superseded-revision queries; neither gate is real-model or pilot evidence.
 - A Chromium vertical-path E2E test for provenance navigation, governed correction, deletion,
-  hostile-content inertness, and non-loopback egress detection. Its hosted workflow is configured,
-  not claimed as successfully run.
+  hostile-content inertness, and non-loopback egress detection. The versioned CI receipt records
+  its successful hosted run at revision `0dde53f`.
 
 ### Changed
 
@@ -62,6 +66,8 @@ semantic-versioning compatibility.
   a repository security-plugin scan, real-model quality qualification, and external pilot gates
   are still open.
 
-When preparing the first tagged alpha, review these entries and link their pull
-requests or issues. Every entry must describe observable behavior; planned
-behavior must not appear as shipped.
+Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
+and keep planned behavior out of shipped release notes.
+
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.1
