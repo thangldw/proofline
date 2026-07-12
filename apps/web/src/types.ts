@@ -1,4 +1,4 @@
-export type Overview = { sources: number; chunks: number; decisions: number; evidence: number };
+export type Overview = { sources: number; chunks: number; decisions: number; memories: number; evidence: number };
 
 export type Source = {
   id: string;
@@ -12,6 +12,7 @@ export type Source = {
   version_count: number;
   chunk_count: number;
   decision_count: number;
+  memory_count: number;
 };
 
 export type SourceDeletionImpact = {
@@ -22,6 +23,7 @@ export type SourceDeletionImpact = {
   chunks: number;
   embeddings: number;
   decisions: number;
+  memories: number;
   evidence: number;
   ingestion_jobs_to_detach: number;
   audit_events_to_delete: number;
@@ -59,21 +61,29 @@ export type Evidence = {
   end_line: number;
 };
 
-export type Decision = {
+export type MemoryKind = "decision" | "assumption" | "constraint" | "alternative";
+
+export type Memory = {
   id: string;
   source_id: string;
   source_version_id: string;
   source_title: string;
+  kind: MemoryKind;
   title: string;
   statement: string;
   rationale: string | null;
   status: string;
   confidence: number;
   extraction_method: string;
+  model_run_id: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
   created_at: string;
   updated_at: string;
   evidence: Evidence[];
 };
+
+export type Decision = Memory;
 
 export type SearchHit = {
   chunk_id: string;

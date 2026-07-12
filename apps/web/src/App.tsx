@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, Database, FileSearch, GitBranch, Search, Upload, X } from "lucide-react";
 import { api } from "./api";
-import type { Decision, Evidence, GroundedAnswer, IngestionJob, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
+import type { Evidence, GroundedAnswer, IngestionJob, Memory, MemoryKind, Overview, SearchHit, Source, SourceDeletionImpact } from "./types";
 
-type View = "search" | "decisions" | "sources";
+type View = "search" | "memories" | "sources";
 
 type DeletionState = {
   source: Source;
@@ -15,9 +15,9 @@ type DeletionState = {
 
 export function App() {
   const [view, setView] = useState<View>("search");
-  const [overview, setOverview] = useState<Overview>({ sources: 0, chunks: 0, decisions: 0, evidence: 0 });
+  const [overview, setOverview] = useState<Overview>({ sources: 0, chunks: 0, decisions: 0, memories: 0, evidence: 0 });
   const [sources, setSources] = useState<Source[]>([]);
-  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [evidence, setEvidence] = useState<{ item: Evidence; sourceTitle: string } | null>(null);
   const [importing, setImporting] = useState(false);
@@ -25,10 +25,10 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextDecisions, nextJobs] = await Promise.all([
-        api.overview(), api.sources(), api.decisions(), api.jobs(),
+      const [nextOverview, nextSources, nextMemories, nextJobs] = await Promise.all([
+        api.overview(), api.sources(), api.memories(), api.jobs(),
       ]);
-      setOverview(nextOverview); setSources(nextSources); setDecisions(nextDecisions); setJobs(nextJobs); setError("");
+      setOverview(nextOverview); setSources(nextSources); setMemories(nextMemories); setJobs(nextJobs); setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Cannot reach Proofline API"); }
   }, []);
 
@@ -36,7 +36,7 @@ export function App() {
 
   async function importFile(file: File) {
     setImporting(true);
-    try { await api.importSource(file.name, await file.text(), `file://${file.name}`); await refresh(); setView("decisions"); }
+    try { await api.importSource(file.name, await file.text(), `file://${file.name}`); await refresh(); setView("memories"); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Import failed"); }
     finally { setImporting(false); }
   }
@@ -51,7 +51,7 @@ export function App() {
       <div className="workspace"><span>LOCAL WORKSPACE</span><strong>Engineering memory</strong></div>
       <nav aria-label="Primary navigation">
         <Nav icon={<Search size={18}/>} active={view === "search"} onClick={() => setView("search")}>Search</Nav>
-        <Nav icon={<GitBranch size={18}/>} active={view === "decisions"} onClick={() => setView("decisions")} count={overview.decisions}>Decisions</Nav>
+        <Nav icon={<GitBranch size={18}/>} active={view === "memories"} onClick={() => setView("memories")} count={overview.memories}>Memories</Nav>
         <Nav icon={<BookOpen size={18}/>} active={view === "sources"} onClick={() => setView("sources")} count={overview.sources}>Sources</Nav>
       </nav>
       <div className="system-status"><span className={error || indexDegraded ? "dot error-dot" : "dot"}/><div><strong>{error ? "API unavailable" : indexDegraded ? "Index degraded" : "Index ready"}</strong><span>{overview.chunks} searchable chunks</span></div></div>
@@ -64,9 +64,9 @@ export function App() {
       {view === "search" && (
         <SearchView onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}/>
       )}
-      {view === "decisions" && (
-        <DecisionView
-          decisions={decisions}
+      {view === "memories" && (
+        <MemoryView
+          memories={memories}
           onChanged={refresh}
           onEvidence={(item, sourceTitle) => setEvidence({item, sourceTitle})}
         />
@@ -188,10 +188,35 @@ function latestJobs(jobs: IngestionJob[]): IngestionJob[] {
   return orphan ? [...bySource.values(), orphan] : [...bySource.values()];
 }
 
-function DecisionView({decisions, onEvidence, onChanged}: {decisions: Decision[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
-  async function setStatus(id: string, status: "accepted" | "rejected" | "obsolete") { await api.updateDecision(id, {status}); await onChanged(); }
-  return <section className="content"><div className="section-heading"><div><span className="eyebrow">DECISION REGISTRY</span><h2>Recorded technical choices</h2></div><span className="mode-badge">{decisions.length} extracted</span></div>
-    {decisions.length === 0 ? <div className="empty-card">No decisions yet. Import a Markdown ADR containing a “Decision:” or “Quyết định:” section.</div> : <div className="decision-grid">{decisions.map(decision => <article className="decision-card" key={decision.id}><div className="decision-top"><span className={`status ${decision.status}`}>{decision.status}</span><span>{Math.round(decision.confidence * 100)}% · {decision.extraction_method}</span></div><h3>{decision.statement}</h3>{decision.rationale && <p>{decision.rationale}</p>}<div className="review-actions"><button onClick={() => void setStatus(decision.id, "accepted")}>Accept</button><button onClick={() => void setStatus(decision.id, "rejected")}>Reject</button><button onClick={() => void setStatus(decision.id, "obsolete")}>Mark obsolete</button></div><footer><span>{decision.source_title}</span>{decision.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, decision.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>)}</div>}
+const memoryKinds: MemoryKind[] = ["decision", "assumption", "constraint", "alternative"];
+const memoryStatuses = ["candidate", "active", "accepted", "rejected", "obsolete"] as const;
+type MemoryStatus = typeof memoryStatuses[number];
+
+export function MemoryView({memories, onEvidence, onChanged}: {memories: Memory[]; onEvidence: (item: Evidence, title: string) => void; onChanged: () => Promise<void>}) {
+  const [kindFilter, setKindFilter] = useState<MemoryKind | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<MemoryStatus | "all">("all");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
+  const filtered = memories.filter(memory =>
+    (kindFilter === "all" || memory.kind === kindFilter)
+    && (statusFilter === "all" || memory.status === statusFilter));
+  async function setStatus(memory: Memory, status: "accepted" | "rejected" | "obsolete") {
+    setReviewingId(memory.id);
+    setReviewErrors(current => ({ ...current, [memory.id]: "" }));
+    try {
+      await api.updateMemory(memory.id, { status });
+      await onChanged();
+    } catch (reason) {
+      setReviewErrors(current => ({
+        ...current,
+        [memory.id]: errorMessage(reason, "Memory review failed"),
+      }));
+    } finally {
+      setReviewingId(null);
+    }
+  }
+  return <section className="content"><div className="section-heading"><div><span className="eyebrow">MEMORY REGISTRY</span><h2>Reviewable engineering context</h2></div><span className="mode-badge">{filtered.length} of {memories.length}</span></div><div className="registry-filters"><fieldset><legend>Kind</legend><button aria-pressed={kindFilter === "all"} onClick={() => setKindFilter("all")}>All</button>{memoryKinds.map(kind => <button key={kind} aria-pressed={kindFilter === kind} onClick={() => setKindFilter(kind)}>{kind[0].toUpperCase() + kind.slice(1)}s</button>)}</fieldset><fieldset><legend>Status</legend><button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</button>{memoryStatuses.map(status => <button key={status} aria-pressed={statusFilter === status} onClick={() => setStatusFilter(status)}>{status}</button>)}</fieldset></div>
+    {filtered.length === 0 ? <div className="empty-card">No memories match these filters. Import an ADR or change the selected kind and status.</div> : <div className="decision-grid">{filtered.map(memory => <article className="decision-card memory-card" aria-label={`${memory.kind} memory: ${memory.statement}`} key={memory.id}><div className="decision-top"><span className="memory-labels"><span className={`memory-kind ${memory.kind}`} aria-label={`Memory kind: ${memory.kind}`}>{memory.kind}</span><span className={`status ${memory.status}`}>{memory.status}</span></span><span>{Math.round(memory.confidence * 100)}% · {memory.extraction_method}</span></div><h3>{memory.statement}</h3>{memory.rationale && <p>{memory.rationale}</p>}<div className="review-actions"><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "accepted")} aria-label={`Accept ${memory.kind}: ${memory.statement}`}>Accept</button><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "rejected")} aria-label={`Reject ${memory.kind}: ${memory.statement}`}>Reject</button><button disabled={reviewingId === memory.id} onClick={() => void setStatus(memory, "obsolete")} aria-label={`Mark obsolete ${memory.kind}: ${memory.statement}`}>Mark obsolete</button></div>{reviewErrors[memory.id] && <div className="action-error" role="alert">{reviewErrors[memory.id]}</div>}<footer><span>{memory.source_title}</span>{memory.evidence.map(item => <button key={item.id} onClick={() => onEvidence(item, memory.source_title)}>View proof · L{item.start_line}–{item.end_line}</button>)}</footer></article>)}</div>}
   </section>;
 }
 
@@ -213,12 +238,12 @@ export function SourcesView({sources, jobs, onChanged, onSourceDeleted}: {source
     setExtractingSourceId(sourceId);
     setExtractionErrors(current => ({ ...current, [sourceId]: "" }));
     try {
-      await api.extractDecisions(sourceId);
+      await api.extractMemories(sourceId);
       await onChanged();
     } catch (reason) {
       setExtractionErrors(current => ({
         ...current,
-        [sourceId]: errorMessage(reason, "AI extraction failed"),
+        [sourceId]: errorMessage(reason, "AI memory extraction failed"),
       }));
     } finally {
       setExtractingSourceId(null);
@@ -276,10 +301,10 @@ export function SourcesView({sources, jobs, onChanged, onSourceDeleted}: {source
         : current);
     }
   }
-  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.decision_count,0)} label="Decisions found"/></div>{orphanFailures.length > 0 && <section className="recent-failures" aria-labelledby="recent-ingestion-failures"><div className="section-heading"><div><span className="eyebrow">PIPELINE DIAGNOSTICS</span><h2 id="recent-ingestion-failures">Recent ingestion failures</h2></div><span className="mode-badge">{orphanFailures.length} orphaned</span></div><div className="failure-list">{orphanFailures.map(job => <article className={`failure-card ${job.state}`} key={job.id}><div className="failure-summary"><strong>Job {job.id.slice(0, 8)}</strong><span>{job.state} · {job.stage}</span></div><div className="failure-metadata"><span>Attempt {job.attempts}/{job.max_attempts}</span><span>Started {job.started_at ?? "not recorded"}</span><span>Finished {job.finished_at ?? "not recorded"}</span></div>{job.error_code && <code>{job.error_code}</code>}{job.error_detail && <p>{job.error_detail}</p>}{job.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion job ${job.id.slice(0, 8)}`}>{retryingJobId === job.id ? "Retrying…" : "Retry"}</button>}{retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}</article>)}</div></section>}<div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
+  return <section className="content"><div className="metrics"><Metric value={sources.length} label="Sources detected"/><Metric value={sources.reduce((n,s) => n+s.chunk_count,0)} label="Searchable chunks"/><Metric value={sources.reduce((n,s) => n+s.memory_count,0)} label="Memories found"/></div>{orphanFailures.length > 0 && <section className="recent-failures" aria-labelledby="recent-ingestion-failures"><div className="section-heading"><div><span className="eyebrow">PIPELINE DIAGNOSTICS</span><h2 id="recent-ingestion-failures">Recent ingestion failures</h2></div><span className="mode-badge">{orphanFailures.length} orphaned</span></div><div className="failure-list">{orphanFailures.map(job => <article className={`failure-card ${job.state}`} key={job.id}><div className="failure-summary"><strong>Job {job.id.slice(0, 8)}</strong><span>{job.state} · {job.stage}</span></div><div className="failure-metadata"><span>Attempt {job.attempts}/{job.max_attempts}</span><span>Started {job.started_at ?? "not recorded"}</span><span>Finished {job.finished_at ?? "not recorded"}</span></div>{job.error_code && <code>{job.error_code}</code>}{job.error_detail && <p>{job.error_detail}</p>}{job.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion job ${job.id.slice(0, 8)}`}>{retryingJobId === job.id ? "Retrying…" : "Retry"}</button>}{retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}</article>)}</div></section>}<div className="source-table source-diagnostics"><div className="table-row table-head"><span>Source</span><span>Type</span><span>Objects</span><span>Health</span><span>Actions</span></div>{sources.map(source => {
     const job = jobsBySource.get(source.id);
     const extractionError = extractionErrors[source.id];
-    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.decision_count} decisions</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts}/${job.max_attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions">{job?.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion for ${source.title}`}>{retryingJobId === job.id ? "Retrying…" : "Retry ingestion"}</button>}<button disabled={extractingSourceId === source.id || retryingJobId === job?.id} onClick={() => void extract(source.id)} aria-label={`Extract AI candidates from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI candidates"}</button><button className="danger-action" onClick={() => void openDeletion(source)} aria-label={`Delete ${source.title}`}>Delete</button>{job && retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
+    return <div className="table-row" key={source.id}><span><strong>{source.title}</strong><small>{source.uri ?? "Local import"}</small></span><span>{source.kind}</span><span>{source.chunk_count} chunks · {source.memory_count} memories</span><span className={`job-health ${job?.state ?? source.status}`}><strong>{job ? `${job.state} · ${job.stage}` : source.status}</strong><small>{job ? `Attempt ${job.attempts}/${job.max_attempts} · ${job.retryable ? "Retryable" : "Not retryable"}` : "No ingestion job recorded"}</small>{job?.error_code && <small className="job-error-code">{job.error_code}</small>}{job?.error_detail && <small className="job-error-detail">{job.error_detail}</small>}</span><span className="source-actions">{job?.state === "failed" && job.retryable && <button disabled={retryingJobId === job.id} onClick={() => void retry(job)} aria-label={`Retry ingestion for ${source.title}`}>{retryingJobId === job.id ? "Retrying…" : "Retry ingestion"}</button>}<button disabled={extractingSourceId === source.id || retryingJobId === job?.id} onClick={() => void extract(source.id)} aria-label={`Extract AI memories from ${source.title}`}>{extractingSourceId === source.id ? "Extracting…" : "Extract AI memories"}</button><button className="danger-action" onClick={() => void openDeletion(source)} aria-label={`Delete ${source.title}`}>Delete</button>{job && retryErrors[job.id] && <small className="action-error" role="alert">{retryErrors[job.id]}</small>}{extractionError && <small className="action-error" role="alert">{extractionError}</small>}</span></div>;
   })}</div>{deletion && <DeletionDialog state={deletion} onCancel={closeDeletion} onConfirm={() => void confirmDeletion()}/>}</section>;
 }
 
@@ -297,6 +322,7 @@ function DeletionDialog({state, onCancel, onConfirm}: {state: DeletionState; onC
     ["Versions", state.impact.versions],
     ["Chunks", state.impact.chunks],
     ["Embeddings", state.impact.embeddings],
+    ["Memories", state.impact.memories],
     ["Decisions", state.impact.decisions],
     ["Evidence", state.impact.evidence],
     ["Jobs detached", state.impact.ingestion_jobs_to_detach],

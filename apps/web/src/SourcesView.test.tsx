@@ -6,9 +6,9 @@ import type { IngestionJob, Source } from "./types";
 const apiMock = vi.hoisted(() => ({
   overview: vi.fn(),
   sources: vi.fn(),
-  decisions: vi.fn(),
+  memories: vi.fn(),
   jobs: vi.fn(),
-  extractDecisions: vi.fn(),
+  extractMemories: vi.fn(),
   retryJob: vi.fn(),
   deletionImpact: vi.fn(),
   deleteSource: vi.fn(),
@@ -29,6 +29,7 @@ const source: Source = {
   version_count: 1,
   chunk_count: 2,
   decision_count: 1,
+  memory_count: 4,
 };
 
 function job(overrides: Partial<IngestionJob> = {}): IngestionJob {
@@ -61,6 +62,7 @@ const deletionImpact = {
   chunks: 4,
   embeddings: 6,
   decisions: 8,
+  memories: 18,
   evidence: 10,
   ingestion_jobs_to_detach: 12,
   audit_events_to_delete: 14,
@@ -92,6 +94,10 @@ describe("source ingestion diagnostics", () => {
 
     expect(screen.getByText("succeeded · ready")).toBeInTheDocument();
     expect(screen.getByText("Attempt 1/3 · Not retryable")).toBeInTheDocument();
+    expect(screen.getByText((_, element) =>
+      element?.tagName === "SPAN" && element.textContent === "2 chunks · 4 memories"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Memories found")).toBeInTheDocument();
     expect(screen.queryByText("old_failure")).not.toBeInTheDocument();
   });
 
@@ -120,21 +126,22 @@ describe("source ingestion diagnostics", () => {
   });
 
   it("marks the global index degraded when a latest source job failed", async () => {
-    apiMock.overview.mockResolvedValue({ sources: 1, chunks: 2, decisions: 1, evidence: 1 });
+    apiMock.overview.mockResolvedValue({ sources: 1, chunks: 2, decisions: 1, memories: 4, evidence: 1 });
     apiMock.sources.mockResolvedValue([source]);
-    apiMock.decisions.mockResolvedValue([]);
+    apiMock.memories.mockResolvedValue([]);
     apiMock.jobs.mockResolvedValue([job({ state: "failed", stage: "indexing" })]);
 
     render(<App/>);
 
     expect(await screen.findByText("Index degraded")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Memories 4" })).toBeInTheDocument();
     expect(screen.queryByText("Index ready")).not.toBeInTheDocument();
   });
 
   it("does not let a newer detached success hide an orphan dead letter", async () => {
-    apiMock.overview.mockResolvedValue({ sources: 0, chunks: 0, decisions: 0, evidence: 0 });
+    apiMock.overview.mockResolvedValue({ sources: 0, chunks: 0, decisions: 0, memories: 0, evidence: 0 });
     apiMock.sources.mockResolvedValue([]);
-    apiMock.decisions.mockResolvedValue([]);
+    apiMock.memories.mockResolvedValue([]);
     apiMock.jobs.mockResolvedValue([
       job({
         id: "detached-success",
@@ -156,12 +163,23 @@ describe("source ingestion diagnostics", () => {
   });
 
   it("catches extraction failures and displays the safe API error", async () => {
-    apiMock.extractDecisions.mockRejectedValue(new Error("AI provider is disabled"));
+    apiMock.extractMemories.mockRejectedValue(new Error("AI provider is disabled"));
     render(<SourcesView sources={[source]} jobs={[job()]} onChanged={vi.fn()}/>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Extract AI candidates from ADR-001" }));
+    fireEvent.click(screen.getByRole("button", { name: "Extract AI memories from ADR-001" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI provider is disabled");
+  });
+
+  it("extracts generalized AI memories and refreshes the registry", async () => {
+    apiMock.extractMemories.mockResolvedValue([]);
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<SourcesView sources={[source]} jobs={[job()]} onChanged={onChanged}/>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Extract AI memories from ADR-001" }));
+
+    await waitFor(() => expect(apiMock.extractMemories).toHaveBeenCalledWith(source.id));
+    expect(onChanged).toHaveBeenCalledOnce();
   });
 
   it("retries a recent orphan failure and refreshes diagnostics", async () => {
@@ -241,7 +259,7 @@ describe("source ingestion diagnostics", () => {
     const dialog = await screen.findByRole("dialog", { name: "Delete ADR-001?" });
     expect(await within(dialog).findByText("version-1")).toBeInTheDocument();
     for (const [label, count] of [
-      ["Versions", 2], ["Chunks", 4], ["Embeddings", 6], ["Decisions", 8],
+      ["Versions", 2], ["Chunks", 4], ["Embeddings", 6], ["Memories", 18], ["Decisions", 8],
       ["Evidence", 10], ["Jobs detached", 12], ["Audit events", 14], ["FTS rows", 16],
     ] as const) {
       expect(within(dialog).getByText(label).nextElementSibling).toHaveTextContent(String(count));
@@ -297,20 +315,24 @@ describe("source ingestion diagnostics", () => {
   });
 
   it("closes an evidence drawer that belongs to the deleted source", async () => {
-    apiMock.overview.mockResolvedValue({ sources: 1, chunks: 2, decisions: 1, evidence: 1 });
+    apiMock.overview.mockResolvedValue({ sources: 1, chunks: 2, decisions: 1, memories: 1, evidence: 1 });
     apiMock.sources.mockResolvedValue([source]);
     apiMock.jobs.mockResolvedValue([job()]);
-    apiMock.decisions.mockResolvedValue([{
+    apiMock.memories.mockResolvedValue([{
       id: "decision-1",
       source_id: source.id,
       source_version_id: "version-1",
       source_title: source.title,
+      kind: "decision",
       title: "Queue decision",
       statement: "Use SQLite",
       rationale: null,
       status: "active",
       confidence: 1,
       extraction_method: "deterministic",
+      model_run_id: null,
+      valid_from: null,
+      valid_to: null,
       created_at: "2026-07-12T10:00:00Z",
       updated_at: "2026-07-12T10:00:00Z",
       evidence: [{
@@ -329,7 +351,7 @@ describe("source ingestion diagnostics", () => {
     apiMock.deleteSource.mockResolvedValue(undefined);
     render(<App/>);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Decisions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Memories/ }));
     fireEvent.click(await screen.findByRole("button", { name: "View proof · L1–1" }));
     expect(screen.getByRole("button", { name: "Close evidence" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Sources/ }));

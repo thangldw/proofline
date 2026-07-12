@@ -86,6 +86,76 @@
   color: #6e3f78;
 }
 
+.registry-filters {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.registry-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.registry-filters legend {
+  float: left;
+  min-width: 54px;
+  padding: 7px 0;
+  color: #63706a;
+  font: 500 10px "IBM Plex Mono";
+  text-transform: uppercase;
+}
+
+.registry-filters button {
+  border: 1px solid #ccd3ca;
+  border-radius: 18px;
+  background: transparent;
+  color: #63706a;
+  cursor: pointer;
+  padding: 6px 10px;
+  text-transform: capitalize;
+}
+
+.registry-filters button[aria-pressed="true"] {
+  border-color: #17201d;
+  background: #17201d;
+  color: #fff;
+}
+
+.memory-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-kind {
+  border-radius: 4px;
+  padding: 4px 7px;
+  font: 500 10px "IBM Plex Mono";
+  text-transform: uppercase;
+  background: #e8f1fa;
+  color: #275779;
+}
+
+.memory-kind.assumption {
+  background: #fff1cf;
+  color: #765510;
+}
+
+.memory-kind.constraint {
+  background: #f5eaf8;
+  color: #6e3f78;
+}
+
+.memory-kind.alternative {
+  background: #edf1eb;
+  color: #53605a;
+}
+
 .source-diagnostics .table-row {
   grid-template-columns: 1.7fr 0.55fr 0.9fr 1.15fr 1fr;
 }
