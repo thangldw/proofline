@@ -86,15 +86,15 @@ As of 2026-07-12:
   qualified observation receipt; this is not a product performance guarantee.
 - Also implemented: a credential-free synthetic grounded-QA regression gate that exercises the
   runtime answer and fail-closed citation path; it is not pilot or real-model quality evidence.
-- Also implemented: verified portable JSON export and complete online SQLite backup commands,
-  strict read-only backup verification, and an automated recovery exercise that revalidates exact
-  source versions, evidence spans, and hashes. Portable import is not implemented.
+- Also implemented: verified portable JSON export, empty-database transactional import, and
+  complete online SQLite backup commands. Import preserves source versions and exact evidence,
+  rebuilds deterministic chunks/FTS without extraction, and records a payload receipt.
 - Also implemented: a credential-free platform smoke script and an Ubuntu/macOS workflow matrix
   covering installation, local evidence, export verification, backup verification, and the web
   build. The [versioned receipt](../evals/platform/github-actions-0dde53f.json) records successful
   hosted API CI and Secret Scan runs, including both platform jobs. This is not production support;
   Windows remains unverified.
-- Not yet completed: portable import, a scalable vector index, reranking, real-model/pilot
+- Not yet completed: merge import, a scalable vector index, reranking, real-model/pilot
   evaluation, a repository security-plugin scan, Windows verification, production support,
   desktop packaging, cloud services, or telemetry.
 

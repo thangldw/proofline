@@ -365,6 +365,37 @@ def _normalize_governed_memory_statuses(connection: Connection) -> None:
     )
 
 
+def _add_import_receipts(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS import_receipts (
+            id VARCHAR(36) PRIMARY KEY,
+            schema VARCHAR(100) NOT NULL,
+            payload_sha256 VARCHAR(64) NOT NULL UNIQUE,
+            export_app_version VARCHAR(50) NOT NULL,
+            export_created_at DATETIME NOT NULL,
+            imported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            counts_json JSON NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_import_receipts_payload_sha256 "
+        "ON import_receipts (payload_sha256)"
+    )
+
+
+def _enforce_memory_status_contract(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """UPDATE decisions
+           SET status = CASE
+               WHEN lower(trim(status)) IN
+                    ('candidate', 'active', 'accepted', 'rejected', 'obsolete')
+                   THEN lower(trim(status))
+               WHEN lower(trim(status)) IN ('superseded', 'replaced') THEN 'obsolete'
+               ELSE 'candidate'
+           END"""
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -377,6 +408,8 @@ MIGRATIONS: tuple[Migration, ...] = (
     (9, "generalized governed memory kinds", _generalize_governed_memory),
     (10, "bounded model output repair lineage", _add_model_run_repair_lineage),
     (11, "normalize governed memory statuses", _normalize_governed_memory_statuses),
+    (12, "portable import receipts", _add_import_receipts),
+    (13, "enforce governed memory status contract", _enforce_memory_status_contract),
 )
 
 

@@ -181,9 +181,10 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
   inert and external requests do not occur. Windows verification and production support remain
   open.
 - Add export, backup guidance, recovery exercises, and a complete deletion test. **Implemented for
-  local SQLite:** portable export/verification, online full backup/read-only verification, recovery
-  provenance exercise, documented retention limits, and cascade deletion coverage. Portable import
-  remains outside the implemented contract.
+  local SQLite:** portable export/verification, empty-database transactional import with exact
+  provenance and deterministic FTS reconstruction, persistent import receipts, online full
+  backup/read-only verification, recovery provenance exercises, documented retention limits, and
+  cascade deletion coverage. Merge/overwrite import remains outside the implemented contract.
 - Run a repository security-plugin scan. The checked-in threat model, secret scan, loopback Docker
   binding, web asset egress check, and hostile-content browser regression are implemented, but they
   do not substitute for that open review or production qualification.
@@ -197,6 +198,11 @@ pilot corpus, so this does not by itself close the insufficient-evidence quality
 
 All metrics below require external pilot or release evidence and remain open; credential-free
 synthetic regression results do not satisfy them.
+
+The versioned `evals/pilot-simulation/` harness exercises seven invented tasks across five
+engineering personas through the production local path. It validates metric collection and exact
+citation behavior only; its scripted completion, source-inspection count, and local latency are not
+human usefulness, adoption, willingness-to-pay, or production evidence.
 
 Continue toward a public beta when:
 

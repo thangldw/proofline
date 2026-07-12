@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval check format release-check
+.PHONY: setup dev dev-api dev-web seed embed test eval simulate-pilot check format release-check
 
 setup:
 	python3 -m venv .venv
@@ -34,6 +34,10 @@ eval:
 	.venv/bin/proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json \
 		--min-citation-resolution 1.0 --min-citation-precision 1.0 \
 		--min-grounded-success 1.0 --min-status-accuracy 1.0
+
+simulate-pilot:
+	@.venv/bin/python scripts/simulate_pilot.py \
+		--dataset evals/pilot-simulation/engineering-context-v1.json
 
 check:
 	.venv/bin/ruff check .
