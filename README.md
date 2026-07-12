@@ -154,6 +154,14 @@ make check
 make eval
 ```
 
+The pre-alpha CI matrix is configured to run source-development smoke checks
+on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. It validates
+installation, local SQLite ingestion/search, exact evidence, portable export,
+raw backup verification, and the web production build without model
+credentials or external runtime services. This matrix does not claim native
+desktop packaging, production
+deployment support, or verified Windows support.
+
 ### Data portability and recovery
 
 Proofline can write an inspectable portable JSON snapshot or a complete local

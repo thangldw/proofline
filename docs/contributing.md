@@ -98,6 +98,16 @@ assuming additional commands exist.
 Live provider tests must be opt-in, clearly named, and excluded from default CI unless a
 maintainer-managed test account and spending limit exist.
 
+The credential-free supported-platform smoke can also be run locally:
+
+```bash
+python scripts/platform_smoke.py
+```
+
+CI is configured to run this installed-package smoke and the web production build on Ubuntu and
+macOS 14. It is a pre-alpha source-development check, not a native packaging or production-support
+claim.
+
 ## Pull request description
 
 Use this minimum structure:
