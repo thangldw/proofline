@@ -4,7 +4,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import func, text
+from sqlalchemy import func, text, update
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -27,6 +27,18 @@ class TextSpan:
     end_offset: int
     start_line: int
     end_line: int
+
+
+@dataclass(frozen=True)
+class SourceDeletionImpact:
+    versions: int
+    chunks: int
+    embeddings: int
+    decisions: int
+    evidence: int
+    ingestion_jobs_to_detach: int
+    audit_events_to_delete: int
+    fts_rows: int
 
 
 class IngestionConflict(ValueError):
@@ -303,7 +315,40 @@ def run_ingestion_job(session: Session, payload: SourceCreate) -> tuple[Source, 
     return source, created, succeeded_job
 
 
+def source_deletion_impact(session: Session, source: Source) -> SourceDeletionImpact:
+    """Count records affected by deleting a source without loading content-bearing rows."""
+    row = (
+        session.execute(
+            text(
+                """SELECT
+                (SELECT count(*) FROM source_versions WHERE source_id = :source) AS versions,
+                (SELECT count(*) FROM chunks WHERE source_id = :source) AS chunks,
+                (SELECT count(*) FROM chunk_embeddings WHERE source_id = :source) AS embeddings,
+                (SELECT count(*) FROM decisions WHERE source_id = :source) AS decisions,
+                (SELECT count(*) FROM evidence WHERE source_id = :source) AS evidence,
+                (SELECT count(*) FROM ingestion_jobs WHERE source_id = :source)
+                    AS ingestion_jobs_to_detach,
+                (SELECT count(*) FROM audit_events
+                   WHERE (object_type = 'source' AND object_id = :source)
+                      OR (object_type = 'decision' AND object_id IN
+                          (SELECT id FROM decisions WHERE source_id = :source)))
+                    AS audit_events_to_delete,
+                (SELECT count(*) FROM chunk_search WHERE source_id = :source) AS fts_rows"""
+            ),
+            {"source": source.id},
+        )
+        .mappings()
+        .one()
+    )
+    return SourceDeletionImpact(**dict(row))
+
+
 def delete_source(session: Session, source: Source) -> None:
+    session.execute(
+        update(IngestionJob)
+        .where(IngestionJob.source_id == source.id)
+        .values(source_id=None, source_version_id=None)
+    )
     session.execute(
         text(
             """DELETE FROM audit_events

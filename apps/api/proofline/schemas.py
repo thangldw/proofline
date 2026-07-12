@@ -61,6 +61,20 @@ class SourceRead(BaseModel):
     decision_count: int = 0
 
 
+class SourceDeletionImpactRead(BaseModel):
+    source_id: str
+    title: str
+    current_version_id: str | None
+    versions: int = Field(ge=0)
+    chunks: int = Field(ge=0)
+    embeddings: int = Field(ge=0)
+    decisions: int = Field(ge=0)
+    evidence: int = Field(ge=0)
+    ingestion_jobs_to_detach: int = Field(ge=0)
+    audit_events_to_delete: int = Field(ge=0)
+    fts_rows: int = Field(ge=0)
+
+
 class EvidenceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
