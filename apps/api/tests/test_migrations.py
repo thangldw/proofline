@@ -1,5 +1,5 @@
 from proofline.database import initialize_database, make_engine
-from proofline.migrations import _initial_schema
+from proofline.migrations import MIGRATIONS, _initial_schema
 from sqlalchemy import inspect, text
 
 
@@ -16,7 +16,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
     assert {
         "sources",
         "source_versions",
@@ -27,7 +27,68 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "audit_events",
         "model_runs",
         "chunk_embeddings",
+        "ingestion_job_inputs",
     } <= tables
+    engine.dispose()
+
+
+def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v7.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:7]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+        connection.execute(
+            text(
+                """INSERT INTO ingestion_jobs
+                   (id, source_id, source_version_id, kind, state, stage, attempts,
+                    error_code, error_detail, retryable, created_at, updated_at)
+                   VALUES ('legacy-job', NULL, NULL, 'source_ingestion', 'failed', 'failed', 1,
+                           'ingestion_error', 'safe legacy failure', 1, :created, :updated)"""
+            ),
+            {
+                "created": "2026-07-12T00:00:00+00:00",
+                "updated": "2026-07-12T00:01:00+00:00",
+            },
+        )
+
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        job = (
+            connection.execute(text("SELECT * FROM ingestion_jobs WHERE id = 'legacy-job'"))
+            .mappings()
+            .one()
+        )
+        versions = (
+            connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            .scalars()
+            .all()
+        )
+        staged_count = connection.execute(
+            text("SELECT count(*) FROM ingestion_job_inputs")
+        ).scalar_one()
+    assert versions == list(range(1, 9))
+    assert job["request_hash"] is None
+    assert job["idempotency_key"] is None
+    assert job["max_attempts"] == 1
+    assert job["retryable"] == 0
+    assert job["started_at"] == job["created_at"]
+    assert job["finished_at"] == job["updated_at"]
+    assert staged_count == 0
     engine.dispose()
 
 

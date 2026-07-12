@@ -7,7 +7,15 @@ from proofline.ingestion import (
     ingest_source,
     run_ingestion_job,
 )
-from proofline.models import Chunk, Decision, Evidence, IngestionJob, Source, SourceVersion
+from proofline.models import (
+    Chunk,
+    Decision,
+    Evidence,
+    IngestionJob,
+    IngestionJobInput,
+    Source,
+    SourceVersion,
+)
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select
 
@@ -89,7 +97,13 @@ def test_ingestion_failure_is_persisted_without_source_content(session, monkeypa
 
     job = session.get(IngestionJob, raised.value.job_id)
     assert job.state == "failed"
+    assert job.stage == "indexing"
     assert job.error_code == "ingestion_error"
-    assert job.retryable is False
+    assert job.retryable is True
+    assert job.attempts == 1
+    assert job.max_attempts == 3
+    assert job.started_at is not None
+    assert job.finished_at is not None
     assert "private source text" not in job.error_detail
+    assert session.get(IngestionJobInput, job.id).content == "private source text"
     assert session.scalar(select(func.count()).select_from(Source)) == 0

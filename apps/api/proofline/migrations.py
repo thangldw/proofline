@@ -288,6 +288,49 @@ def _link_decisions_to_model_runs(connection: Connection) -> None:
     )
 
 
+def _add_resumable_ingestion_jobs(connection: Connection) -> None:
+    columns = {column["name"] for column in inspect(connection).get_columns("ingestion_jobs")}
+    additions = {
+        "request_hash": "VARCHAR(64)",
+        "idempotency_key": "VARCHAR(200)",
+        "max_attempts": "INTEGER NOT NULL DEFAULT 3",
+        "started_at": "DATETIME",
+        "finished_at": "DATETIME",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            connection.exec_driver_sql(f"ALTER TABLE ingestion_jobs ADD COLUMN {name} {definition}")
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_request_hash ON ingestion_jobs (request_hash)"
+    )
+    connection.exec_driver_sql(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_ingestion_jobs_idempotency_key "
+        "ON ingestion_jobs (idempotency_key)"
+    )
+    # Every row present before v8 lacks staged input and therefore cannot be retried safely.
+    # The column default remains three for newly inserted v8 jobs.
+    connection.exec_driver_sql("UPDATE ingestion_jobs SET max_attempts = 1, retryable = 0")
+    connection.exec_driver_sql(
+        "UPDATE ingestion_jobs SET started_at = created_at WHERE started_at IS NULL"
+    )
+    connection.exec_driver_sql(
+        """UPDATE ingestion_jobs SET finished_at = updated_at
+           WHERE finished_at IS NULL AND state != 'running'"""
+    )
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS ingestion_job_inputs (
+            job_id VARCHAR(36) PRIMARY KEY
+                REFERENCES ingestion_jobs(id) ON DELETE CASCADE,
+            title VARCHAR(300) NOT NULL,
+            kind VARCHAR(30) NOT NULL,
+            uri TEXT,
+            content TEXT NOT NULL,
+            content_hash VARCHAR(64) NOT NULL,
+            created_at DATETIME NOT NULL
+        )"""
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -296,6 +339,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (5, "provider-neutral model runs", _add_model_runs),
     (6, "versioned chunk embeddings", _add_chunk_embeddings),
     (7, "model-derived decision candidates", _link_decisions_to_model_runs),
+    (8, "resumable atomic ingestion jobs", _add_resumable_ingestion_jobs),
 )
 
 

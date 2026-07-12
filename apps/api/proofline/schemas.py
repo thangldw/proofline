@@ -219,11 +219,15 @@ class IngestionJobRead(BaseModel):
     state: str
     stage: str
     attempts: int
+    request_hash: str | None
+    max_attempts: int
     error_code: str | None
     error_detail: str | None
     retryable: bool
     created_at: datetime
     updated_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
 
 
 class AuditEventRead(BaseModel):

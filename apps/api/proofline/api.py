@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,7 +13,11 @@ from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_
 from .ingestion import (
     IngestionConflict,
     IngestionExecutionError,
+    IngestionIdempotencyConflict,
+    IngestionJobNotFound,
+    IngestionRetryConflict,
     delete_source,
+    retry_ingestion_job,
     run_ingestion_job,
     source_deletion_impact,
 )
@@ -119,12 +123,28 @@ def overview(session: Session = Depends(get_session)) -> Overview:
 
 @router.post("/sources", response_model=SourceRead, status_code=status.HTTP_201_CREATED)
 def create_source(
-    payload: SourceCreate, response: Response, session: Session = Depends(get_session)
+    payload: SourceCreate,
+    response: Response,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+        pattern=r".*\S.*",
+    ),
+    session: Session = Depends(get_session),
 ) -> SourceRead:
     try:
-        source, created, job = run_ingestion_job(session, payload)
+        source, created, job = run_ingestion_job(session, payload, idempotency_key=idempotency_key)
+    except IngestionIdempotencyConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+            headers={"X-Proofline-Job-ID": exc.job_id},
+        ) from exc
     except IngestionConflict as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        headers = {"X-Proofline-Job-ID": exc.job_id} if exc.job_id else None
+        raise HTTPException(status_code=409, detail=str(exc), headers=headers) from exc
     except IngestionExecutionError as exc:
         raise HTTPException(
             status_code=500,
@@ -197,6 +217,26 @@ def get_job(job_id: str, session: Session = Depends(get_session)) -> IngestionJo
     if not job:
         raise HTTPException(status_code=404, detail="Ingestion job not found")
     return job
+
+
+@router.post("/jobs/{job_id}/retry", response_model=IngestionJobRead)
+def retry_job(job_id: str, session: Session = Depends(get_session)) -> IngestionJob:
+    try:
+        return retry_ingestion_job(session, job_id)
+    except IngestionJobNotFound as exc:
+        raise HTTPException(status_code=404, detail="Ingestion job not found") from exc
+    except (IngestionRetryConflict, IngestionConflict) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+            headers={"X-Proofline-Job-ID": job_id},
+        ) from exc
+    except IngestionExecutionError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="ingestion retry failed; inspect the persisted job",
+            headers={"X-Proofline-Job-ID": exc.job_id},
+        ) from exc
 
 
 @router.get("/model/provider", response_model=ProviderStatus)

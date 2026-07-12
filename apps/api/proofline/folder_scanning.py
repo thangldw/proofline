@@ -154,8 +154,9 @@ def _ingest_file(session: Session, root: Path, candidate: Path) -> FolderScanFil
                 uri=uri,
             ),
         )
-    except IngestionConflict:
-        return _failed_file(relative_path, "source_identity_conflict", uri=uri)
+    except IngestionConflict as exc:
+        result = _failed_file(relative_path, "source_identity_conflict", uri=uri)
+        return result.model_copy(update={"job_id": exc.job_id})
     except IngestionExecutionError as exc:
         result = _failed_file(relative_path, "ingestion_error", uri=uri)
         return result.model_copy(update={"job_id": exc.job_id})

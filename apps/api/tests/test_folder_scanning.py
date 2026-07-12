@@ -3,6 +3,7 @@ import os
 import proofline.folder_scanning as folder_scanning
 import pytest
 from proofline.config import get_settings
+from proofline.ingestion import IngestionConflict
 
 
 def register_roots(monkeypatch, *roots):
@@ -118,6 +119,23 @@ def test_folder_scan_continues_after_safe_per_file_failures(client, monkeypatch,
     assert len(jobs) == 1
     assert jobs[0]["state"] == "succeeded"
     assert all("Decision: ok" not in str(item) for item in report["files"])
+
+
+def test_folder_scan_reports_persisted_identity_conflict_job(client, monkeypatch, tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    (root / "conflict.md").write_text("Decision: Keep identity", encoding="utf-8")
+    register_roots(monkeypatch, root)
+
+    def conflict(*_args, **_kwargs):
+        raise IngestionConflict("safe identity conflict", job_id="conflict-job")
+
+    monkeypatch.setattr(folder_scanning, "run_ingestion_job", conflict)
+    report = client.post("/api/v1/folder-scans", json={}).json()
+
+    assert report["failed_count"] == 1
+    assert report["files"][0]["error_code"] == "source_identity_conflict"
+    assert report["files"][0]["job_id"] == "conflict-job"
 
 
 def test_folder_scan_only_previews_missing_sources(client, monkeypatch, tmp_path):

@@ -122,11 +122,30 @@ class IngestionJob(Base):
     state: Mapped[str] = mapped_column(String(30), default="running", index=True)
     stage: Mapped[str] = mapped_column(String(30), default="accepted")
     attempts: Mapped[int] = mapped_column(Integer, default=1)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
     error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
     retryable: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+class IngestionJobInput(Base):
+    __tablename__ = "ingestion_job_inputs"
+
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), primary_key=True
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    kind: Mapped[str] = mapped_column(String(30))
+    uri: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content: Mapped[str] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
 
 class AuditEvent(Base):
