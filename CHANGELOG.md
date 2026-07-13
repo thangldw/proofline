@@ -7,7 +7,22 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.6`.
+No changes have been recorded after `v0.14.7`.
+
+## [0.14.7] - 2026-07-14
+
+### Added
+
+- Add an evidence-based production-readiness matrix for the first supported local desktop profile.
+
+### Changed
+
+- Remove contributor-machine absolute paths from Studio design QA evidence.
+- Update the security support table and alpha boundary to the current pre-alpha release.
+- Correct the portability documentation to cover the explicit no-overwrite merge workflow that
+  has been implemented since `v0.8.0`.
+- Mark all `v0.x` local GitHub releases as pre-releases so release metadata matches the documented
+  support boundary.
 
 ## [0.14.6] - 2026-07-13
 

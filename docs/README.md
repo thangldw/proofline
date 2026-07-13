@@ -14,6 +14,7 @@ way and trace every answer back to exact source evidence.
 | --- | --- | --- |
 | [v0.11.0 notes](./releases/v0.11.0.md) | One-command installed app with bundled web UI | Pre-alpha |
 | [Alpha support boundary](./alpha-support-boundary.md) | Current exclusions and evidence required for alpha | Current |
+| [Production readiness](./production-readiness.md) | Evidence gate matrix for the first supported local desktop profile | Current |
 | [v0.10.0 notes](./releases/v0.10.0.md) | Embedded runtime lifecycle and same-origin web serving | Pre-alpha |
 | [Embedded lifecycle](./embedded-lifecycle.md) | Start, readiness, data directory, stop and recovery contract | Implemented locally |
 | [Roadmap evidence quality report](./reports/roadmap-evidence-quality-v0.10.0.html) | Metadata fitness of checked-in benchmark/platform receipts | Current report |

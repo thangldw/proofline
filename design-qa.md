@@ -1,8 +1,9 @@
 # Studio design QA
 
-- Source visual truth: `/Users/thang/Desktop/Screenshot 2026-07-13 at 16.22.56.png`
-- Implementation screenshot: `/Users/thang/Documents/proofline/artifacts/studio-qa/studio-mobile-v3.png`
-- Combined comparison: `/Users/thang/Documents/proofline/artifacts/studio-qa/studio-comparison.png`
+- Source visual truth: NotebookLM Studio reference supplied for the review; the external source
+  screenshot is intentionally not retained in this repository.
+- Implementation screenshot: `artifacts/studio-qa/studio-mobile-v3.png`
+- Combined comparison: `artifacts/studio-qa/studio-comparison.png`
 - Viewport: 746 × 860
 - State: Studio selected, one saved Report artifact, tool gallery at the top
 

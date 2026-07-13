@@ -1,8 +1,9 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** mock-qualified model comparison CLI đã hoàn thành cho `v0.14.6`;
-Windows, production qualification, real-model evaluation và external pilot vẫn mở.
+**Trạng thái hiện tại:** public-hygiene và production gate matrix đã hoàn thành cho `v0.14.7`;
+Windows, native packaging, production qualification, real-model evaluation và external pilot vẫn
+mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
 ## Mở rộng evidence-first đã được chấp thuận
@@ -59,6 +60,13 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Scripted provider chạy in-process, không gọi QwenCloud hoặc Ollama.
 - [x] Fixture extraction/grounded-QA và comparison plan được version hóa.
 - [x] Receipt giữ qualification `mock_integration`; điểm fixture không được tính là model quality.
+
+### v0.14.7 — Public hygiene and production gate matrix
+
+- [x] Xóa contributor-machine absolute paths khỏi design QA.
+- [x] Cập nhật security support boundary theo release hiện tại.
+- [x] Sửa tài liệu portable merge để khớp behavior đã phát hành từ `v0.8.0`.
+- [x] Định nghĩa production target local desktop và receipt bắt buộc cho từng gate.
 
 ## Việc nên làm đầu tiên ngày mai
 

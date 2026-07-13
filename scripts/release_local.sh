@@ -83,7 +83,7 @@ release_args=(
   --title "Proofline $tag"
   --notes-file "docs/releases/$tag.md"
 )
-if [[ "$tag" == *-* ]]; then
+if [[ "$tag" == v0.* || "$tag" == *-* ]]; then
   release_args+=(--prerelease)
 fi
 gh release create "${release_args[@]}"
