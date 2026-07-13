@@ -54,12 +54,12 @@ Import local repo → index immutable commit/file sources → search → grounde
 
 ### Provider configuration và reliability
 
-- [ ] Thêm Settings UI cho Qwen, DeepSeek, Ollama/vLLM và OpenAI-compatible endpoint.
-- [ ] Health check riêng cho generation, embedding và reranking capability.
-- [ ] Hiển thị degraded mode khi provider không sẵn sàng.
-- [ ] Thêm bounded transport retry cho lỗi transient.
-- [ ] Thêm model-run dead-letter/retry workflow thay vì chỉ repair structured output.
-- [ ] Không tự động chuyển từ local provider sang remote provider.
+- [x] Thêm Settings UI cho Qwen, DeepSeek, Ollama/vLLM và OpenAI-compatible endpoint.
+- [x] Health check riêng cho generation, embedding và reranking capability.
+- [x] Hiển thị degraded mode khi provider không sẵn sàng.
+- [x] Thêm bounded transport retry cho lỗi transient.
+- [x] Thêm model-run dead-letter/retry workflow thay vì chỉ repair structured output.
+- [x] Không tự động chuyển từ local provider sang remote provider.
 
 ### Retrieval quality
 

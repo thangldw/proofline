@@ -202,3 +202,29 @@ export type ModelRunFilters = {
   parentRunId?: string;
   limit?: number;
 };
+
+export type ProviderStatus = {
+  configured: boolean;
+  provider_id: string | null;
+  model_id: string | null;
+  generation: boolean;
+  structured_output: boolean;
+  embedding: boolean;
+  reranking: boolean;
+  remote_egress_allowed: boolean;
+  healthy: boolean | null;
+  error_code: string | null;
+  mode: "ready" | "degraded" | "disabled" | "unchecked";
+};
+
+export type ProviderConfiguration = {
+  ai_provider: string;
+  ai_base_url: string | null;
+  ai_model: string | null;
+  ai_api_key_configured: boolean;
+  embedding_provider: string;
+  embedding_base_url: string | null;
+  embedding_model: string | null;
+  embedding_api_key_configured: boolean;
+  allow_remote_ai: boolean;
+};

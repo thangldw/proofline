@@ -435,9 +435,36 @@ class ProviderStatus(BaseModel):
     model_id: str | None = None
     generation: bool = False
     structured_output: bool = False
+    embedding: bool = False
+    reranking: bool = False
     remote_egress_allowed: bool = False
     healthy: bool | None = None
     error_code: str | None = None
+    mode: Literal["ready", "degraded", "disabled", "unchecked"] = "unchecked"
+
+
+class ProviderConfigurationUpdate(BaseModel):
+    ai_provider: Literal["disabled", "qwen", "deepseek", "ollama", "vllm", "openai_compatible"]
+    ai_base_url: str | None = Field(default=None, max_length=2_000)
+    ai_model: str | None = Field(default=None, max_length=300)
+    ai_api_key: str | None = Field(default=None, max_length=2_000)
+    embedding_provider: Literal["disabled", "ollama", "vllm", "openai_compatible"]
+    embedding_base_url: str | None = Field(default=None, max_length=2_000)
+    embedding_model: str | None = Field(default=None, max_length=300)
+    embedding_api_key: str | None = Field(default=None, max_length=2_000)
+    allow_remote_ai: bool = False
+
+
+class ProviderConfigurationRead(BaseModel):
+    ai_provider: str
+    ai_base_url: str | None
+    ai_model: str | None
+    ai_api_key_configured: bool
+    embedding_provider: str
+    embedding_base_url: str | None
+    embedding_model: str | None
+    embedding_api_key_configured: bool
+    allow_remote_ai: bool
 
 
 class EmbeddingIndexResponse(BaseModel):
@@ -466,3 +493,15 @@ class ModelRunRead(BaseModel):
     error_code: str | None
     created_at: datetime
     finished_at: datetime | None
+
+
+class ModelRunRetryRequest(BaseModel):
+    source_id: str
+    operation: Literal["extract_memories"] = "extract_memories"
+
+
+class ModelRunRetryResponse(BaseModel):
+    parent_run_id: str
+    model_run_id: str
+    status: str
+    memory_count: int
