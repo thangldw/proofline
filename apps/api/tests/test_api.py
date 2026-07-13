@@ -271,9 +271,12 @@ def test_model_provider_is_disabled_and_secret_safe_by_default(client, monkeypat
         "model_id": None,
         "generation": False,
         "structured_output": False,
+        "embedding": False,
+        "reranking": False,
         "remote_egress_allowed": False,
         "healthy": None,
         "error_code": "provider_disabled",
+        "mode": "disabled",
     }
     assert client.get("/api/v1/model/runs").json() == []
     embedding = client.get("/api/v1/model/embedding-provider").json()

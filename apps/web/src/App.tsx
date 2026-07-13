@@ -6,6 +6,7 @@ import {
   FileSearch,
   GitBranch,
   Search,
+  Settings,
   Upload,
   X,
 } from "lucide-react";
@@ -20,13 +21,15 @@ import type {
   ModelRun,
   ModelRunFilters,
   Overview,
+  ProviderConfiguration,
+  ProviderStatus,
   SearchHit,
   SearchScope,
   Source,
   SourceDeletionImpact,
 } from "./types";
 
-type View = "search" | "memories" | "sources" | "model runs";
+type View = "search" | "memories" | "sources" | "model runs" | "settings";
 
 type DeletionState = {
   source: Source;
@@ -146,6 +149,13 @@ export function App() {
           >
             Model runs
           </Nav>
+          <Nav
+            icon={<Settings size={18} />}
+            active={view === "settings"}
+            onClick={() => setView("settings")}
+          >
+            Settings
+          </Nav>
         </nav>
         <div className="system-status">
           <span className={error || indexDegraded ? "dot error-dot" : "dot"} />
@@ -212,6 +222,7 @@ export function App() {
           />
         )}
         {view === "model runs" && <ModelRunsView />}
+        {view === "settings" && <SettingsView />}
       </main>
       {evidence && (
         <EvidenceDrawer {...evidence} onClose={() => setEvidence(null)} />
@@ -250,6 +261,229 @@ type RunLineage = {
   parent: ModelRun | null;
   children: ModelRun[];
 };
+
+export function SettingsView() {
+  const [configuration, setConfiguration] =
+    useState<ProviderConfiguration | null>(null);
+  const [generation, setGeneration] = useState<ProviderStatus | null>(null);
+  const [embedding, setEmbedding] = useState<ProviderStatus | null>(null);
+  const [reranking, setReranking] = useState<ProviderStatus | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const refreshProviders = useCallback(async () => {
+    const [nextConfiguration, nextGeneration, nextEmbedding, nextReranking] =
+      await Promise.all([
+        api.providerConfiguration(),
+        api.generationProviderStatus(),
+        api.embeddingProviderStatus(),
+        api.rerankingProviderStatus(),
+      ]);
+    setConfiguration(nextConfiguration);
+    setGeneration(nextGeneration);
+    setEmbedding(nextEmbedding);
+    setReranking(nextReranking);
+  }, []);
+  useEffect(() => {
+    void refreshProviders().catch((reason) =>
+      setMessage(errorMessage(reason, "Provider settings unavailable")),
+    );
+  }, [refreshProviders]);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!configuration) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.saveProviderConfiguration({
+        ai_provider: configuration.ai_provider,
+        ai_base_url: configuration.ai_base_url || null,
+        ai_model: configuration.ai_model || null,
+        ai_api_key: apiKey || undefined,
+        embedding_provider: configuration.embedding_provider,
+        embedding_base_url: configuration.embedding_base_url || null,
+        embedding_model: configuration.embedding_model || null,
+        embedding_api_key: embeddingApiKey || undefined,
+        allow_remote_ai: configuration.allow_remote_ai,
+      });
+      setApiKey("");
+      setEmbeddingApiKey("");
+      await refreshProviders();
+      setMessage(
+        "Provider configuration saved and capability health refreshed.",
+      );
+    } catch (reason) {
+      setMessage(errorMessage(reason, "Provider configuration failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!configuration)
+    return (
+      <section className="content">
+        <div role="status">Loading provider settings…</div>
+        {message && <div className="integrity-error">{message}</div>}
+      </section>
+    );
+  return (
+    <section className="content">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">LOCAL PROVIDER CONTROL</span>
+          <h2>Model providers</h2>
+        </div>
+        <span className="mode-badge">No automatic fallback</span>
+      </div>
+      <form
+        className="model-run-filters"
+        onSubmit={(event) => void save(event)}
+      >
+        <label>
+          Generation provider
+          <select
+            value={configuration.ai_provider}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                ai_provider: event.target.value,
+              })
+            }
+          >
+            <option value="disabled">Disabled</option>
+            <option value="qwen">Qwen</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="ollama">Ollama</option>
+            <option value="vllm">vLLM</option>
+            <option value="openai_compatible">OpenAI-compatible</option>
+          </select>
+        </label>
+        <label>
+          Generation base URL
+          <input
+            value={configuration.ai_base_url ?? ""}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                ai_base_url: event.target.value,
+              })
+            }
+          />
+        </label>
+        <label>
+          Generation model
+          <input
+            value={configuration.ai_model ?? ""}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                ai_model: event.target.value,
+              })
+            }
+          />
+        </label>
+        <label>
+          Generation API key
+          <input
+            type="password"
+            value={apiKey}
+            placeholder={
+              configuration.ai_api_key_configured
+                ? "Configured; leave blank to keep"
+                : "Optional"
+            }
+            onChange={(event) => setApiKey(event.target.value)}
+          />
+        </label>
+        <label>
+          Embedding provider
+          <select
+            value={configuration.embedding_provider}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                embedding_provider: event.target.value,
+              })
+            }
+          >
+            <option value="disabled">Disabled</option>
+            <option value="ollama">Ollama</option>
+            <option value="vllm">vLLM</option>
+            <option value="openai_compatible">OpenAI-compatible</option>
+          </select>
+        </label>
+        <label>
+          Embedding base URL
+          <input
+            value={configuration.embedding_base_url ?? ""}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                embedding_base_url: event.target.value,
+              })
+            }
+          />
+        </label>
+        <label>
+          Embedding model
+          <input
+            value={configuration.embedding_model ?? ""}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                embedding_model: event.target.value,
+              })
+            }
+          />
+        </label>
+        <label>
+          Embedding API key
+          <input
+            type="password"
+            value={embeddingApiKey}
+            placeholder={
+              configuration.embedding_api_key_configured
+                ? "Configured; leave blank to keep"
+                : "Optional"
+            }
+            onChange={(event) => setEmbeddingApiKey(event.target.value)}
+          />
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={configuration.allow_remote_ai}
+            onChange={(event) =>
+              setConfiguration({
+                ...configuration,
+                allow_remote_ai: event.target.checked,
+              })
+            }
+          />{" "}
+          Allow explicit remote model egress
+        </label>
+        <button disabled={busy}>
+          {busy ? "Saving…" : "Save and check health"}
+        </button>
+      </form>
+      <div className="metrics">
+        <Metric value={generation?.mode ?? "unchecked"} label="Generation" />
+        <Metric value={embedding?.mode ?? "unchecked"} label="Embedding" />
+        <Metric value={reranking?.mode ?? "unchecked"} label="Reranking" />
+      </div>
+      {(generation?.mode === "degraded" || embedding?.mode === "degraded") && (
+        <div className="degraded-banner" role="status">
+          Provider degraded. Deterministic ingestion and lexical retrieval
+          remain available.
+        </div>
+      )}
+      {message && <div role="status">{message}</div>}
+    </section>
+  );
+}
 
 export function ModelRunsView() {
   const [runs, setRuns] = useState<ModelRun[]>([]);
@@ -1726,7 +1960,7 @@ function DeletionDialog({
   );
 }
 
-function Metric({ value, label }: { value: number; label: string }) {
+function Metric({ value, label }: { value: number | string; label: string }) {
   return (
     <div className="metric">
       <strong>{value}</strong>

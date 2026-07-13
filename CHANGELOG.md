@@ -7,7 +7,23 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.4.0`.
+No changes have been recorded after `v0.5.0`.
+
+## [0.5.0] - 2026-07-14
+
+### Added
+
+- A local Settings screen configures Qwen, DeepSeek, Ollama, vLLM, and generic
+  OpenAI-compatible generation/embedding profiles without returning stored API keys.
+- Separate generation, embedding, and reranking capability health states plus visible degraded
+  mode preserve deterministic ingestion and lexical retrieval when models are unavailable.
+- Transient model transport calls use three bounded attempts; exhaustion persists a dead-letter
+  run that can be explicitly retried against the same immutable input and exact provider/model.
+
+### Security
+
+- Provider configuration is written atomically with owner-only permissions. Remote egress remains
+  opt-in and retries never fall back to a different provider.
 
 ## [0.4.0] - 2026-07-14
 
@@ -148,7 +164,8 @@ No changes have been recorded after `v0.4.0`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/thangldw/proofline/releases/tag/v0.5.0
 [0.4.0]: https://github.com/thangldw/proofline/releases/tag/v0.4.0
 [0.3.0]: https://github.com/thangldw/proofline/releases/tag/v0.3.0
 [0.1.0-alpha.5]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.5

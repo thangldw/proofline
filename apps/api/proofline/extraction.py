@@ -62,6 +62,7 @@ def extract_memory_candidates(
     provider: GenerationProvider,
     *,
     allowed_kinds: frozenset[MemoryKind] = ALL_MEMORY_KINDS,
+    retry_parent_run_id: str | None = None,
 ) -> tuple[list[Decision], ModelRun]:
     if not allowed_kinds:
         raise ValueError("allowed_kinds must not be empty")
@@ -110,8 +111,14 @@ def extract_memory_candidates(
         input_hashes=[version.content_hash],
     )
     initial_request = request
-    parent_run_id: str | None = None
-    repair_reason: str | None = None
+    parent_run_id: str | None = retry_parent_run_id
+    repair_reason: str | None = "manual_retry" if retry_parent_run_id else None
+    attempt_offset = 0
+    if retry_parent_run_id:
+        parent = session.get(ModelRun, retry_parent_run_id)
+        if not parent:
+            raise ValueError("retry parent run does not exist")
+        attempt_offset = parent.attempt_number
     batch: MemoryCandidateBatch | None = None
     run: ModelRun | None = None
     for attempt_number in range(1, MAX_GENERATION_ATTEMPTS + 1):
@@ -122,7 +129,7 @@ def extract_memory_candidates(
                 request,
                 MemoryCandidateBatch,
                 parent_run_id=parent_run_id,
-                attempt_number=attempt_number,
+                attempt_number=attempt_offset + attempt_number,
                 repair_reason=repair_reason,
             )
         except StructuredOutputError as exc:

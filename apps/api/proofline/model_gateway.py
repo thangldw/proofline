@@ -16,6 +16,8 @@ from .models import ModelRun, utc_now
 
 MAX_STRUCTURED_OUTPUT_BYTES = 128 * 1024
 MAX_GENERATION_ATTEMPTS = 2
+MAX_TRANSPORT_ATTEMPTS = 3
+TRANSIENT_STATUS_CODES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 REPAIRABLE_OUTPUT_CODES = frozenset(
     {
         "structured_output_invalid",
@@ -89,8 +91,15 @@ class ProviderConfigurationError(ValueError):
 
 
 class ProviderRequestError(RuntimeError):
-    def __init__(self, message: str = "model provider request failed", run_id: str | None = None):
+    def __init__(
+        self,
+        message: str = "model provider request failed",
+        run_id: str | None = None,
+        *,
+        retry_exhausted: bool = False,
+    ):
         self.run_id = run_id
+        self.retry_exhausted = retry_exhausted
         super().__init__(message)
 
 
@@ -154,6 +163,8 @@ class OpenAICompatibleProvider:
         api_key: str | None = None,
         allow_remote: bool = False,
         client: httpx.Client | None = None,
+        provider_id: str = "openai_compatible",
+        max_transport_attempts: int = MAX_TRANSPORT_ATTEMPTS,
     ) -> None:
         if not is_loopback_url(base_url) and not allow_remote:
             raise ProviderConfigurationError(
@@ -163,6 +174,8 @@ class OpenAICompatibleProvider:
         self.model = model
         self.api_key = api_key
         self.client = client or httpx.Client(timeout=60)
+        self.id = provider_id
+        self.max_transport_attempts = max_transport_attempts
 
     def capabilities(self) -> ModelCapabilities:
         return ModelCapabilities()
@@ -192,8 +205,11 @@ class OpenAICompatibleProvider:
                 "json_schema": {"name": "proofline_output", "schema": request.response_schema},
             }
         try:
-            response = self.client.post(
+            response = _request_with_retry(
+                self.client,
+                "POST",
                 f"{self.base_url}/chat/completions",
+                attempts=self.max_transport_attempts,
                 headers=self._headers(),
                 json=payload,
             )
@@ -206,8 +222,10 @@ class OpenAICompatibleProvider:
                 prompt_tokens=usage.get("prompt_tokens"),
                 completion_tokens=usage.get("completion_tokens"),
             )
+        except ProviderRequestError:
+            raise
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-            raise ProviderRequestError("model provider request failed") from exc
+            raise ProviderRequestError("model provider response was invalid") from exc
 
 
 class OpenAICompatibleEmbeddingProvider:
@@ -221,6 +239,8 @@ class OpenAICompatibleEmbeddingProvider:
         api_key: str | None = None,
         allow_remote: bool = False,
         client: httpx.Client | None = None,
+        provider_id: str = "openai_compatible_embedding",
+        max_transport_attempts: int = MAX_TRANSPORT_ATTEMPTS,
     ) -> None:
         if not is_loopback_url(base_url) and not allow_remote:
             raise ProviderConfigurationError(
@@ -230,6 +250,8 @@ class OpenAICompatibleEmbeddingProvider:
         self.model = model
         self.api_key = api_key
         self.client = client or httpx.Client(timeout=60)
+        self.id = provider_id
+        self.max_transport_attempts = max_transport_attempts
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -246,8 +268,11 @@ class OpenAICompatibleEmbeddingProvider:
 
     def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
         try:
-            response = self.client.post(
+            response = _request_with_retry(
+                self.client,
+                "POST",
                 f"{self.base_url}/embeddings",
+                attempts=self.max_transport_attempts,
                 headers=self._headers(),
                 json={"model": self.model, "input": request.texts},
             )
@@ -260,8 +285,53 @@ class OpenAICompatibleEmbeddingProvider:
                 vectors=vectors,
                 prompt_tokens=body.get("usage", {}).get("prompt_tokens"),
             )
+        except ProviderRequestError:
+            raise
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-            raise ProviderRequestError("embedding provider request failed") from exc
+            raise ProviderRequestError("embedding provider response was invalid") from exc
+
+
+def _request_with_retry(
+    client: httpx.Client,
+    method: str,
+    url: str,
+    *,
+    attempts: int,
+    **kwargs: Any,
+) -> httpx.Response:
+    if attempts < 1 or attempts > MAX_TRANSPORT_ATTEMPTS:
+        raise ValueError("transport attempts must be between one and three")
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.request(method, url, **kwargs)
+            if response.status_code not in TRANSIENT_STATUS_CODES:
+                return response
+            last_error = httpx.HTTPStatusError(
+                "transient provider response", request=response.request, response=response
+            )
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            last_error = exc
+        if attempt < attempts:
+            time.sleep(0.05 * attempt)
+    raise ProviderRequestError(
+        "model provider transient failure exhausted bounded retries",
+        retry_exhausted=True,
+    ) from last_error
+
+
+GENERATION_PROFILES = {
+    "openai_compatible": (None, None),
+    "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-plus"),
+    "deepseek": ("https://api.deepseek.com/v1", "deepseek-chat"),
+    "ollama": ("http://127.0.0.1:11434/v1", "qwen2.5:7b"),
+    "vllm": ("http://127.0.0.1:8001/v1", None),
+}
+EMBEDDING_PROFILES = {
+    "openai_compatible": (None, None),
+    "ollama": ("http://127.0.0.1:11434/v1", "nomic-embed-text"),
+    "vllm": ("http://127.0.0.1:8001/v1", None),
+}
 
 
 def build_generation_provider(settings: Settings) -> GenerationProvider | None:
@@ -269,16 +339,20 @@ def build_generation_provider(settings: Settings) -> GenerationProvider | None:
         return None
     if settings.ai_provider == "fake":
         return FakeGenerationProvider(model=settings.ai_model or "fake-deterministic")
-    if settings.ai_provider == "openai_compatible":
-        if not settings.ai_base_url or not settings.ai_model:
+    if settings.ai_provider in GENERATION_PROFILES:
+        default_url, default_model = GENERATION_PROFILES[settings.ai_provider]
+        base_url = settings.ai_base_url or default_url
+        model = settings.ai_model or default_model
+        if not base_url or not model:
             raise ProviderConfigurationError(
                 "PROOFLINE_AI_BASE_URL and PROOFLINE_AI_MODEL are required"
             )
         return OpenAICompatibleProvider(
-            base_url=settings.ai_base_url,
-            model=settings.ai_model,
+            base_url=base_url,
+            model=model,
             api_key=settings.ai_api_key,
             allow_remote=settings.allow_remote_ai,
+            provider_id=settings.ai_provider,
         )
     raise ProviderConfigurationError(f"unsupported AI provider: {settings.ai_provider}")
 
@@ -286,16 +360,20 @@ def build_generation_provider(settings: Settings) -> GenerationProvider | None:
 def build_embedding_provider(settings: Settings) -> EmbeddingProvider | None:
     if settings.embedding_provider == "disabled":
         return None
-    if settings.embedding_provider == "openai_compatible":
-        if not settings.embedding_base_url or not settings.embedding_model:
+    if settings.embedding_provider in EMBEDDING_PROFILES:
+        default_url, default_model = EMBEDDING_PROFILES[settings.embedding_provider]
+        base_url = settings.embedding_base_url or default_url
+        model = settings.embedding_model or default_model
+        if not base_url or not model:
             raise ProviderConfigurationError(
                 "PROOFLINE_EMBEDDING_BASE_URL and PROOFLINE_EMBEDDING_MODEL are required"
             )
         return OpenAICompatibleEmbeddingProvider(
-            base_url=settings.embedding_base_url,
-            model=settings.embedding_model,
+            base_url=base_url,
+            model=model,
             api_key=settings.embedding_api_key,
             allow_remote=settings.allow_remote_ai,
+            provider_id=f"{settings.embedding_provider}_embedding",
         )
     raise ProviderConfigurationError(
         f"unsupported embedding provider: {settings.embedding_provider}"
@@ -388,9 +466,12 @@ def run_generation(
     except Exception as exc:
         session.rollback()
         failed = session.get(ModelRun, run.id)
-        failed.status = "failed"
+        exhausted = isinstance(exc, ProviderRequestError) and exc.retry_exhausted
+        failed.status = "dead_letter" if exhausted else "failed"
         failed.error_code = (
-            "provider_request_failed"
+            "provider_transport_retry_exhausted"
+            if exhausted
+            else "provider_request_failed"
             if isinstance(exc, ProviderRequestError)
             else "provider_internal_error"
         )
@@ -448,9 +529,12 @@ def run_embedding(
     except Exception as exc:
         session.rollback()
         failed = session.get(ModelRun, run.id)
-        failed.status = "failed"
+        exhausted = isinstance(exc, ProviderRequestError) and exc.retry_exhausted
+        failed.status = "dead_letter" if exhausted else "failed"
         failed.error_code = (
-            "provider_request_failed"
+            "provider_transport_retry_exhausted"
+            if exhausted
+            else "provider_request_failed"
             if isinstance(exc, ProviderRequestError)
             else "provider_internal_error"
         )
