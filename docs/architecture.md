@@ -68,7 +68,8 @@ text, prompts, model output, credentials, or input hashes. Desktop packaging is 
 The service will grow through internal interfaces rather than provider-specific product logic.
 Current and target boundaries are:
 
-- workspace abstraction — planned; the current implementation is one local workspace;
+- workspace abstraction — implemented as local API workspaces selected by the
+  `X-Proofline-Workspace-ID` header, with a backward-compatible default workspace;
 - source catalog and ingestion coordinator — implemented for upload and registered roots;
 - read-only local Git ingestion — implemented for immutable commit metadata and tracked
   Markdown/text objects;

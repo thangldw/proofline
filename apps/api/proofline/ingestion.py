@@ -302,7 +302,11 @@ def ingest_source(
     digest = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
     source = None
     if payload.uri:
-        matches = session.query(Source).filter(Source.uri == payload.uri).all()
+        matches = (
+            session.query(Source)
+            .filter(Source.workspace_id == payload.workspace_id, Source.uri == payload.uri)
+            .all()
+        )
         if len(matches) > 1:
             raise IngestionConflict(
                 "multiple sources already use this URI; resolve the duplicate identity first"
@@ -316,7 +320,11 @@ def ingest_source(
         duplicate = (
             session.query(Source)
             .join(SourceVersion, Source.current_version_id == SourceVersion.id)
-            .filter(Source.uri.is_(None), SourceVersion.content_hash == digest)
+            .filter(
+                Source.workspace_id == payload.workspace_id,
+                Source.uri.is_(None),
+                SourceVersion.content_hash == digest,
+            )
             .one_or_none()
         )
         if duplicate:
@@ -327,6 +335,7 @@ def ingest_source(
         source_id = new_id()
         source = Source(
             id=source_id,
+            workspace_id=payload.workspace_id,
             title=payload.title,
             kind=payload.kind,
             uri=payload.uri,
@@ -376,6 +385,7 @@ def ingestion_request_hash(payload: SourceCreate) -> tuple[str, str]:
             "kind": payload.kind,
             "title": payload.title,
             "uri": payload.uri,
+            "workspace_id": payload.workspace_id,
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -428,6 +438,7 @@ def _stage_ingestion_job(
             return existing, True
     now = utc_now()
     job = IngestionJob(
+        workspace_id=payload.workspace_id,
         state="running",
         stage="accepted",
         attempts=1,
@@ -443,6 +454,7 @@ def _stage_ingestion_job(
     session.add(
         IngestionJobInput(
             job_id=job.id,
+            workspace_id=payload.workspace_id,
             title=payload.title,
             kind=payload.kind,
             uri=payload.uri,
@@ -519,6 +531,7 @@ def _execute_staged_ingestion(session: Session, job_id: str) -> tuple[Source, bo
             kind=staged_input.kind,
             uri=staged_input.uri,
             content=staged_input.content,
+            workspace_id=staged_input.workspace_id,
         )
         source, created = ingest_source(session, payload, commit=False)
         job = session.get(IngestionJob, job_id)

@@ -3,12 +3,15 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from threading import Lock
 from urllib.parse import unquote, urlparse
 
-from sqlalchemy import select
+from sqlalchemy import delete, insert, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .ingestion import (
@@ -17,7 +20,7 @@ from .ingestion import (
     delete_source,
     run_ingestion_job,
 )
-from .models import AuditEvent, Source, SourceVersion, utc_now
+from .models import AuditEvent, Source, SourceVersion, WorkspaceLease, utc_now
 from .schemas import (
     FolderScanFileResult,
     FolderScanRequest,
@@ -36,7 +39,7 @@ class FolderScanError(ValueError):
 
 
 class FolderScanCoordinator:
-    """Serialize every scan owned by one API process, including manual scans."""
+    """Serialize scans in-process and across API workers through a durable lease."""
 
     def __init__(self) -> None:
         self._lock = Lock()
@@ -48,7 +51,41 @@ class FolderScanCoordinator:
         registered_roots: tuple[Path, ...],
     ) -> FolderScanResponse:
         with self._lock:
-            return scan_registered_folder(session, payload, registered_roots)
+            owner_id = str(uuid.uuid4())
+            now = utc_now()
+            session.execute(
+                delete(WorkspaceLease).where(
+                    WorkspaceLease.workspace_id == payload.workspace_id,
+                    WorkspaceLease.expires_at <= now,
+                )
+            )
+            session.commit()
+            try:
+                session.execute(
+                    insert(WorkspaceLease).values(
+                        workspace_id=payload.workspace_id,
+                        owner_id=owner_id,
+                        purpose="folder_scan",
+                        expires_at=now + timedelta(minutes=30),
+                    )
+                )
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise FolderScanError(
+                    "scan_in_progress",
+                    "Another worker is already scanning this workspace.",
+                ) from exc
+            try:
+                return scan_registered_folder(session, payload, registered_roots)
+            finally:
+                session.execute(
+                    delete(WorkspaceLease).where(
+                        WorkspaceLease.workspace_id == payload.workspace_id,
+                        WorkspaceLease.owner_id == owner_id,
+                    )
+                )
+                session.commit()
 
 
 @dataclass(frozen=True)
@@ -192,11 +229,17 @@ def _prepare_file(root: Path, candidate: Path) -> PreparedFile | FolderScanFileR
     )
 
 
-def _ingest_prepared_file(session: Session, prepared: PreparedFile) -> FolderScanFileResult:
+def _ingest_prepared_file(
+    session: Session, prepared: PreparedFile, workspace_id: str
+) -> FolderScanFileResult:
     relative_path = prepared.relative_path
     uri = prepared.uri
 
-    existing_matches = list(session.scalars(select(Source).where(Source.uri == uri)).all())
+    existing_matches = list(
+        session.scalars(
+            select(Source).where(Source.workspace_id == workspace_id, Source.uri == uri)
+        ).all()
+    )
     existing = existing_matches[0] if len(existing_matches) == 1 else None
     previous_version_id = existing.current_version_id if existing else None
     if existing and previous_version_id:
@@ -205,6 +248,7 @@ def _ingest_prepared_file(session: Session, prepared: PreparedFile) -> FolderSca
             return FolderScanFileResult(
                 relative_path=relative_path,
                 uri=uri,
+                workspace_id=workspace_id,
                 status="unchanged",
                 source_id=existing.id,
                 source_version_id=previous_version_id,
@@ -260,6 +304,7 @@ def _rename_source(
     source.indexed_at = utc_now()
     session.add(
         AuditEvent(
+            workspace_id=source.workspace_id,
             action="source.renamed",
             object_type="source",
             object_id=source.id,
@@ -295,7 +340,13 @@ def scan_registered_folder(
     prepared_items = [_prepare_file(root, candidate) for candidate in candidates]
     discovered_uris = {item.uri for item in prepared_items if item.uri is not None}
 
-    sources = list(session.scalars(select(Source).where(Source.uri.is_not(None))).all())
+    sources = list(
+        session.scalars(
+            select(Source).where(
+                Source.workspace_id == payload.workspace_id, Source.uri.is_not(None)
+            )
+        ).all()
+    )
     sources_by_uri: dict[str, list[Source]] = {}
     missing_sources_by_hash: dict[str, list[Source]] = {}
     for source in sources:
@@ -329,7 +380,7 @@ def scan_registered_folder(
         files.append(
             _rename_source(session, rename_source, item)
             if rename_source
-            else _ingest_prepared_file(session, item)
+            else _ingest_prepared_file(session, item, payload.workspace_id)
         )
 
     missing_source_ids: list[str] = []

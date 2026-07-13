@@ -9,7 +9,14 @@ from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session
 
 from .model_gateway import EmbeddingProvider, EmbeddingRequest, run_embedding
-from .models import Chunk, ChunkEmbedding, ChunkVectorBucket, Source, SourceVersion
+from .models import (
+    DEFAULT_WORKSPACE_ID,
+    Chunk,
+    ChunkEmbedding,
+    ChunkVectorBucket,
+    Source,
+    SourceVersion,
+)
 from .reranking import Reranker, apply_reranking
 from .retrieval import lexical_search
 from .schemas import SearchHit
@@ -39,12 +46,16 @@ def index_current_embeddings(
     session: Session,
     provider: EmbeddingProvider,
     batch_size: int = 64,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
 ) -> EmbeddingIndexReport:
     chunks = list(
         session.scalars(
             select(Chunk)
             .join(Source)
-            .where(Chunk.source_version_id == Source.current_version_id)
+            .where(
+                Chunk.source_version_id == Source.current_version_id,
+                Source.workspace_id == workspace_id,
+            )
             .order_by(Chunk.source_id, Chunk.ordinal)
         ).all()
     )
@@ -54,6 +65,9 @@ def index_current_embeddings(
             select(ChunkEmbedding).where(
                 ChunkEmbedding.provider_id == provider.id,
                 ChunkEmbedding.model_id == provider.model,
+                ChunkEmbedding.source_id.in_(
+                    select(Source.id).where(Source.workspace_id == workspace_id)
+                ),
             )
         ).all()
     }
@@ -74,6 +88,7 @@ def index_current_embeddings(
             texts=[chunk.content for chunk, _fingerprint in batch],
             input_hashes=[fingerprint for _chunk, fingerprint in batch],
             template_version="chunk-embedding-v1",
+            workspace_id=workspace_id,
         )
         result, run = run_embedding(session, provider, request)
         run_ids.append(run.id)
@@ -143,6 +158,7 @@ def semantic_search(
     source_ids: list[str] | None = None,
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
 ) -> list[SearchHit]:
     if not math.isfinite(min_semantic_score) or not 0 <= min_semantic_score <= 1:
         raise ValueError("min_semantic_score must be finite and between 0 and 1")
@@ -153,7 +169,10 @@ def semantic_search(
         session,
         provider,
         EmbeddingRequest(
-            texts=[query], input_hashes=[query_hash], template_version="query-embedding-v1"
+            texts=[query],
+            input_hashes=[query_hash],
+            template_version="query-embedding-v1",
+            workspace_id=workspace_id,
         ),
     )
     query_vector = result.vectors[0]
@@ -170,6 +189,7 @@ def semantic_search(
             ChunkEmbedding.provider_id == provider.id,
             ChunkEmbedding.model_id == provider.model,
             Chunk.source_version_id == Source.current_version_id,
+            Source.workspace_id == workspace_id,
             or_(
                 *[
                     and_(
@@ -250,6 +270,7 @@ def hybrid_search(
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
     reranker: Reranker | None = None,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
 ) -> list[SearchHit]:
     lexical = lexical_search(
         session,
@@ -258,6 +279,7 @@ def hybrid_search(
         source_ids,
         ingested_from,
         ingested_before,
+        workspace_id,
     )
     lexical = [
         hit.model_copy(update={"lexical_rank": index, "retrieval_channels": ["lexical"]})
@@ -273,6 +295,7 @@ def hybrid_search(
             source_ids,
             ingested_from,
             ingested_before,
+            workspace_id,
         )
         if provider
         else []

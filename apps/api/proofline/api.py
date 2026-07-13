@@ -38,6 +38,7 @@ from .model_gateway import (
     build_generation_provider,
 )
 from .models import (
+    DEFAULT_WORKSPACE_ID,
     AuditEvent,
     Chunk,
     Decision,
@@ -48,6 +49,7 @@ from .models import (
     ModelRun,
     Source,
     SourceVersion,
+    Workspace,
     utc_now,
 )
 from .reranking import DeterministicTokenReranker
@@ -85,10 +87,50 @@ from .schemas import (
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
+    WorkspaceCreate,
+    WorkspaceRead,
     normalize_retrieval_filters,
 )
 
 router = APIRouter(prefix="/api/v1")
+
+
+def resolve_workspace_id(
+    workspace_id: str = Header(default=DEFAULT_WORKSPACE_ID, alias="X-Proofline-Workspace-ID"),
+    session: Session = Depends(get_session),
+) -> str:
+    if not session.get(Workspace, workspace_id):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return workspace_id
+
+
+def get_workspace_source(session: Session, source_id: str, workspace_id: str) -> Source:
+    source = session.get(Source, source_id)
+    if not source or source.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return source
+
+
+@router.post("/workspaces", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
+def create_workspace(
+    payload: WorkspaceCreate, session: Session = Depends(get_session)
+) -> Workspace:
+    workspace = Workspace(slug=payload.slug, title=payload.title)
+    session.add(workspace)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Workspace slug already exists") from exc
+    session.refresh(workspace)
+    return workspace
+
+
+@router.get("/workspaces", response_model=list[WorkspaceRead])
+def list_workspaces(session: Session = Depends(get_session)) -> list[Workspace]:
+    return list(
+        session.scalars(select(Workspace).order_by(Workspace.created_at, Workspace.id)).all()
+    )
 
 
 def git_repository_to_read(repository: GitRepository) -> GitRepositoryRead:
@@ -145,6 +187,7 @@ def apply_memory_update(
     object_type: str,
     action: str,
 ) -> DecisionRead:
+    workspace_id = session.scalar(select(Source.workspace_id).where(Source.id == memory.source_id))
     before = decision_snapshot(memory)
     for field, value in changes.items():
         setattr(memory, field, value)
@@ -152,6 +195,7 @@ def apply_memory_update(
     after = decision_snapshot(memory)
     session.add(
         AuditEvent(
+            workspace_id=workspace_id,
             actor="local_user",
             action=action,
             object_type=object_type,
@@ -167,14 +211,23 @@ def apply_memory_update(
 
 
 @router.get("/overview", response_model=Overview)
-def overview(session: Session = Depends(get_session)) -> Overview:
+def overview(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> Overview:
     return Overview(
-        sources=session.scalar(select(func.count()).select_from(Source)) or 0,
+        sources=session.scalar(
+            select(func.count()).select_from(Source).where(Source.workspace_id == workspace_id)
+        )
+        or 0,
         chunks=session.scalar(
             select(func.count())
             .select_from(Chunk)
             .join(Source)
-            .where(Chunk.source_version_id == Source.current_version_id)
+            .where(
+                Chunk.source_version_id == Source.current_version_id,
+                Source.workspace_id == workspace_id,
+            )
         )
         or 0,
         decisions=session.scalar(
@@ -184,6 +237,7 @@ def overview(session: Session = Depends(get_session)) -> Overview:
             .where(
                 Decision.source_version_id == Source.current_version_id,
                 Decision.kind == "decision",
+                Source.workspace_id == workspace_id,
             )
         )
         or 0,
@@ -191,14 +245,20 @@ def overview(session: Session = Depends(get_session)) -> Overview:
             select(func.count())
             .select_from(Decision)
             .join(Source)
-            .where(Decision.source_version_id == Source.current_version_id)
+            .where(
+                Decision.source_version_id == Source.current_version_id,
+                Source.workspace_id == workspace_id,
+            )
         )
         or 0,
         evidence=session.scalar(
             select(func.count())
             .select_from(Evidence)
             .join(Source)
-            .where(Evidence.source_version_id == Source.current_version_id)
+            .where(
+                Evidence.source_version_id == Source.current_version_id,
+                Source.workspace_id == workspace_id,
+            )
         )
         or 0,
     )
@@ -208,6 +268,7 @@ def overview(session: Session = Depends(get_session)) -> Overview:
 def create_source(
     payload: SourceCreate,
     response: Response,
+    workspace_id: str = Depends(resolve_workspace_id),
     idempotency_key: str | None = Header(
         default=None,
         alias="Idempotency-Key",
@@ -217,6 +278,7 @@ def create_source(
     ),
     session: Session = Depends(get_session),
 ) -> SourceRead:
+    payload = payload.model_copy(update={"workspace_id": workspace_id})
     try:
         source, created, job = run_ingestion_job(session, payload, idempotency_key=idempotency_key)
     except IngestionIdempotencyConflict as exc:
@@ -253,8 +315,10 @@ def create_source(
 def create_folder_scan(
     payload: FolderScanRequest,
     request: Request,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> FolderScanResponse:
+    payload = payload.model_copy(update={"workspace_id": workspace_id})
     try:
         return request.app.state.folder_scan_coordinator.scan(
             session, payload, get_settings().import_roots
@@ -286,8 +350,10 @@ def create_folder_scan(
 def create_git_repository(
     payload: GitRepositoryCreate,
     response: Response,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> GitRepositoryImportResponse:
+    payload = payload.model_copy(update={"workspace_id": workspace_id})
     try:
         repository, commit_sha, created, unchanged, failures = import_git_repository(
             session, payload
@@ -311,9 +377,13 @@ def create_git_repository(
 
 
 @router.get("/git-repositories", response_model=list[GitRepositoryRead])
-def list_git_repositories(session: Session = Depends(get_session)) -> list[GitRepositoryRead]:
+def list_git_repositories(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[GitRepositoryRead]:
     repositories = session.scalars(
         select(GitRepository)
+        .where(GitRepository.workspace_id == workspace_id)
         .options(selectinload(GitRepository.sources))
         .order_by(GitRepository.indexed_at.desc())
     ).all()
@@ -321,9 +391,13 @@ def list_git_repositories(session: Session = Depends(get_session)) -> list[GitRe
 
 
 @router.delete("/git-repositories/{repository_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_git_repository(repository_id: str, session: Session = Depends(get_session)) -> Response:
+def remove_git_repository(
+    repository_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> Response:
     repository = session.get(GitRepository, repository_id)
-    if not repository:
+    if not repository or repository.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Git repository not found")
     for source in list(repository.sources):
         delete_source(session, source)
@@ -339,9 +413,13 @@ def folder_watch_status(request: Request) -> FolderWatchStatus:
 
 
 @router.get("/sources", response_model=list[SourceRead])
-def list_sources(session: Session = Depends(get_session)) -> list[SourceRead]:
+def list_sources(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[SourceRead]:
     sources = session.scalars(
         select(Source)
+        .where(Source.workspace_id == workspace_id)
         .options(
             selectinload(Source.versions),
             selectinload(Source.chunks),
@@ -356,24 +434,41 @@ def list_sources(session: Session = Depends(get_session)) -> list[SourceRead]:
 def list_jobs(
     job_state: str | None = Query(default=None, alias="state"),
     limit: int = Query(default=50, ge=1, le=200),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[IngestionJob]:
-    query = select(IngestionJob).order_by(IngestionJob.updated_at.desc()).limit(limit)
+    query = (
+        select(IngestionJob)
+        .where(IngestionJob.workspace_id == workspace_id)
+        .order_by(IngestionJob.updated_at.desc())
+        .limit(limit)
+    )
     if job_state:
         query = query.where(IngestionJob.state == job_state)
     return list(session.scalars(query).all())
 
 
 @router.get("/jobs/{job_id}", response_model=IngestionJobRead)
-def get_job(job_id: str, session: Session = Depends(get_session)) -> IngestionJob:
+def get_job(
+    job_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> IngestionJob:
     job = session.get(IngestionJob, job_id)
-    if not job:
+    if not job or job.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Ingestion job not found")
     return job
 
 
 @router.post("/jobs/{job_id}/retry", response_model=IngestionJobRead)
-def retry_job(job_id: str, session: Session = Depends(get_session)) -> IngestionJob:
+def retry_job(
+    job_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> IngestionJob:
+    job = session.get(IngestionJob, job_id)
+    if not job or job.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Ingestion job not found")
     try:
         return retry_ingestion_job(session, job_id)
     except IngestionJobNotFound as exc:
@@ -516,12 +611,15 @@ def reranking_provider_status() -> ProviderStatus:
 
 
 @router.post("/model/embeddings/index", response_model=EmbeddingIndexResponse)
-def index_embeddings(session: Session = Depends(get_session)) -> EmbeddingIndexResponse:
+def index_embeddings(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> EmbeddingIndexResponse:
     try:
         provider = build_embedding_provider(get_settings())
         if provider is None:
             raise HTTPException(status_code=409, detail="Embedding provider is disabled")
-        report = index_current_embeddings(session, provider)
+        report = index_current_embeddings(session, provider, workspace_id=workspace_id)
     except ProviderConfigurationError as exc:
         raise HTTPException(
             status_code=409, detail="Embedding provider configuration is invalid"
@@ -542,9 +640,10 @@ def list_model_runs(
     provider_id: str | None = None,
     parent_run_id: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[ModelRun]:
-    query = select(ModelRun)
+    query = select(ModelRun).where(ModelRun.workspace_id == workspace_id)
     if run_status:
         query = query.where(ModelRun.status == run_status)
     if operation:
@@ -560,15 +659,16 @@ def list_model_runs(
 def retry_model_run(
     run_id: str,
     payload: ModelRunRetryRequest,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> ModelRunRetryResponse:
     parent = session.get(ModelRun, run_id)
-    if not parent:
+    if not parent or parent.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Model run not found")
     if parent.status not in {"failed", "dead_letter"}:
         raise HTTPException(status_code=409, detail="Only failed model runs can be retried")
     source = session.get(Source, payload.source_id)
-    if not source or not source.current_version_id:
+    if not source or source.workspace_id != workspace_id or not source.current_version_id:
         raise HTTPException(status_code=404, detail="Source not found")
     version = session.get(SourceVersion, source.current_version_id)
     if not version or version.content_hash not in parent.input_hashes:
@@ -606,18 +706,24 @@ def retry_model_run(
 
 
 @router.get("/model/runs/{run_id}", response_model=ModelRunRead)
-def get_model_run(run_id: str, session: Session = Depends(get_session)) -> ModelRun:
+def get_model_run(
+    run_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> ModelRun:
     run = session.get(ModelRun, run_id)
-    if not run:
+    if not run or run.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Model run not found")
     return run
 
 
 @router.get("/sources/{source_id}")
-def get_source(source_id: str, session: Session = Depends(get_session)) -> dict:
-    source = session.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Source not found")
+def get_source(
+    source_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> dict:
+    source = get_workspace_source(session, source_id, workspace_id)
     return {
         "id": source.id,
         "title": source.title,
@@ -636,11 +742,11 @@ def get_source(source_id: str, session: Session = Depends(get_session)) -> dict:
     response_model=SourceDeletionImpactRead,
 )
 def get_source_deletion_impact(
-    source_id: str, session: Session = Depends(get_session)
+    source_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
 ) -> SourceDeletionImpactRead:
-    source = session.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Source not found")
+    source = get_workspace_source(session, source_id, workspace_id)
     impact = source_deletion_impact(session, source)
     return SourceDeletionImpactRead(
         source_id=source.id,
@@ -652,10 +758,11 @@ def get_source_deletion_impact(
 
 @router.get("/sources/{source_id}/versions", response_model=list[SourceVersionRead])
 def list_source_versions(
-    source_id: str, session: Session = Depends(get_session)
+    source_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
 ) -> list[SourceVersion]:
-    if not session.get(Source, source_id):
-        raise HTTPException(status_code=404, detail="Source not found")
+    get_workspace_source(session, source_id, workspace_id)
     return list(
         session.scalars(
             select(SourceVersion)
@@ -669,11 +776,10 @@ def list_source_versions(
 def extract_source_decisions(
     source_id: str,
     response: Response,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[DecisionRead]:
-    source = session.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Source not found")
+    source = get_workspace_source(session, source_id, workspace_id)
     try:
         provider = build_generation_provider(get_settings())
         if provider is None:
@@ -697,11 +803,10 @@ def extract_source_decisions(
 def extract_source_memories(
     source_id: str,
     response: Response,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[MemoryRead]:
-    source = session.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Source not found")
+    source = get_workspace_source(session, source_id, workspace_id)
     try:
         provider = build_generation_provider(get_settings())
         if provider is None:
@@ -728,8 +833,12 @@ def extract_source_memories(
     response_model=SourceVersionContentRead,
 )
 def get_source_version(
-    source_id: str, version_id: str, session: Session = Depends(get_session)
+    source_id: str,
+    version_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
 ) -> SourceVersion:
+    get_workspace_source(session, source_id, workspace_id)
     version = session.scalar(
         select(SourceVersion).where(
             SourceVersion.id == version_id, SourceVersion.source_id == source_id
@@ -741,10 +850,12 @@ def get_source_version(
 
 
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_source(source_id: str, session: Session = Depends(get_session)) -> Response:
-    source = session.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Source not found")
+def remove_source(
+    source_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> Response:
+    source = get_workspace_source(session, source_id, workspace_id)
     delete_source(session, source)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -753,12 +864,16 @@ def remove_source(source_id: str, session: Session = Depends(get_session)) -> Re
 def list_memories(
     memory_kind: MemoryKind | None = Query(default=None, alias="kind"),
     memory_status: str | None = Query(default=None, alias="status"),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[DecisionRead]:
     query = (
         select(Decision, Source.title)
         .join(Source)
-        .where(Decision.source_version_id == Source.current_version_id)
+        .where(
+            Decision.source_version_id == Source.current_version_id,
+            Source.workspace_id == workspace_id,
+        )
         .options(selectinload(Decision.evidence))
         .order_by(Decision.created_at.desc())
     )
@@ -770,11 +885,15 @@ def list_memories(
 
 
 @router.get("/memories/{memory_id}", response_model=MemoryRead)
-def get_memory(memory_id: str, session: Session = Depends(get_session)) -> DecisionRead:
+def get_memory(
+    memory_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> DecisionRead:
     row = session.execute(
         select(Decision, Source.title)
         .join(Source)
-        .where(Decision.id == memory_id)
+        .where(Decision.id == memory_id, Source.workspace_id == workspace_id)
         .options(selectinload(Decision.evidence))
     ).one_or_none()
     if not row:
@@ -786,10 +905,14 @@ def get_memory(memory_id: str, session: Session = Depends(get_session)) -> Decis
 def update_memory(
     memory_id: str,
     payload: MemoryUpdate,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> DecisionRead:
     memory = session.scalar(
-        select(Decision).where(Decision.id == memory_id).options(selectinload(Decision.evidence))
+        select(Decision)
+        .join(Source)
+        .where(Decision.id == memory_id, Source.workspace_id == workspace_id)
+        .options(selectinload(Decision.evidence))
     )
     if not memory:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -808,6 +931,7 @@ def update_memory(
 @router.get("/decisions", response_model=list[DecisionRead])
 def list_decisions(
     decision_status: str | None = Query(default=None, alias="status"),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[DecisionRead]:
     query = (
@@ -816,6 +940,7 @@ def list_decisions(
         .where(
             Decision.source_version_id == Source.current_version_id,
             Decision.kind == "decision",
+            Source.workspace_id == workspace_id,
         )
         .options(selectinload(Decision.evidence))
         .order_by(Decision.created_at.desc())
@@ -826,11 +951,19 @@ def list_decisions(
 
 
 @router.get("/decisions/{decision_id}", response_model=DecisionRead)
-def get_decision(decision_id: str, session: Session = Depends(get_session)) -> DecisionRead:
+def get_decision(
+    decision_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> DecisionRead:
     row = session.execute(
         select(Decision, Source.title)
         .join(Source)
-        .where(Decision.id == decision_id, Decision.kind == "decision")
+        .where(
+            Decision.id == decision_id,
+            Decision.kind == "decision",
+            Source.workspace_id == workspace_id,
+        )
         .options(selectinload(Decision.evidence))
     ).one_or_none()
     if not row:
@@ -842,11 +975,17 @@ def get_decision(decision_id: str, session: Session = Depends(get_session)) -> D
 def update_decision(
     decision_id: str,
     payload: DecisionUpdate,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> DecisionRead:
     decision = session.scalar(
         select(Decision)
-        .where(Decision.id == decision_id, Decision.kind == "decision")
+        .join(Source)
+        .where(
+            Decision.id == decision_id,
+            Decision.kind == "decision",
+            Source.workspace_id == workspace_id,
+        )
         .options(selectinload(Decision.evidence))
     )
     if not decision:
@@ -870,14 +1009,18 @@ def update_decision(
 )
 def create_decision_relation(
     payload: DecisionRelationCreate,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> DecisionRelation:
     decisions = {
         decision.id: decision
         for decision in session.scalars(
-            select(Decision).where(
+            select(Decision)
+            .join(Source)
+            .where(
                 Decision.id.in_([payload.source_decision_id, payload.target_decision_id]),
                 Decision.kind == "decision",
+                Source.workspace_id == workspace_id,
             )
         ).all()
     }
@@ -897,6 +1040,7 @@ def create_decision_relation(
         session.add_all(
             [
                 AuditEvent(
+                    workspace_id=workspace_id,
                     actor="local_user",
                     action="decision.supersedes",
                     object_type="decision",
@@ -905,6 +1049,7 @@ def create_decision_relation(
                     after_json=decision_snapshot(source),
                 ),
                 AuditEvent(
+                    workspace_id=workspace_id,
                     actor="local_user",
                     action="decision.superseded",
                     object_type="decision",
@@ -927,9 +1072,20 @@ def create_decision_relation(
 def list_decision_relations(
     decision_id: str | None = None,
     relation_kind: str | None = Query(default=None, alias="kind"),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[DecisionRelation]:
-    query = select(DecisionRelation).order_by(DecisionRelation.created_at, DecisionRelation.id)
+    workspace_decisions = (
+        select(Decision.id).join(Source).where(Source.workspace_id == workspace_id)
+    )
+    query = (
+        select(DecisionRelation)
+        .where(
+            DecisionRelation.source_decision_id.in_(workspace_decisions),
+            DecisionRelation.target_decision_id.in_(workspace_decisions),
+        )
+        .order_by(DecisionRelation.created_at, DecisionRelation.id)
+    )
     if decision_id:
         query = query.where(
             (DecisionRelation.source_decision_id == decision_id)
@@ -942,11 +1098,15 @@ def list_decision_relations(
 
 @router.get("/decisions/{decision_id}/timeline", response_model=DecisionTimelineRead)
 def get_decision_timeline(
-    decision_id: str, session: Session = Depends(get_session)
+    decision_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
 ) -> DecisionTimelineRead:
     decision = session.scalar(
         select(Decision)
+        .join(Source)
         .where(Decision.id == decision_id, Decision.kind == "decision")
+        .where(Source.workspace_id == workspace_id)
         .options(selectinload(Decision.evidence))
     )
     if not decision:
@@ -973,11 +1133,19 @@ def get_decision_timeline(
 
 @router.get("/decision-relation-candidates", response_model=list[DecisionRelationCandidateRead])
 def list_decision_relation_candidates(
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[DecisionRelationCandidateRead]:
     candidates: list[DecisionRelationCandidateRead] = []
+    workspace_decisions = (
+        select(Decision.id).join(Source).where(Source.workspace_id == workspace_id)
+    )
     relations = session.scalars(
-        select(DecisionRelation).where(DecisionRelation.kind == "contradicts")
+        select(DecisionRelation).where(
+            DecisionRelation.kind == "contradicts",
+            DecisionRelation.source_decision_id.in_(workspace_decisions),
+            DecisionRelation.target_decision_id.in_(workspace_decisions),
+        )
     ).all()
     for relation in relations:
         decisions = [
@@ -995,8 +1163,11 @@ def list_decision_relation_candidates(
             )
     now = utc_now().replace(tzinfo=None)
     stale = session.scalars(
-        select(Decision).where(
+        select(Decision)
+        .join(Source)
+        .where(
             Decision.kind == "decision",
+            Source.workspace_id == workspace_id,
             Decision.status.in_(["active", "accepted"]),
             Decision.valid_to.is_not(None),
             Decision.valid_to <= now,
@@ -1018,9 +1189,15 @@ def list_audit_events(
     object_type: str | None = None,
     object_id: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[AuditEvent]:
-    query = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    query = (
+        select(AuditEvent)
+        .where(AuditEvent.workspace_id == workspace_id)
+        .order_by(AuditEvent.created_at.desc())
+        .limit(limit)
+    )
     if object_type:
         query = query.where(AuditEvent.object_type == object_type)
     if object_id:
@@ -1044,6 +1221,7 @@ def search(
     source_ids: list[str] | None = Query(default=None, alias="source_id"),
     ingested_from: datetime | None = Query(default=None),
     ingested_before: datetime | None = Query(default=None),
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> SearchResponse:
     try:
@@ -1070,6 +1248,7 @@ def search(
             ingested_from=ingested_from,
             ingested_before=ingested_before,
             reranker=DeterministicTokenReranker() if rerank else None,
+            workspace_id=workspace_id,
         )
     except (ProviderRequestError, EmbeddingValidationError) as exc:
         raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
@@ -1080,6 +1259,7 @@ def search(
 def create_answer(
     payload: AnswerRequest,
     response: Response,
+    workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> AnswerResponse:
     try:
@@ -1098,6 +1278,7 @@ def create_answer(
             payload.ingested_from,
             payload.ingested_before,
             reranker=DeterministicTokenReranker() if payload.rerank else None,
+            workspace_id=workspace_id,
         )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
