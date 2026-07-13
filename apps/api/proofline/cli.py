@@ -34,6 +34,7 @@ from .portable_import import (
     merge_portable_export,
     preview_portable_merge,
 )
+from .real_model_evaluation import preflight_real_model_plan, write_preflight_receipt
 from .schemas import SourceCreate
 from .server import run_server
 
@@ -117,6 +118,13 @@ def main(argv: list[str] | None = None) -> None:
     extraction.add_argument("--min-evidence-resolution", type=unit_interval, default=0)
     extraction.add_argument("--min-expected-evidence-accuracy", type=unit_interval, default=0)
     extraction.add_argument("--min-negative-source-accuracy", type=unit_interval, default=0)
+    real_model_preflight = subcommands.add_parser(
+        "eval-real-model-preflight",
+        help="Validate a versioned local/remote real-model comparison plan",
+    )
+    real_model_preflight.add_argument("--plan", type=Path, required=True)
+    real_model_preflight.add_argument("--output", type=Path, required=True)
+    real_model_preflight.add_argument("--force", action="store_true")
     benchmark = subcommands.add_parser(
         "benchmark", help="Measure local SQLite FTS5 lexical search latency"
     )
@@ -196,6 +204,15 @@ def main(argv: list[str] | None = None) -> None:
             min_expected_evidence_accuracy=args.min_expected_evidence_accuracy,
             min_negative_source_accuracy=args.min_negative_source_accuracy,
         ):
+            raise SystemExit(1)
+    elif args.command == "eval-real-model-preflight":
+        try:
+            receipt = preflight_real_model_plan(args.plan)
+            write_preflight_receipt(args.output, receipt, force=args.force)
+        except (FileExistsError, OSError, ValueError) as exc:
+            raise SystemExit(f"real-model preflight failed: {type(exc).__name__}") from exc
+        print(receipt.model_dump_json(indent=2))
+        if receipt.status != "ready":
             raise SystemExit(1)
     elif args.command == "benchmark":
         try:

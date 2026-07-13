@@ -1,7 +1,7 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** các lát cắt evidence-first nội bộ đã phát hành đến `v0.14.2`; Windows, production
+**Trạng thái hiện tại:** real-model comparison preflight đã triển khai cho `v0.14.3`; Windows, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -138,6 +138,15 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [ ] Đo extraction precision/recall cho bốn memory kinds.
 - [ ] Đo grounded answer citation precision, abstention, latency và estimated cost.
 - [ ] Không dùng vài demo thành công để tuyên bố chất lượng tổng quát.
+
+Nền tảng preflight đã triển khai ngày 2026-07-13:
+
+- [x] Manifest versioned bắt buộc có ít nhất một provider local và một provider remote.
+- [x] Receipt khóa dataset SHA-256, declared model revision, prompt version và token pricing.
+- [x] Credential chỉ đọc từ tên biến môi trường; receipt không ghi secret.
+- [x] Endpoint/credential failure được ghi `blocked` với error code và CLI exit khác 0.
+- [ ] Chưa chọn model thật vì máy hiện tại không có Ollama model và không có Qwen/DeepSeek key.
+- [ ] Chưa chạy extraction/grounded comparison; preflight không được tính là quality evidence.
 
 ### Problem corpus và pilot
 
