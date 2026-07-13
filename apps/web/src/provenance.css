@@ -131,7 +131,7 @@
 
 .scope-controls > button:disabled {
   cursor: default;
-  opacity: .5;
+  opacity: 0.5;
 }
 
 .scope-summary {
@@ -579,7 +579,10 @@
 
 .failure-card {
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.7fr) minmax(120px, 1fr) auto;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.7fr) minmax(
+      120px,
+      1fr
+    ) auto;
   align-items: center;
   gap: 12px;
   background: #fff;
@@ -693,7 +696,7 @@
 
 .model-run-filters button:disabled {
   cursor: wait;
-  opacity: .6;
+  opacity: 0.6;
 }
 
 .diagnostic-state {
@@ -706,7 +709,7 @@
 
 .model-run-layout {
   display: grid;
-  grid-template-columns: minmax(390px, 1.15fr) minmax(310px, .85fr);
+  grid-template-columns: minmax(390px, 1.15fr) minmax(310px, 0.85fr);
   gap: 16px;
   align-items: start;
 }
@@ -718,7 +721,10 @@
 
 .model-run-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) auto minmax(130px, .8fr);
+  grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) auto minmax(
+      130px,
+      0.8fr
+    );
   gap: 12px;
   align-items: center;
   width: 100%;

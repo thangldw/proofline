@@ -11,6 +11,8 @@ way and trace every answer back to exact source evidence.
 ## Start here
 
 | Document | Purpose | Status |
+| [v0.5.0 notes](./releases/v0.5.0.md) | Provider settings and model reliability | Pre-alpha |
+| [Provider configuration](./provider-configuration.md) | Profiles, keys, health and retry semantics | Implemented |
 | [v0.4.0 notes](./releases/v0.4.0.md) | Temporal decision relations and timelines | Pre-alpha |
 | [v0.3.0 notes](./releases/v0.3.0.md) | Immutable local Git repository ingestion | Pre-alpha |
 | --- | --- | --- |

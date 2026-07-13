@@ -191,13 +191,16 @@ production qualification. They do not block an explicitly experimental pre-alpha
 
 ## Releases
 
-`v0.4.0` is the latest experimental pre-alpha release. It adds typed temporal decision relations,
-reviewable timelines, and current-decision retrieval preference; application limitations remain pre-alpha.
+Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
+the [provider configuration guide](docs/provider-configuration.md).
+
+`v0.5.0` is the latest experimental pre-alpha release. It adds local provider settings, separate
+capability health, bounded transient retries, and explicit model-run retry/dead-letter handling.
 Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
 archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
 reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
 proven two-process development workflow above. See the
-[release notes](docs/releases/v0.4.0.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.5.0.md) and verify `SHA256SUMS` before installation.
 
 ### Data portability and recovery
 

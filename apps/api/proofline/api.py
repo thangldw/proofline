@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from .config import get_settings
+from .config import get_settings, load_provider_config, save_provider_config
 from .database import get_session
 from .embeddings import hybrid_search, index_current_embeddings
 from .extraction import (
@@ -72,7 +72,11 @@ from .schemas import (
     MemoryRead,
     MemoryUpdate,
     ModelRunRead,
+    ModelRunRetryRequest,
+    ModelRunRetryResponse,
     Overview,
+    ProviderConfigurationRead,
+    ProviderConfigurationUpdate,
     ProviderStatus,
     SearchResponse,
     SourceCreate,
@@ -397,14 +401,17 @@ def model_provider_status(check_health: bool = False) -> ProviderStatus:
             configured=False,
             remote_egress_allowed=settings.allow_remote_ai,
             error_code="provider_configuration_invalid",
+            mode="degraded",
         )
     if provider is None:
         return ProviderStatus(
             configured=False,
             remote_egress_allowed=settings.allow_remote_ai,
             error_code="provider_disabled",
+            mode="disabled",
         )
     capabilities = provider.capabilities()
+    healthy = provider.health() if check_health else None
     return ProviderStatus(
         configured=True,
         provider_id=provider.id,
@@ -412,7 +419,8 @@ def model_provider_status(check_health: bool = False) -> ProviderStatus:
         generation=capabilities.generation,
         structured_output=capabilities.structured_output,
         remote_egress_allowed=settings.allow_remote_ai,
-        healthy=provider.health() if check_health else None,
+        healthy=healthy,
+        mode="ready" if healthy else "degraded" if healthy is False else "unchecked",
     )
 
 
@@ -426,21 +434,83 @@ def embedding_provider_status(check_health: bool = False) -> ProviderStatus:
             configured=False,
             remote_egress_allowed=settings.allow_remote_ai,
             error_code="embedding_provider_configuration_invalid",
+            mode="degraded",
         )
     if provider is None:
         return ProviderStatus(
             configured=False,
             remote_egress_allowed=settings.allow_remote_ai,
             error_code="embedding_provider_disabled",
+            mode="disabled",
         )
+    healthy = provider.health() if check_health else None
     return ProviderStatus(
         configured=True,
         provider_id=provider.id,
         model_id=provider.model,
         generation=False,
         structured_output=False,
+        embedding=True,
         remote_egress_allowed=settings.allow_remote_ai,
-        healthy=provider.health() if check_health else None,
+        healthy=healthy,
+        mode="ready" if healthy else "degraded" if healthy is False else "unchecked",
+    )
+
+
+def provider_configuration_read() -> ProviderConfigurationRead:
+    settings = get_settings()
+    return ProviderConfigurationRead(
+        ai_provider=settings.ai_provider,
+        ai_base_url=settings.ai_base_url,
+        ai_model=settings.ai_model,
+        ai_api_key_configured=bool(settings.ai_api_key),
+        embedding_provider=settings.embedding_provider,
+        embedding_base_url=settings.embedding_base_url,
+        embedding_model=settings.embedding_model,
+        embedding_api_key_configured=bool(settings.embedding_api_key),
+        allow_remote_ai=settings.allow_remote_ai,
+    )
+
+
+@router.get("/model/configuration", response_model=ProviderConfigurationRead)
+def get_provider_configuration() -> ProviderConfigurationRead:
+    return provider_configuration_read()
+
+
+@router.put("/model/configuration", response_model=ProviderConfigurationRead)
+def update_provider_configuration(
+    payload: ProviderConfigurationUpdate,
+) -> ProviderConfigurationRead:
+    existing = load_provider_config()
+    values = payload.model_dump(exclude={"ai_api_key", "embedding_api_key"})
+    for field in ("ai_api_key", "embedding_api_key"):
+        supplied = getattr(payload, field)
+        if supplied is not None:
+            if supplied:
+                values[field] = supplied
+            else:
+                existing.pop(field, None)
+        elif field in existing:
+            values[field] = existing[field]
+    candidate = existing | values
+    save_provider_config(candidate)
+    try:
+        settings = get_settings()
+        build_generation_provider(settings)
+        build_embedding_provider(settings)
+    except ProviderConfigurationError as exc:
+        save_provider_config(existing)
+        raise HTTPException(status_code=422, detail="Provider configuration is invalid") from exc
+    return provider_configuration_read()
+
+
+@router.get("/model/reranking-provider", response_model=ProviderStatus)
+def reranking_provider_status() -> ProviderStatus:
+    return ProviderStatus(
+        configured=False,
+        reranking=False,
+        mode="disabled",
+        error_code="reranking_provider_disabled",
     )
 
 
@@ -483,6 +553,55 @@ def list_model_runs(
     if parent_run_id:
         query = query.where(ModelRun.parent_run_id == parent_run_id)
     return list(session.scalars(query.order_by(ModelRun.created_at.desc()).limit(limit)).all())
+
+
+@router.post("/model/runs/{run_id}/retry", response_model=ModelRunRetryResponse)
+def retry_model_run(
+    run_id: str,
+    payload: ModelRunRetryRequest,
+    session: Session = Depends(get_session),
+) -> ModelRunRetryResponse:
+    parent = session.get(ModelRun, run_id)
+    if not parent:
+        raise HTTPException(status_code=404, detail="Model run not found")
+    if parent.status not in {"failed", "dead_letter"}:
+        raise HTTPException(status_code=409, detail="Only failed model runs can be retried")
+    source = session.get(Source, payload.source_id)
+    if not source or not source.current_version_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+    version = session.get(SourceVersion, source.current_version_id)
+    if not version or version.content_hash not in parent.input_hashes:
+        raise HTTPException(
+            status_code=409,
+            detail="Retry source revision does not match the original immutable input",
+        )
+    try:
+        provider = build_generation_provider(get_settings())
+        if provider is None:
+            raise HTTPException(status_code=409, detail="AI provider is disabled")
+        if provider.id != parent.provider_id or provider.model != parent.model_id:
+            raise HTTPException(
+                status_code=409,
+                detail="Configured provider must match the failed run; fallback is disabled",
+            )
+        memories, run = extract_memory_candidates(
+            session, source, provider, retry_parent_run_id=parent.id
+        )
+    except ProviderConfigurationError as exc:
+        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
+    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
+        retry_run_id = getattr(exc, "run_id", None)
+        raise HTTPException(
+            status_code=502,
+            detail="Model-run retry failed and remains inspectable",
+            headers={"X-Proofline-Model-Run-ID": retry_run_id} if retry_run_id else None,
+        ) from exc
+    return ModelRunRetryResponse(
+        parent_run_id=parent.id,
+        model_run_id=run.id,
+        status=run.status,
+        memory_count=len(memories),
+    )
 
 
 @router.get("/model/runs/{run_id}", response_model=ModelRunRead)

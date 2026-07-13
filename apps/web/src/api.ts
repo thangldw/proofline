@@ -6,6 +6,8 @@ import type {
   ModelRun,
   ModelRunFilters,
   Overview,
+  ProviderConfiguration,
+  ProviderStatus,
   SearchHit,
   SearchScope,
   Source,
@@ -41,6 +43,21 @@ export const api = {
     return request<ModelRun[]>(`/api/v1/model/runs?${params.toString()}`);
   },
   modelRun: (id: string) => request<ModelRun>(`/api/v1/model/runs/${id}`),
+  providerConfiguration: () =>
+    request<ProviderConfiguration>("/api/v1/model/configuration"),
+  saveProviderConfiguration: (configuration: Record<string, unknown>) =>
+    request<ProviderConfiguration>("/api/v1/model/configuration", {
+      method: "PUT",
+      body: JSON.stringify(configuration),
+    }),
+  generationProviderStatus: () =>
+    request<ProviderStatus>("/api/v1/model/provider?check_health=true"),
+  embeddingProviderStatus: () =>
+    request<ProviderStatus>(
+      "/api/v1/model/embedding-provider?check_health=true",
+    ),
+  rerankingProviderStatus: () =>
+    request<ProviderStatus>("/api/v1/model/reranking-provider"),
   retryJob: (id: string) =>
     request<IngestionJob>(`/api/v1/jobs/${id}/retry`, { method: "POST" }),
   source: (id: string) =>
