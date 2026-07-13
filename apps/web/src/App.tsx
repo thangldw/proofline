@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Search,
   Settings,
+  Sparkles,
   StickyNote,
   Upload,
   X,
@@ -15,6 +16,7 @@ import {
 import { api } from "./api";
 import type {
   DecisionTimeline,
+  ActionProposal,
   Evidence,
   GroundedAnswer,
   IngestionJob,
@@ -38,6 +40,7 @@ type View =
   | "search"
   | "notes"
   | "study"
+  | "proposals"
   | "memories"
   | "sources"
   | "model runs"
@@ -63,6 +66,7 @@ export function App() {
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [studyCards, setStudyCards] = useState<StudyCard[]>([]);
+  const [proposals, setProposals] = useState<ActionProposal[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [evidence, setEvidence] = useState<{
@@ -76,12 +80,13 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextMemories, nextJobs] =
+      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextProposals, nextMemories, nextJobs] =
         await Promise.all([
           api.overview(),
           api.sources(),
           api.notes(),
           api.studyCards(),
+          api.actionProposals(),
           api.memories(),
           api.jobs(),
         ]);
@@ -89,6 +94,7 @@ export function App() {
       setSources(nextSources);
       setNotes(nextNotes);
       setStudyCards(nextStudyCards);
+      setProposals(nextProposals);
       setMemories(nextMemories);
       setJobs(nextJobs);
       setError("");
@@ -190,6 +196,14 @@ export function App() {
             Study
           </Nav>
           <Nav
+            icon={<Sparkles size={18} />}
+            active={view === "proposals"}
+            onClick={() => setView("proposals")}
+            count={proposals.filter((proposal) => proposal.status === "candidate").length}
+          >
+            Proposals
+          </Nav>
+          <Nav
             icon={<Search size={18} />}
             active={view === "search"}
             onClick={() => setView("search")}
@@ -278,6 +292,9 @@ export function App() {
             onChanged={refresh}
           />
         )}
+        {view === "proposals" && (
+          <ProposalsView proposals={proposals} onChanged={refresh} />
+        )}
         {view === "memories" && (
           <MemoryView
             memories={memories}
@@ -339,6 +356,92 @@ type RunLineage = {
   parent: ModelRun | null;
   children: ModelRun[];
 };
+
+export function ProposalsView({
+  proposals,
+  onChanged,
+}: {
+  proposals: ActionProposal[];
+  onChanged: () => Promise<void>;
+}) {
+  const [goal, setGoal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function generate(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await api.createActionProposal(goal);
+      setGoal("");
+      setMessage("Grounded proposal created for human review.");
+      await onChanged();
+    } catch (reason) {
+      setMessage(errorMessage(reason, "Could not create grounded proposal"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function review(id: string, status: "accepted" | "rejected") {
+    await api.reviewActionProposal(id, status);
+    setMessage(`Proposal ${status}; no source content was changed.`);
+    await onChanged();
+  }
+
+  return (
+    <section className="content proposals-view" aria-label="Grounded action proposals">
+      <form className="proposal-form" onSubmit={(event) => void generate(event)}>
+        <div>
+          <span className="eyebrow">THIRD BRAIN · HUMAN-GOVERNED</span>
+          <h2>Ask for an evidence-backed next action</h2>
+          <p>Only grounded model output becomes a candidate. Acceptance never writes to sources.</p>
+        </div>
+        <label>
+          Goal or decision to plan
+          <textarea
+            required
+            minLength={2}
+            maxLength={2000}
+            value={goal}
+            onChange={(event) => setGoal(event.target.value)}
+            placeholder="What should we change next, and why?"
+          />
+        </label>
+        <button type="submit" disabled={busy}>{busy ? "Grounding…" : "Create proposal"}</button>
+      </form>
+      {message && <p className="proposal-message">{message}</p>}
+      <div className="proposal-list">
+        {proposals.length === 0 ? (
+          <div className="empty-card">No proposals yet. Configure a generation provider and ask a grounded question.</div>
+        ) : proposals.map((proposal) => (
+          <article className="proposal-card" key={proposal.id}>
+            <header>
+              <span className="eyebrow">{proposal.status} · MODEL RUN {proposal.model_run_id.slice(0, 8)}</span>
+              <h3>{proposal.goal}</h3>
+            </header>
+            <p className="proposal-body">{proposal.body}</p>
+            <div className="proposal-citations">
+              {proposal.citations.map((citation) => (
+                <div key={citation.id}>
+                  <strong>{citation.source_title} · L{citation.start_line}–{citation.end_line}</strong>
+                  <span>{citation.quote}</span>
+                  <small>Immutable version {citation.source_version_id.slice(0, 8)}</small>
+                </div>
+              ))}
+            </div>
+            {proposal.status === "candidate" && (
+              <footer>
+                <button type="button" onClick={() => void review(proposal.id, "rejected")}>Reject</button>
+                <button type="button" onClick={() => void review(proposal.id, "accepted")}>Accept proposal</button>
+              </footer>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function StudyView({
   cards,
@@ -2177,6 +2280,8 @@ function DeletionDialog({
         ["Decision relations", state.impact.decision_relations ?? 0],
         ["Study cards", state.impact.study_cards ?? 0],
         ["Study reviews", state.impact.study_reviews ?? 0],
+        ["Action proposals", state.impact.action_proposals ?? 0],
+        ["Proposal citations", state.impact.proposal_citations ?? 0],
         ["Jobs detached", state.impact.ingestion_jobs_to_detach],
         ["Audit events", state.impact.audit_events_to_delete],
         ["FTS rows", state.impact.fts_rows],

@@ -45,6 +45,8 @@ class SourceDeletionImpact:
     decision_relations: int
     study_cards: int
     study_reviews: int
+    action_proposals: int
+    proposal_citations: int
     ingestion_jobs_to_detach: int
     audit_events_to_delete: int
     fts_rows: int
@@ -686,12 +688,19 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
                 (SELECT count(*) FROM study_cards WHERE source_id = :source) AS study_cards,
                 (SELECT count(*) FROM study_reviews WHERE card_id IN
                     (SELECT id FROM study_cards WHERE source_id = :source)) AS study_reviews,
+                (SELECT count(DISTINCT proposal_id) FROM proposal_citations
+                    WHERE source_id = :source) AS action_proposals,
+                (SELECT count(*) FROM proposal_citations
+                    WHERE proposal_id IN (SELECT proposal_id FROM proposal_citations
+                        WHERE source_id = :source)) AS proposal_citations,
                 (SELECT count(*) FROM ingestion_jobs WHERE source_id = :source)
                     AS ingestion_jobs_to_detach,
                 (SELECT count(*) FROM audit_events
                    WHERE (object_type = 'source' AND object_id = :source)
                       OR (object_type IN ('decision', 'memory') AND object_id IN
-                          (SELECT id FROM decisions WHERE source_id = :source)))
+                          (SELECT id FROM decisions WHERE source_id = :source))
+                      OR (object_type = 'action_proposal' AND object_id IN
+                          (SELECT proposal_id FROM proposal_citations WHERE source_id = :source)))
                     AS audit_events_to_delete,
                 (SELECT count(*) FROM chunk_search WHERE source_id = :source) AS fts_rows"""
             ),
@@ -719,6 +728,22 @@ def delete_source(session: Session, source: Source, *, commit: bool = True) -> N
     )
     session.execute(
         text("DELETE FROM audit_events WHERE object_type = 'source' AND object_id = :source"),
+        {"source": source.id},
+    )
+    session.execute(
+        text(
+            """DELETE FROM audit_events
+               WHERE object_type = 'action_proposal'
+                 AND object_id IN (SELECT proposal_id FROM proposal_citations
+                                   WHERE source_id = :source)"""
+        ),
+        {"source": source.id},
+    )
+    session.execute(
+        text(
+            """DELETE FROM action_proposals
+               WHERE id IN (SELECT proposal_id FROM proposal_citations WHERE source_id = :source)"""
+        ),
         {"source": source.id},
     )
     session.execute(

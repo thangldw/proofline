@@ -349,6 +349,45 @@ class StudyReview(Base):
     reviewed_at: Mapped[datetime] = mapped_column(default=utc_now)
 
 
+class ActionProposal(Base):
+    __tablename__ = "action_proposals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    goal: Mapped[str] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), default="candidate", index=True)
+    model_run_id: Mapped[str] = mapped_column(
+        ForeignKey("model_runs.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now)
+    citations: Mapped[list[ProposalCitation]] = relationship(cascade="all, delete-orphan")
+
+
+class ProposalCitation(Base):
+    __tablename__ = "proposal_citations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    proposal_id: Mapped[str] = mapped_column(
+        ForeignKey("action_proposals.id", ondelete="CASCADE"), index=True
+    )
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id", ondelete="CASCADE"), index=True)
+    source_title: Mapped[str] = mapped_column(String(300))
+    quote: Mapped[str] = mapped_column(Text)
+    quote_hash: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+
+
 class ImportReceipt(Base):
     """Persistent idempotency receipt for a verified portable export payload."""
 

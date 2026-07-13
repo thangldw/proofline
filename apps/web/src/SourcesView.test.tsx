@@ -16,6 +16,7 @@ const apiMock = vi.hoisted(() => ({
   sources: vi.fn(),
   notes: vi.fn(),
   studyCards: vi.fn(),
+  actionProposals: vi.fn(),
   memories: vi.fn(),
   jobs: vi.fn(),
   extractMemories: vi.fn(),
@@ -94,6 +95,7 @@ describe("source ingestion diagnostics", () => {
     ]);
     apiMock.notes.mockResolvedValue([]);
     apiMock.studyCards.mockResolvedValue([]);
+    apiMock.actionProposals.mockResolvedValue([]);
   });
 
   afterEach(() => cleanup());

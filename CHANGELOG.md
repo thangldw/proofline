@@ -7,7 +7,23 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.13.0`.
+No changes have been recorded after `v0.14.0`.
+
+## [0.14.0] - 2026-07-13
+
+### Added
+
+- Grounded action proposals generated through the existing provider-neutral answer pipeline; only
+  successfully grounded output can become a persisted candidate.
+- Every proposal retains its model run plus immutable chunk/source/version citations, exact spans
+  and quote hashes.
+- A Third Brain review surface and append-only audit events for explicit human accept/reject.
+
+### Changed
+
+- Proposal acceptance is governance state only and never mutates source content or accepted memory.
+- Deleting any cited source removes the complete dependent proposal and reports proposal/citation
+  counts in the deletion preview, avoiding partially grounded artifacts.
 
 ## [0.13.0] - 2026-07-13
 
