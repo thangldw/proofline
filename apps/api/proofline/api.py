@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
@@ -30,6 +30,7 @@ from .ingestion import (
     run_ingestion_job,
     source_deletion_impact,
 )
+from .learning import extract_study_pairs, next_interval
 from .model_gateway import (
     EmbeddingValidationError,
     ProviderConfigurationError,
@@ -50,6 +51,8 @@ from .models import (
     ModelRun,
     Source,
     SourceVersion,
+    StudyCard,
+    StudyReview,
     Workspace,
     utc_now,
 )
@@ -93,6 +96,9 @@ from .schemas import (
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
+    StudyCardRead,
+    StudyReviewCreate,
+    StudyReviewRead,
     WorkspaceCreate,
     WorkspaceRead,
     normalize_retrieval_filters,
@@ -557,6 +563,112 @@ def list_note_backlinks(
                 )
             )
     return backlinks
+
+
+def study_card_to_read(card: StudyCard, source_title: str | None = None) -> StudyCardRead:
+    return StudyCardRead.model_validate(card).model_copy(update={"source_title": source_title})
+
+
+@router.post("/sources/{source_id}/study-cards", response_model=list[StudyCardRead])
+def create_study_cards(
+    source_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[StudyCardRead]:
+    source = get_workspace_source(session, source_id, workspace_id)
+    version = session.get(SourceVersion, source.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=409, detail="Source has no current immutable version")
+    pairs = extract_study_pairs(version.content)
+    if not pairs:
+        raise HTTPException(
+            status_code=422,
+            detail="No deterministic study pairs found; use adjacent Q: and A: lines",
+        )
+    session.query(StudyCard).filter(
+        StudyCard.source_id == source.id,
+        StudyCard.source_version_id != version.id,
+        StudyCard.state != "superseded",
+    ).update({"state": "superseded", "updated_at": utc_now()})
+    existing = {
+        (card.start_offset, card.end_offset): card
+        for card in session.scalars(
+            select(StudyCard).where(StudyCard.source_version_id == version.id)
+        ).all()
+    }
+    cards: list[StudyCard] = []
+    for pair in pairs:
+        card = existing.get((pair.start_offset, pair.end_offset))
+        if card is None:
+            card = StudyCard(
+                workspace_id=workspace_id,
+                source_id=source.id,
+                source_version_id=version.id,
+                question=pair.question,
+                answer=pair.answer,
+                quote_hash=pair.quote_hash,
+                start_offset=pair.start_offset,
+                end_offset=pair.end_offset,
+                start_line=pair.start_line,
+                end_line=pair.end_line,
+                state="new",
+                interval_days=0,
+                due_at=utc_now(),
+            )
+            session.add(card)
+        cards.append(card)
+    session.commit()
+    for card in cards:
+        session.refresh(card)
+    return [study_card_to_read(card, source.title) for card in cards]
+
+
+@router.get("/study-cards", response_model=list[StudyCardRead])
+def list_study_cards(
+    include_superseded: bool = False,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[StudyCardRead]:
+    query = (
+        select(StudyCard, Source.title)
+        .join(Source, Source.id == StudyCard.source_id)
+        .where(StudyCard.workspace_id == workspace_id)
+        .order_by(StudyCard.due_at, StudyCard.created_at)
+    )
+    if not include_superseded:
+        query = query.where(StudyCard.state != "superseded")
+    return [study_card_to_read(card, title) for card, title in session.execute(query).all()]
+
+
+@router.post("/study-cards/{card_id}/reviews", response_model=StudyReviewRead)
+def review_study_card(
+    card_id: str,
+    payload: StudyReviewCreate,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> StudyReview:
+    card = session.get(StudyCard, card_id)
+    if card is None or card.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Study card not found")
+    if card.state == "superseded":
+        raise HTTPException(status_code=409, detail="Superseded study card cannot be reviewed")
+    reviewed_at = utc_now()
+    interval = next_interval(payload.rating, card.interval_days)
+    review = StudyReview(
+        card_id=card.id,
+        rating=payload.rating,
+        previous_interval_days=card.interval_days,
+        next_interval_days=interval,
+        reviewed_at=reviewed_at,
+    )
+    card.interval_days = interval
+    card.state = "learning" if payload.rating == "again" else "review"
+    card.due_at = reviewed_at + timedelta(days=interval)
+    card.updated_at = reviewed_at
+    session.add(review)
+    session.commit()
+    session.refresh(review)
+    return review
 
 
 @router.get("/sources", response_model=list[SourceRead])

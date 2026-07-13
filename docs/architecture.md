@@ -407,6 +407,15 @@ from the current version. Each backlink returns the linking source ID, immutable
 offsets and line range. Historical versions remain addressable through the existing source-version
 API; no graph database or autonomous mutation is involved.
 
+### Evidence-first learning
+
+Migration 19 adds `study_cards` and append-only `study_reviews`. Card extraction is deterministic:
+only an adjacent single-line `Q:`/`A:` pair is accepted, and the answer stores its source identity,
+immutable version, exact offsets/lines and quote hash. Re-extraction is idempotent for one version.
+A newer source version marks older cards superseded without rewriting them. Review ratings update a
+bounded deterministic interval while preserving each before/after interval in a review event.
+Deleting the source cascades through both tables and exposes their counts in the deletion preview.
+
 Planned MVP operations (exact contracts remain undecided):
 
 ```text

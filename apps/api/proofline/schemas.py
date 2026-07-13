@@ -182,6 +182,43 @@ class NoteBacklinkRead(NoteLinkRead):
     source_title: str
 
 
+class StudyCardRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    source_id: str
+    source_version_id: str
+    source_title: str | None = None
+    question: str
+    answer: str
+    quote_hash: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+    state: str
+    interval_days: int
+    due_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudyReviewCreate(BaseModel):
+    rating: Literal["again", "hard", "good", "easy"]
+
+
+class StudyReviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    card_id: str
+    rating: str
+    previous_interval_days: int
+    next_interval_days: int
+    reviewed_at: datetime
+
+
 class GitRepositoryCreate(BaseModel):
     path: str = Field(min_length=1, max_length=4_096)
     title: str | None = Field(default=None, min_length=1, max_length=300)
@@ -226,6 +263,8 @@ class SourceDeletionImpactRead(BaseModel):
     memories: int = Field(ge=0)
     evidence: int = Field(ge=0)
     decision_relations: int = Field(ge=0)
+    study_cards: int = Field(ge=0)
+    study_reviews: int = Field(ge=0)
     ingestion_jobs_to_detach: int = Field(ge=0)
     audit_events_to_delete: int = Field(ge=0)
     fts_rows: int = Field(ge=0)

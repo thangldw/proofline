@@ -569,6 +569,50 @@ def _add_workspace_leases(connection: Connection) -> None:
     )
 
 
+def _add_evidence_first_study_cards(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS study_cards (
+            id VARCHAR(36) PRIMARY KEY,
+            workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL REFERENCES source_versions(id) ON DELETE CASCADE,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            quote_hash VARCHAR(64) NOT NULL,
+            start_offset INTEGER NOT NULL,
+            end_offset INTEGER NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            state VARCHAR(30) NOT NULL,
+            interval_days INTEGER NOT NULL,
+            due_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE(source_version_id, start_offset, end_offset)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_study_cards_workspace_due "
+        "ON study_cards (workspace_id, due_at)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_study_cards_source_id ON study_cards (source_id)"
+    )
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS study_reviews (
+            id VARCHAR(36) PRIMARY KEY,
+            card_id VARCHAR(36) NOT NULL REFERENCES study_cards(id) ON DELETE CASCADE,
+            rating VARCHAR(20) NOT NULL,
+            previous_interval_days INTEGER NOT NULL,
+            next_interval_days INTEGER NOT NULL,
+            reviewed_at DATETIME NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_study_reviews_card_id ON study_reviews (card_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -588,6 +632,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (16, "vector candidate band index", _add_vector_candidate_index),
     (17, "workspace scoped records", _add_workspace_scope),
     (18, "multi-worker workspace leases", _add_workspace_leases),
+    (19, "evidence-first study cards", _add_evidence_first_study_cards),
 )
 
 

@@ -311,6 +311,44 @@ class ChunkVectorBucket(Base):
     band_value: Mapped[str] = mapped_column(String(16))
 
 
+class StudyCard(Base):
+    __tablename__ = "study_cards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    quote_hash: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(30), default="new")
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    due_at: Mapped[datetime] = mapped_column(default=utc_now, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
+class StudyReview(Base):
+    __tablename__ = "study_reviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    card_id: Mapped[str] = mapped_column(
+        ForeignKey("study_cards.id", ondelete="CASCADE"), index=True
+    )
+    rating: Mapped[str] = mapped_column(String(20))
+    previous_interval_days: Mapped[int] = mapped_column(Integer)
+    next_interval_days: Mapped[int] = mapped_column(Integer)
+    reviewed_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
 class ImportReceipt(Base):
     """Persistent idempotency receipt for a verified portable export payload."""
 
