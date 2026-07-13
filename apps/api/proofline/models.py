@@ -239,6 +239,24 @@ class ChunkEmbedding(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
 
+class ChunkVectorBucket(Base):
+    __tablename__ = "chunk_vector_buckets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    embedding_id: Mapped[str] = mapped_column(
+        ForeignKey("chunk_embeddings.id", ondelete="CASCADE"), index=True
+    )
+    chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    provider_id: Mapped[str] = mapped_column(String(100))
+    model_id: Mapped[str] = mapped_column(String(200))
+    band_index: Mapped[int] = mapped_column(Integer)
+    band_value: Mapped[str] = mapped_column(String(16))
+
+
 class ImportReceipt(Base):
     """Persistent idempotency receipt for a verified portable export payload."""
 

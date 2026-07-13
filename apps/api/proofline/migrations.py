@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from collections.abc import Callable
 
@@ -456,6 +457,61 @@ def _add_temporal_decision_relations(connection: Connection) -> None:
     )
 
 
+def _add_vector_candidate_index(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS chunk_vector_buckets (
+            id VARCHAR(36) PRIMARY KEY,
+            embedding_id VARCHAR(36) NOT NULL REFERENCES chunk_embeddings(id) ON DELETE CASCADE,
+            chunk_id VARCHAR(36) NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL REFERENCES source_versions(id) ON DELETE CASCADE,
+            provider_id VARCHAR(100) NOT NULL,
+            model_id VARCHAR(200) NOT NULL,
+            band_index INTEGER NOT NULL,
+            band_value VARCHAR(16) NOT NULL,
+            UNIQUE(embedding_id, band_index)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_vector_buckets_lookup "
+        "ON chunk_vector_buckets (provider_id, model_id, band_index, band_value)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_chunk_vector_buckets_embedding_id "
+        "ON chunk_vector_buckets (embedding_id)"
+    )
+    existing = connection.execute(
+        text(
+            "SELECT id, chunk_id, source_id, source_version_id, provider_id, model_id, vector_json "
+            "FROM chunk_embeddings"
+        )
+    ).mappings()
+    for embedding in existing:
+        vector = json.loads(embedding["vector_json"])
+        bits = "".join("1" if float(value) >= 0 else "0" for value in vector[:64])
+        for offset in range(0, len(bits), 16):
+            connection.execute(
+                text(
+                    """INSERT OR IGNORE INTO chunk_vector_buckets
+                       (id, embedding_id, chunk_id, source_id, source_version_id,
+                        provider_id, model_id, band_index, band_value)
+                       VALUES (:id, :embedding_id, :chunk_id, :source_id, :source_version_id,
+                               :provider_id, :model_id, :band_index, :band_value)"""
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "embedding_id": embedding["id"],
+                    "chunk_id": embedding["chunk_id"],
+                    "source_id": embedding["source_id"],
+                    "source_version_id": embedding["source_version_id"],
+                    "provider_id": embedding["provider_id"],
+                    "model_id": embedding["model_id"],
+                    "band_index": offset // 16,
+                    "band_value": bits[offset : offset + 16],
+                },
+            )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -472,6 +528,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (13, "enforce governed memory status contract", _enforce_memory_status_contract),
     (14, "read-only git repository sources", _add_git_repositories),
     (15, "temporal decision relations", _add_temporal_decision_relations),
+    (16, "vector candidate band index", _add_vector_candidate_index),
 )
 
 

@@ -7,7 +7,20 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.5.0`.
+No changes have been recorded after `v0.6.0`.
+
+## [0.6.0] - 2026-07-14
+
+### Added
+
+- A provider-neutral reranker interface, optional deterministic post-RRF reranking, and an HTTP
+  cross-encoder adapter with rank/score diagnostics.
+- Statement support assessment reports `supported` or `uncertain` and rejects direct negation
+  contradictions through the existing bounded repair contract.
+- A SQLite locality-sensitive vector band index narrows semantic candidates before exact cosine
+  scoring and is covered by migration backfill, integrity verification, and deletion impact.
+- Versioned synthetic receipts record reranker MRR and 1,000-source vector index latency, memory,
+  storage, and no-op update cost without making 10,000-file or 1-GB claims.
 
 ## [0.5.0] - 2026-07-14
 
@@ -164,7 +177,8 @@ No changes have been recorded after `v0.5.0`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/thangldw/proofline/releases/tag/v0.6.0
 [0.5.0]: https://github.com/thangldw/proofline/releases/tag/v0.5.0
 [0.4.0]: https://github.com/thangldw/proofline/releases/tag/v0.4.0
 [0.3.0]: https://github.com/thangldw/proofline/releases/tag/v0.3.0
