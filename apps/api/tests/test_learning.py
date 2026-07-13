@@ -35,6 +35,10 @@ def test_review_history_and_source_revision_supersede_old_cards(client, session)
     assert review.status_code == 200
     assert review.json()["previous_interval_days"] == 0
     assert review.json()["next_interval_days"] == 1
+    assert client.get("/api/v1/study-cards", params={"due_only": True}).json() == []
+    history = client.get(f"/api/v1/study-cards/{card['id']}/reviews").json()
+    assert len(history) == 1
+    assert history[0]["rating"] == "good"
 
     revised = client.post(
         "/api/v1/sources",

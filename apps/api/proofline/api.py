@@ -527,6 +527,14 @@ def update_note(
     note = get_workspace_source(session, note_id, workspace_id)
     if note.kind != "note":
         raise HTTPException(status_code=404, detail="Note not found")
+    current = session.get(SourceVersion, note.current_version_id)
+    if current is not None and current.content == payload.content:
+        if note.title != payload.title:
+            note.title = payload.title
+            session.commit()
+        notes = _workspace_notes(session, workspace_id)
+        hydrated = next(item for item in notes if item.id == note.id)
+        return note_to_read(hydrated, notes)
     source, _, _ = run_ingestion_job(
         session,
         SourceCreate(
@@ -632,6 +640,7 @@ def create_study_cards(
 @router.get("/study-cards", response_model=list[StudyCardRead])
 def list_study_cards(
     include_superseded: bool = False,
+    due_only: bool = False,
     workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
 ) -> list[StudyCardRead]:
@@ -643,7 +652,27 @@ def list_study_cards(
     )
     if not include_superseded:
         query = query.where(StudyCard.state != "superseded")
+    if due_only:
+        query = query.where(StudyCard.due_at <= utc_now())
     return [study_card_to_read(card, title) for card, title in session.execute(query).all()]
+
+
+@router.get("/study-cards/{card_id}/reviews", response_model=list[StudyReviewRead])
+def list_study_reviews(
+    card_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[StudyReview]:
+    card = session.get(StudyCard, card_id)
+    if card is None or card.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Study card not found")
+    return list(
+        session.scalars(
+            select(StudyReview)
+            .where(StudyReview.card_id == card_id)
+            .order_by(StudyReview.reviewed_at, StudyReview.id)
+        ).all()
+    )
 
 
 @router.post("/study-cards/{card_id}/reviews", response_model=StudyReviewRead)

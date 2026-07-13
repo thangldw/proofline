@@ -7,6 +7,7 @@ import type {
   ModelRun,
   ModelRunFilters,
   Note,
+  NoteBacklink,
   Overview,
   ProviderConfiguration,
   ProviderStatus,
@@ -45,7 +46,7 @@ export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
   notes: () => request<Note[]>("/api/v1/notes"),
-  studyCards: () => request<StudyCard[]>("/api/v1/study-cards"),
+  studyCards: () => request<StudyCard[]>("/api/v1/study-cards?due_only=true"),
   actionProposals: () => request<ActionProposal[]>("/api/v1/action-proposals"),
   createActionProposal: (question: string) =>
     request<ActionProposal>("/api/v1/action-proposals", {
@@ -76,6 +77,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ title, content }),
     }),
+  noteBacklinks: (id: string) =>
+    request<NoteBacklink[]>(`/api/v1/notes/${id}/backlinks`),
   deletionImpact: (id: string) =>
     request<SourceDeletionImpact>(`/api/v1/sources/${id}/deletion-impact`),
   deleteSource: (id: string) =>

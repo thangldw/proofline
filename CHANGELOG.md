@@ -7,7 +7,21 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.0`.
+No changes have been recorded after `v0.14.1`.
+
+## [0.14.1] - 2026-07-13
+
+### Added
+
+- Notes now expose deterministic tags, resolved/unresolved wiki-links and backlinks with exact line
+  and immutable source-version identity directly in the UI.
+- Study review history is readable through a workspace-scoped API.
+
+### Fixed
+
+- Title-only note edits update metadata without creating a fake immutable content revision or
+  changing the content ingestion timestamp.
+- The Study navigation count and review queue now include only cards whose due time has arrived.
 
 ## [0.14.0] - 2026-07-13
 

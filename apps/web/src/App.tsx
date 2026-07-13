@@ -25,6 +25,7 @@ import type {
   ModelRun,
   ModelRunFilters,
   Note,
+  NoteBacklink,
   Overview,
   ProviderConfiguration,
   ProviderStatus,
@@ -530,11 +531,18 @@ export function NotesView({
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [backlinks, setBacklinks] = useState<NoteBacklink[]>([]);
 
   useEffect(() => {
     setTitle(selected?.title ?? "");
     setContent(selected?.content ?? "");
     setMessage("");
+    setBacklinks([]);
+    if (selected) {
+      void api.noteBacklinks(selected.id).then(setBacklinks).catch((reason) =>
+        setMessage(errorMessage(reason, "Could not load backlinks")),
+      );
+    }
   }, [selected]);
 
   async function saveNote(event: React.FormEvent) {
@@ -548,7 +556,9 @@ export function NotesView({
       setSelectedId(saved.id);
       setMessage(
         selected
-          ? `Saved immutable revision ${saved.version_count}.`
+          ? saved.version_count === selected.version_count
+            ? "Metadata saved; immutable content unchanged."
+            : `Saved immutable revision ${saved.version_count}.`
           : "Note captured and indexed.",
       );
     } catch (reason) {
@@ -608,6 +618,30 @@ export function NotesView({
             placeholder="Write plain Markdown. Use #tags and [[Wiki links]]."
           />
         </label>
+        {selected && (
+          <div className="note-provenance">
+            <div>
+              <strong>Tags</strong>
+              <span>{selected.tags.length ? selected.tags.map((tag) => `#${tag.name}`).join(" · ") : "None"}</span>
+            </div>
+            <div>
+              <strong>Wiki links</strong>
+              <span>
+                {selected.links.length
+                  ? selected.links.map((link) => `${link.target_title}${link.resolved_source_id ? "" : " (unresolved)"}`).join(" · ")
+                  : "None"}
+              </span>
+            </div>
+            <div>
+              <strong>Backlinks</strong>
+              <span>
+                {backlinks.length
+                  ? backlinks.map((link) => `${link.source_title} · L${link.start_line}–${link.end_line} · ${link.source_version_id.slice(0, 8)}`).join(" · ")
+                  : "None"}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="note-form-footer">
           <span>{message || "Every content change preserves the previous version."}</span>
           <button type="submit" disabled={saving}>
