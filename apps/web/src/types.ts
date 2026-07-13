@@ -19,6 +19,9 @@ export type Source = {
   chunk_count: number;
   decision_count: number;
   memory_count: number;
+  git_repository_id?: string | null;
+  git_commit_sha?: string | null;
+  git_path?: string | null;
 };
 
 export type SourceDeletionImpact = {
@@ -107,6 +110,9 @@ export type SearchHit = {
   semantic_rank: number | null;
   semantic_score: number | null;
   fused_score: number | null;
+  source_kind?: string | null;
+  git_commit_sha?: string | null;
+  git_path?: string | null;
 };
 
 export type AnswerCitation = {
@@ -119,6 +125,9 @@ export type AnswerCitation = {
   end_offset: number;
   start_line: number;
   end_line: number;
+  source_kind?: string | null;
+  git_commit_sha?: string | null;
+  git_path?: string | null;
 };
 
 export type GroundedAnswer = {

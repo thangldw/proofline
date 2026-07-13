@@ -60,7 +60,7 @@ def lexical_search(
         f"""
             SELECT c.id, c.source_id, c.source_version_id, s.title, c.content,
                    c.start_offset, c.end_offset, c.start_line, c.end_line,
-                   bm25(chunk_search) AS rank
+                   bm25(chunk_search) AS rank, s.kind, s.git_commit_sha, s.git_path
             FROM chunk_search
             JOIN chunks c ON c.id = chunk_search.chunk_id
             JOIN sources s ON s.id = c.source_id
@@ -89,6 +89,9 @@ def lexical_search(
             start_line=row[7],
             end_line=row[8],
             rank=row[9],
+            source_kind=row[10],
+            git_commit_sha=row[11],
+            git_path=row[12],
         )
         for row in rows
     ]

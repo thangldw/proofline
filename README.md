@@ -3,9 +3,9 @@
 **Evidence-backed engineering memory.**
 
 Proofline is an open-source system that helps engineering teams recover why
-software was built the way it was. The current local slice ingests Markdown and
-UTF-8 text such as ADRs and design notes into searchable evidence; issue, pull
-request, commit, and meeting connectors remain planned. The implemented memory registry models decisions,
+software was built the way it was. The current local slice ingests Markdown,
+UTF-8 text, and tracked text files plus commit metadata from explicitly registered local Git
+repositories; hosted issue, pull-request, and meeting connectors remain planned. The implemented memory registry models decisions,
 assumptions, constraints, and alternatives explicitly instead of treating a
 knowledge base as an unstructured collection of vector chunks.
 
@@ -191,14 +191,13 @@ production qualification. They do not block an explicitly experimental pre-alpha
 
 ## Releases
 
-`v0.1.0-alpha.5` is the latest experimental pre-release. It adds read-only semantic provenance
-verification and requires cited evidence for inference statements; application limitations remain
-pre-alpha.
+`v0.3.0` is the latest experimental pre-alpha release. It adds read-only local Git repository
+ingestion with immutable commit/path/line provenance; application limitations remain pre-alpha.
 Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
 archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
 reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
 proven two-process development workflow above. See the
-[release notes](docs/releases/v0.1.0-alpha.5.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.3.0.md) and verify `SHA256SUMS` before installation.
 
 ### Data portability and recovery
 

@@ -59,6 +59,8 @@ Before delivery work, record:
 ### Outcomes
 
 - A local folder can be scanned into immutable source versions and exact spans.
+- An explicitly registered local Git repository can be scanned at an immutable commit into commit
+  and tracked-file sources with exact commit/path/line provenance. This slice is implemented.
 - Every source has visible stage status and actionable failures.
 - Unchanged files are not reprocessed; changed and deleted files behave deterministically.
 
