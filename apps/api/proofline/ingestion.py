@@ -41,6 +41,7 @@ class SourceDeletionImpact:
     decisions: int
     memories: int
     evidence: int
+    decision_relations: int
     ingestion_jobs_to_detach: int
     audit_events_to_delete: int
     fts_rows: int
@@ -658,6 +659,12 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
                    WHERE source_id = :source AND kind = 'decision') AS decisions,
                 (SELECT count(*) FROM decisions WHERE source_id = :source) AS memories,
                 (SELECT count(*) FROM evidence WHERE source_id = :source) AS evidence,
+                (SELECT count(*) FROM decision_relations
+                   WHERE source_decision_id IN
+                         (SELECT id FROM decisions WHERE source_id = :source)
+                      OR target_decision_id IN
+                         (SELECT id FROM decisions WHERE source_id = :source))
+                    AS decision_relations,
                 (SELECT count(*) FROM ingestion_jobs WHERE source_id = :source)
                     AS ingestion_jobs_to_detach,
                 (SELECT count(*) FROM audit_events

@@ -111,6 +111,23 @@ class Decision(Base):
     evidence: Mapped[list[Evidence]] = relationship(cascade="all, delete-orphan")
 
 
+class DecisionRelation(Base):
+    __tablename__ = "decision_relations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decisions.id", ondelete="CASCADE"), index=True
+    )
+    target_decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decisions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(30), index=True)
+    valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
+    valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_by: Mapped[str] = mapped_column(String(40), default="local_user")
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
 class Evidence(Base):
     __tablename__ = "evidence"
 

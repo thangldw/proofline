@@ -60,13 +60,28 @@ def lexical_search(
         f"""
             SELECT c.id, c.source_id, c.source_version_id, s.title, c.content,
                    c.start_offset, c.end_offset, c.start_line, c.end_line,
-                   bm25(chunk_search) AS rank, s.kind, s.git_commit_sha, s.git_path
+                   bm25(chunk_search) AS rank, s.kind, s.git_commit_sha, s.git_path,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM decisions d
+                       WHERE d.source_id = s.id
+                         AND d.source_version_id = s.current_version_id
+                         AND d.kind = 'decision'
+                         AND (d.status = 'obsolete' OR d.valid_to IS NOT NULL)
+                   ) THEN 1 ELSE 0 END AS temporal_rank,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM decisions d
+                       WHERE d.source_id = s.id
+                         AND d.source_version_id = s.current_version_id
+                         AND d.kind = 'decision'
+                         AND d.status IN ('active', 'accepted')
+                         AND d.valid_to IS NULL
+                   ) THEN 1 ELSE 0 END AS is_current_decision
             FROM chunk_search
             JOIN chunks c ON c.id = chunk_search.chunk_id
             JOIN sources s ON s.id = c.source_id
             JOIN source_versions sv ON sv.id = c.source_version_id
             WHERE {" AND ".join(filters)}
-            ORDER BY rank, c.id
+            ORDER BY temporal_rank, rank, c.id
             LIMIT :limit
             """
     )
@@ -92,6 +107,7 @@ def lexical_search(
             source_kind=row[10],
             git_commit_sha=row[11],
             git_path=row[12],
+            temporal_priority="current_decision" if row[14] == 1 else "neutral",
         )
         for row in rows
     ]

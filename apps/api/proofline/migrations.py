@@ -425,6 +425,37 @@ def _add_git_repositories(connection: Connection) -> None:
     )
 
 
+def _add_temporal_decision_relations(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS decision_relations (
+            id VARCHAR(36) PRIMARY KEY,
+            source_decision_id VARCHAR(36) NOT NULL
+                REFERENCES decisions(id) ON DELETE CASCADE,
+            target_decision_id VARCHAR(36) NOT NULL
+                REFERENCES decisions(id) ON DELETE CASCADE,
+            kind VARCHAR(30) NOT NULL,
+            valid_from DATETIME,
+            valid_to DATETIME,
+            created_by VARCHAR(40) NOT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE(source_decision_id, target_decision_id, kind),
+            CHECK(source_decision_id != target_decision_id),
+            CHECK(kind IN ('supersedes', 'implements', 'contradicts', 'based_on', 'considered'))
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_relations_source "
+        "ON decision_relations (source_decision_id, created_at)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_relations_target "
+        "ON decision_relations (target_decision_id, created_at)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_relations_kind ON decision_relations (kind)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -440,6 +471,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (12, "portable import receipts", _add_import_receipts),
     (13, "enforce governed memory status contract", _enforce_memory_status_contract),
     (14, "read-only git repository sources", _add_git_repositories),
+    (15, "temporal decision relations", _add_temporal_decision_relations),
 )
 
 

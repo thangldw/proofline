@@ -157,6 +157,7 @@ class SourceDeletionImpactRead(BaseModel):
     decisions: int = Field(ge=0)
     memories: int = Field(ge=0)
     evidence: int = Field(ge=0)
+    decision_relations: int = Field(ge=0)
     ingestion_jobs_to_detach: int = Field(ge=0)
     audit_events_to_delete: int = Field(ge=0)
     fts_rows: int = Field(ge=0)
@@ -203,6 +204,14 @@ class DecisionUpdate(BaseModel):
     statement: str | None = Field(default=None, min_length=1)
     rationale: str | None = None
     status: Literal["candidate", "active", "accepted", "rejected", "obsolete"] | None = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_validity(self) -> DecisionUpdate:
+        if self.valid_from and self.valid_to and self.valid_from >= self.valid_to:
+            raise ValueError("valid_from must be earlier than valid_to")
+        return self
 
 
 class MemoryRead(DecisionRead):
@@ -211,6 +220,51 @@ class MemoryRead(DecisionRead):
 
 class MemoryUpdate(DecisionUpdate):
     pass
+
+
+DecisionRelationKind = Literal["supersedes", "implements", "contradicts", "based_on", "considered"]
+
+
+class DecisionRelationCreate(BaseModel):
+    source_decision_id: str
+    target_decision_id: str
+    kind: DecisionRelationKind
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_relation(self) -> DecisionRelationCreate:
+        if self.source_decision_id == self.target_decision_id:
+            raise ValueError("a decision cannot relate to itself")
+        if self.valid_from and self.valid_to and self.valid_from >= self.valid_to:
+            raise ValueError("valid_from must be earlier than valid_to")
+        return self
+
+
+class DecisionRelationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_decision_id: str
+    target_decision_id: str
+    kind: DecisionRelationKind
+    valid_from: datetime | None
+    valid_to: datetime | None
+    created_by: str
+    created_at: datetime
+
+
+class DecisionTimelineRead(BaseModel):
+    decision: DecisionRead
+    incoming: list[DecisionRelationRead]
+    outgoing: list[DecisionRelationRead]
+
+
+class DecisionRelationCandidateRead(BaseModel):
+    kind: Literal["contradiction", "stale"]
+    decision_ids: list[str]
+    relation_id: str | None = None
+    reason: str
 
 
 class SearchHit(BaseModel):
@@ -232,6 +286,7 @@ class SearchHit(BaseModel):
     source_kind: str | None = None
     git_commit_sha: str | None = None
     git_path: str | None = None
+    temporal_priority: Literal["current_decision", "neutral"] = "neutral"
 
 
 class SearchResponse(BaseModel):

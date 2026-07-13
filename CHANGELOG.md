@@ -7,7 +7,20 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.3.0`.
+No changes have been recorded after `v0.4.0`.
+
+## [0.4.0] - 2026-07-14
+
+### Added
+
+- Typed temporal decision relations for `supersedes`, `implements`, `contradicts`, `based_on`, and
+  `considered`, with validity windows, audit history, timeline API/UI, and candidate diagnostics.
+- Superseding a decision atomically closes the prior decision's validity and marks it obsolete.
+
+### Changed
+
+- Retrieval demotes evidence owned by expired or obsolete decisions while preserving lexical and
+  semantic relevance ordering among current and neutral sources.
 
 ## [0.3.0] - 2026-07-13
 
@@ -135,7 +148,8 @@ No changes have been recorded after `v0.3.0`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/thangldw/proofline/releases/tag/v0.4.0
 [0.3.0]: https://github.com/thangldw/proofline/releases/tag/v0.3.0
 [0.1.0-alpha.5]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.5
 [0.1.0-alpha.4]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.4
