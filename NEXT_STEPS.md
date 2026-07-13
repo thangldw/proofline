@@ -74,7 +74,7 @@ Import local repo → index immutable commit/file sources → search → grounde
 
 - [ ] Nâng polling watcher lên native filesystem notifications nếu benchmark cho thấy cần thiết.
 - [x] Thiết kế coordination cho nhiều API worker bằng SQLite workspace lease có expiry.
-- [ ] Hỗ trợ portable import vào database không rỗng bằng explicit merge/remap workflow.
+- [x] Hỗ trợ portable import vào database không rỗng bằng explicit merge/remap workflow.
 - [ ] Không hỗ trợ overwrite phá hủy dữ liệu nếu chưa có preview và rollback semantics.
 
 ### Workspace và packaging

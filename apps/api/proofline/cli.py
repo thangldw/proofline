@@ -29,7 +29,12 @@ from .portability import (
     build_portable_export,
     load_and_verify_export,
 )
-from .portable_import import import_portable_export, load_verified_import
+from .portable_import import (
+    import_portable_export,
+    load_verified_import,
+    merge_portable_export,
+    preview_portable_merge,
+)
 from .schemas import SourceCreate
 
 
@@ -105,9 +110,12 @@ def main(argv: list[str] | None = None) -> None:
     verify_export = subcommands.add_parser("verify-export", help="Verify a portable JSON snapshot")
     verify_export.add_argument("path", type=Path)
     import_export = subcommands.add_parser(
-        "import", help="Restore a verified portable JSON snapshot into an empty database"
+        "import", help="Restore or explicitly merge a verified portable JSON snapshot"
     )
     import_export.add_argument("path", type=Path)
+    import_export.add_argument("--preview-merge", action="store_true")
+    import_export.add_argument("--merge", action="store_true")
+    import_export.add_argument("--preview-sha256")
     backup = subcommands.add_parser("backup", help="Create a complete local SQLite backup")
     backup.add_argument("--output", type=Path, required=True)
     backup.add_argument("--force", action="store_true")
@@ -208,8 +216,21 @@ def main(argv: list[str] | None = None) -> None:
         initialize_database()
         try:
             document = load_verified_import(args.path)
-            with SessionLocal() as session, session.begin():
-                report = import_portable_export(session, document)
+            with SessionLocal() as session:
+                if args.preview_merge:
+                    report = preview_portable_merge(session, document)
+                elif args.merge:
+                    if not args.preview_sha256:
+                        raise PortabilityError("merge_preview_required")
+                    with session.begin():
+                        report = merge_portable_export(
+                            session,
+                            document,
+                            expected_preview_sha256=args.preview_sha256,
+                        )
+                else:
+                    with session.begin():
+                        report = import_portable_export(session, document)
         except PortabilityError as exc:
             raise SystemExit(f"import failed: {exc.code}") from exc
         print(json.dumps({"valid": True, **report}, sort_keys=True))
