@@ -126,7 +126,7 @@ def semantic_search(
     if source_ids == []:
         return []
     statement = (
-        select(ChunkEmbedding, Chunk, Source.title)
+        select(ChunkEmbedding, Chunk, Source)
         .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
         .join(Source, Source.id == Chunk.source_id)
         .join(SourceVersion, SourceVersion.id == Chunk.source_version_id)
@@ -155,10 +155,10 @@ def semantic_search(
     )
     query_vector = result.vectors[0]
     candidates = []
-    for embedding, chunk, title in rows:
+    for embedding, chunk, source in rows:
         score = cosine_similarity(query_vector, embedding.vector_json)
         if score is not None and score >= min_semantic_score:
-            candidates.append((score, chunk, title))
+            candidates.append((score, chunk, source))
     scored = sorted(
         candidates,
         key=lambda item: (-item[0], item[1].id),
@@ -168,7 +168,7 @@ def semantic_search(
             chunk_id=chunk.id,
             source_id=chunk.source_id,
             source_version_id=chunk.source_version_id,
-            source_title=title,
+            source_title=source.title,
             content=chunk.content,
             start_offset=chunk.start_offset,
             end_offset=chunk.end_offset,
@@ -178,8 +178,11 @@ def semantic_search(
             retrieval_channels=["semantic"],
             semantic_rank=index,
             semantic_score=score,
+            source_kind=source.kind,
+            git_commit_sha=source.git_commit_sha,
+            git_path=source.git_path,
         )
-        for index, (score, chunk, title) in enumerate(scored, start=1)
+        for index, (score, chunk, source) in enumerate(scored, start=1)
     ]
 
 

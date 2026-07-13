@@ -7,7 +7,16 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.1.0-alpha.5`.
+No changes have been recorded after `v0.3.0`.
+
+## [0.3.0] - 2026-07-13
+
+### Added
+
+- Read-only local Git repository ingestion resolves revisions to immutable commits and indexes
+  tracked Markdown/text files plus commit metadata with exact commit/path/line provenance.
+- Git scans are idempotent per commit, preserve historical citations across later commits, report
+  per-file failures, and delete all repository-owned derived data through the existing cascade.
 
 ## [0.1.0-alpha.5] - 2026-07-13
 
@@ -126,7 +135,8 @@ No changes have been recorded after `v0.1.0-alpha.5`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.1.0-alpha.5...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/thangldw/proofline/releases/tag/v0.3.0
 [0.1.0-alpha.5]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.5
 [0.1.0-alpha.4]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.3]: https://github.com/thangldw/proofline/releases/tag/v0.1.0-alpha.3
