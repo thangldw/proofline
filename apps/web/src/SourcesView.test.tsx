@@ -14,6 +14,7 @@ import type { IngestionJob, Source } from "./types";
 const apiMock = vi.hoisted(() => ({
   overview: vi.fn(),
   sources: vi.fn(),
+  notes: vi.fn(),
   memories: vi.fn(),
   jobs: vi.fn(),
   extractMemories: vi.fn(),
@@ -90,6 +91,7 @@ describe("source ingestion diagnostics", () => {
         created_at: "2026-07-13T00:00:00Z",
       },
     ]);
+    apiMock.notes.mockResolvedValue([]);
   });
 
   afterEach(() => cleanup());

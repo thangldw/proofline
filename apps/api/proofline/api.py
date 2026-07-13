@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
@@ -52,6 +53,7 @@ from .models import (
     Workspace,
     utc_now,
 )
+from .notes import parse_note_links, parse_note_tags
 from .reranking import DeterministicTokenReranker
 from .schemas import (
     AnswerRequest,
@@ -77,6 +79,10 @@ from .schemas import (
     ModelRunRead,
     ModelRunRetryRequest,
     ModelRunRetryResponse,
+    NoteBacklinkRead,
+    NoteCreate,
+    NoteRead,
+    NoteUpdate,
     Overview,
     ProviderConfigurationRead,
     ProviderConfigurationUpdate,
@@ -157,6 +163,39 @@ def source_to_read(source: Source) -> SourceRead:
         memory_count=sum(
             memory.source_version_id == source.current_version_id for memory in source.decisions
         ),
+    )
+
+
+def note_to_read(source: Source, notes: list[Source] | None = None) -> NoteRead:
+    links = parse_note_links(source.content)
+    title_candidates: dict[str, list[str]] = {}
+    for note in notes or []:
+        title_candidates.setdefault(note.title.casefold(), []).append(note.id)
+    links = [
+        link.model_copy(
+            update={
+                "resolved_source_id": (
+                    candidates[0]
+                    if len(candidates := title_candidates.get(link.target_title.casefold(), []))
+                    == 1
+                    else None
+                )
+            }
+        )
+        for link in links
+    ]
+    return NoteRead(
+        id=source.id,
+        workspace_id=source.workspace_id,
+        title=source.title,
+        content=source.content,
+        uri=source.uri or "",
+        current_version_id=source.current_version_id or "",
+        version_count=len(source.versions),
+        created_at=source.created_at,
+        indexed_at=source.indexed_at,
+        tags=parse_note_tags(source.content),
+        links=links,
     )
 
 
@@ -410,6 +449,114 @@ def remove_git_repository(
 @router.get("/folder-watch", response_model=FolderWatchStatus)
 def folder_watch_status(request: Request) -> FolderWatchStatus:
     return FolderWatchStatus.model_validate(request.app.state.folder_watcher.snapshot())
+
+
+def _workspace_notes(session: Session, workspace_id: str) -> list[Source]:
+    return list(
+        session.scalars(
+            select(Source)
+            .where(Source.workspace_id == workspace_id, Source.kind == "note")
+            .options(selectinload(Source.versions))
+            .order_by(Source.indexed_at.desc())
+        ).all()
+    )
+
+
+@router.post("/notes", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
+def create_note(
+    payload: NoteCreate,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> NoteRead:
+    source, _, _ = run_ingestion_job(
+        session,
+        SourceCreate(
+            title=payload.title,
+            content=payload.content,
+            kind="note",
+            uri=f"note://{uuid.uuid4()}",
+            workspace_id=workspace_id,
+        ),
+    )
+    notes = _workspace_notes(session, workspace_id)
+    hydrated = next(note for note in notes if note.id == source.id)
+    return note_to_read(hydrated, notes)
+
+
+@router.get("/notes", response_model=list[NoteRead])
+def list_notes(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[NoteRead]:
+    notes = _workspace_notes(session, workspace_id)
+    return [note_to_read(note, notes) for note in notes]
+
+
+@router.get("/notes/{note_id}", response_model=NoteRead)
+def get_note(
+    note_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> NoteRead:
+    notes = _workspace_notes(session, workspace_id)
+    note = next((item for item in notes if item.id == note_id), None)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note_to_read(note, notes)
+
+
+@router.put("/notes/{note_id}", response_model=NoteRead)
+def update_note(
+    note_id: str,
+    payload: NoteUpdate,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> NoteRead:
+    note = get_workspace_source(session, note_id, workspace_id)
+    if note.kind != "note":
+        raise HTTPException(status_code=404, detail="Note not found")
+    source, _, _ = run_ingestion_job(
+        session,
+        SourceCreate(
+            title=payload.title,
+            content=payload.content,
+            kind="note",
+            uri=note.uri,
+            workspace_id=workspace_id,
+        ),
+    )
+    notes = _workspace_notes(session, workspace_id)
+    hydrated = next(item for item in notes if item.id == source.id)
+    return note_to_read(hydrated, notes)
+
+
+@router.get("/notes/{note_id}/backlinks", response_model=list[NoteBacklinkRead])
+def list_note_backlinks(
+    note_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[NoteBacklinkRead]:
+    target = get_workspace_source(session, note_id, workspace_id)
+    if target.kind != "note":
+        raise HTTPException(status_code=404, detail="Note not found")
+    notes = _workspace_notes(session, workspace_id)
+    same_title = [note for note in notes if note.title.casefold() == target.title.casefold()]
+    if len(same_title) != 1:
+        return []
+    backlinks: list[NoteBacklinkRead] = []
+    for source in notes:
+        for link in parse_note_links(source.content):
+            if link.target_title.casefold() != target.title.casefold():
+                continue
+            backlinks.append(
+                NoteBacklinkRead(
+                    **link.model_copy(update={"resolved_source_id": target.id}).model_dump(),
+                    source_id=source.id,
+                    source_version_id=source.current_version_id or "",
+                    source_title=source.title,
+                )
+            )
+    return backlinks
 
 
 @router.get("/sources", response_model=list[SourceRead])

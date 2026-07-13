@@ -7,6 +7,7 @@ import {
   GitBranch,
   Search,
   Settings,
+  StickyNote,
   Upload,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import type {
   MemoryKind,
   ModelRun,
   ModelRunFilters,
+  Note,
   Overview,
   ProviderConfiguration,
   ProviderStatus,
@@ -30,7 +32,13 @@ import type {
   Workspace,
 } from "./types";
 
-type View = "search" | "memories" | "sources" | "model runs" | "settings";
+type View =
+  | "search"
+  | "notes"
+  | "memories"
+  | "sources"
+  | "model runs"
+  | "settings";
 
 type DeletionState = {
   source: Source;
@@ -50,6 +58,7 @@ export function App() {
     evidence: 0,
   });
   const [sources, setSources] = useState<Source[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [evidence, setEvidence] = useState<{
@@ -63,15 +72,17 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextMemories, nextJobs] =
+      const [nextOverview, nextSources, nextNotes, nextMemories, nextJobs] =
         await Promise.all([
           api.overview(),
           api.sources(),
+          api.notes(),
           api.memories(),
           api.jobs(),
         ]);
       setOverview(nextOverview);
       setSources(nextSources);
+      setNotes(nextNotes);
       setMemories(nextMemories);
       setJobs(nextJobs);
       setError("");
@@ -157,6 +168,14 @@ export function App() {
         </div>
         <nav aria-label="Primary navigation">
           <Nav
+            icon={<StickyNote size={18} />}
+            active={view === "notes"}
+            onClick={() => setView("notes")}
+            count={notes.length}
+          >
+            Notes
+          </Nav>
+          <Nav
             icon={<Search size={18} />}
             active={view === "search"}
             onClick={() => setView("search")}
@@ -237,6 +256,7 @@ export function App() {
             }
           />
         )}
+        {view === "notes" && <NotesView notes={notes} onChanged={refresh} />}
         {view === "memories" && (
           <MemoryView
             memories={memories}
@@ -298,6 +318,108 @@ type RunLineage = {
   parent: ModelRun | null;
   children: ModelRun[];
 };
+
+export function NotesView({
+  notes,
+  onChanged,
+}: {
+  notes: Note[];
+  onChanged: () => Promise<void>;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = notes.find((note) => note.id === selectedId) ?? null;
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setTitle(selected?.title ?? "");
+    setContent(selected?.content ?? "");
+    setMessage("");
+  }, [selected]);
+
+  async function saveNote(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const saved = selected
+        ? await api.updateNote(selected.id, title, content)
+        : await api.createNote(title, content);
+      await onChanged();
+      setSelectedId(saved.id);
+      setMessage(
+        selected
+          ? `Saved immutable revision ${saved.version_count}.`
+          : "Note captured and indexed.",
+      );
+    } catch (reason) {
+      setMessage(errorMessage(reason, "Could not save note"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="content notes-view" aria-label="Evidence-first notes">
+      <div className="notes-list">
+        <div className="notes-list-heading">
+          <div>
+            <span className="eyebrow">PERSONAL SECOND BRAIN</span>
+            <h2>Markdown notes</h2>
+          </div>
+          <button type="button" onClick={() => setSelectedId(null)}>
+            New note
+          </button>
+        </div>
+        {notes.length === 0 ? (
+          <p className="empty-copy">Capture a note to make it searchable.</p>
+        ) : (
+          notes.map((note) => (
+            <button
+              type="button"
+              className={note.id === selectedId ? "note-row active" : "note-row"}
+              key={note.id}
+              onClick={() => setSelectedId(note.id)}
+            >
+              <strong>{note.title}</strong>
+              <span>
+                {note.version_count} revision{note.version_count === 1 ? "" : "s"} · {note.tags.length} tags
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+      <form className="note-form" onSubmit={(event) => void saveNote(event)}>
+        <span className="eyebrow">{selected ? "IMMUTABLE REVISION" : "QUICK CAPTURE"}</span>
+        <label>
+          Title
+          <input
+            required
+            maxLength={300}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </label>
+        <label>
+          Markdown note
+          <textarea
+            required
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            placeholder="Write plain Markdown. Use #tags and [[Wiki links]]."
+          />
+        </label>
+        <div className="note-form-footer">
+          <span>{message || "Every content change preserves the previous version."}</span>
+          <button type="submit" disabled={saving}>
+            {saving ? "Saving…" : selected ? "Save revision" : "Capture note"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
 
 export function SettingsView() {
   const [configuration, setConfiguration] =

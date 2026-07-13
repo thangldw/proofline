@@ -398,6 +398,15 @@ select an owned data directory, bind port `0`, atomically observe readiness afte
 recovery, serve the built web archive from the same origin, and request graceful shutdown. This is
 locally verified packaging infrastructure, not a native desktop or production-support claim.
 
+### Evidence-first notes
+
+Personal notes are not stored in a parallel editor database. They are `Source` rows with kind
+`note`, a generated stable `note://` URI, and the same immutable `SourceVersion`, chunk, FTS and
+deletion behavior as imported Markdown. Hashtags and `[[wiki links]]` are derived deterministically
+from the current version. Each backlink returns the linking source ID, immutable version ID, quote,
+offsets and line range. Historical versions remain addressable through the existing source-version
+API; no graph database or autonomous mutation is involved.
+
 Planned MVP operations (exact contracts remain undecided):
 
 ```text

@@ -38,8 +38,9 @@ engineering managers. The initial team profile is a 5–50 person engineering or
 has meaningful technical documentation and source-control history, and values local or
 self-hosted processing.
 
-Proofline is not initially optimized for general note-taking, education, consumer journaling,
-or company-wide enterprise search.
+Proofline remains primarily optimized for engineering decision memory. Evidence-first personal
+capture and learning workflows are an experimental extension accepted in ADR 0004; consumer
+journaling and company-wide enterprise search remain outside the current scope.
 
 ## Product principles
 
@@ -83,6 +84,10 @@ lexical and dense retrieval through RRF and enforces server-owned evidence IDs p
 citations. Dense scoring is intentionally bounded and not yet a large-vault performance claim.
 Generation providers can also create decision candidates, but only after structured-output and
 evidence-ID validation; candidates remain unaccepted until the user reviews them.
+The bounded Personal Second Brain slice adds plain Markdown quick capture as a `note` source kind.
+Notes use generated stable identities, immutable content revisions, deterministic exact-span tags
+and wiki-links, and current-version backlinks; they do not introduce a rich-text editor or a
+parallel provenance model.
 
 ## MVP outcome
 

@@ -5,6 +5,27 @@
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
+## Mở rộng evidence-first đã được chấp thuận
+
+ADR 0004 giới hạn các đề xuất “bộ não” thành những lát cắt vẫn dùng immutable source identity và
+exact source span. Thứ tự phát hành tiếp theo:
+
+### v0.12 — Personal Second Brain
+
+- [x] Quick-capture ghi chú Markdown với stable `note://` identity.
+- [x] Mỗi lần sửa nội dung tạo source version bất biến; citation lịch sử vẫn mở được.
+- [x] Parse deterministic hashtag và `[[wiki-link]]` kèm exact offsets.
+- [x] Backlink chỉ ra source version và exact span tạo liên kết.
+- [x] Search, deletion cascade, workspace isolation, API và web tests.
+
+### Các mốc sau v0.12
+
+- [ ] **v0.13 Learning Brain:** flashcard/study prompt có exact evidence và review state.
+- [ ] **v0.14 Third Brain AI:** suggestion/plan có citation, human review, không autonomous write-back.
+- [ ] **v0.15 Team Brain:** chỉ bắt đầu sau authentication, RBAC, organization audit và permission-aware retrieval.
+
+Không mốc nào ở trên cho phép rich-text editor, canvas, graph database hoặc generic agent.
+
 ## Việc nên làm đầu tiên ngày mai
 
 ### P0 — Git repository ingestion dạng read-only

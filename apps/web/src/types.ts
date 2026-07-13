@@ -38,6 +38,33 @@ export type Source = {
   git_path?: string | null;
 };
 
+export type NoteSpan = {
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+};
+
+export type NoteLink = NoteSpan & {
+  target_title: string;
+  quote: string;
+  resolved_source_id: string | null;
+};
+
+export type Note = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content: string;
+  uri: string;
+  current_version_id: string;
+  version_count: number;
+  created_at: string;
+  indexed_at: string;
+  tags: Array<NoteSpan & { name: string }>;
+  links: NoteLink[];
+};
+
 export type SourceDeletionImpact = {
   source_id: string;
   title: string;

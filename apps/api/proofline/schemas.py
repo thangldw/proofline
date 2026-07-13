@@ -51,7 +51,7 @@ def normalize_retrieval_filters(
 class SourceCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     content: str = Field(min_length=1, max_length=5_000_000)
-    kind: str = Field(default="markdown", pattern="^(markdown|text)$")
+    kind: str = Field(default="markdown", pattern="^(markdown|text|note)$")
     uri: str | None = Field(default=None, max_length=4_096)
     workspace_id: str = Field(default=DEFAULT_WORKSPACE_ID, min_length=36, max_length=36)
 
@@ -133,6 +133,53 @@ class SourceRead(BaseModel):
     git_repository_id: str | None = None
     git_commit_sha: str | None = None
     git_path: str | None = None
+
+
+class NoteCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    content: str = Field(min_length=1, max_length=5_000_000)
+
+
+class NoteUpdate(NoteCreate):
+    pass
+
+
+class NoteTagRead(BaseModel):
+    name: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+
+
+class NoteLinkRead(BaseModel):
+    target_title: str
+    quote: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+    resolved_source_id: str | None = None
+
+
+class NoteRead(BaseModel):
+    id: str
+    workspace_id: str
+    title: str
+    content: str
+    uri: str
+    current_version_id: str
+    version_count: int
+    created_at: datetime
+    indexed_at: datetime
+    tags: list[NoteTagRead]
+    links: list[NoteLinkRead]
+
+
+class NoteBacklinkRead(NoteLinkRead):
+    source_id: str
+    source_version_id: str
+    source_title: str
 
 
 class GitRepositoryCreate(BaseModel):
