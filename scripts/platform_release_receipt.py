@@ -168,7 +168,8 @@ def main() -> None:
         "os_keyring": os_keyring,
         "qualification": (
             f"Installed-release qualification for {system} {platform.machine()} only. "
-            "It proves local lifecycle, bundled web, deterministic portability, backup and "
+            "It proves local lifecycle, bundled web, deterministic portability, backup restore/"
+            "rollback and "
             + ("OS keyring set/read/delete, " if args.qualify_os_keyring else "")
             + "integrity behavior for the identified artifact; it does not qualify another OS, "
             "native installer signing, real-model quality, external pilots or production support."

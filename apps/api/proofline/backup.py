@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -130,3 +131,80 @@ def create_sqlite_backup(engine: Engine, output: Path, *, force: bool = False) -
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def restore_sqlite_backup(
+    backup: Path,
+    target: Path,
+    *,
+    rollback_output: Path | None = None,
+) -> dict[str, int | bool]:
+    backup = Path(os.path.abspath(backup.expanduser()))
+    target = Path(os.path.abspath(target.expanduser()))
+    rollback = (
+        Path(os.path.abspath(rollback_output.expanduser())) if rollback_output is not None else None
+    )
+    if backup == target or rollback in {backup, target}:
+        raise BackupError("restore_paths_must_be_distinct")
+    report = verify_sqlite_backup(backup)
+    target_existed = target.exists()
+    if target_existed and rollback is None:
+        raise BackupError("rollback_output_required")
+    if rollback is not None and rollback.exists():
+        raise BackupError("rollback_output_exists")
+    if any(Path(f"{target}{suffix}").exists() for suffix in ("-wal", "-shm", "-journal")):
+        raise BackupError("restore_target_has_sidecars")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    restored_temporary = _private_copy(backup, target.parent, f".{target.name}.restore-")
+    rollback_created = False
+    try:
+        if verify_sqlite_backup(restored_temporary) != report:
+            raise BackupError("restore_candidate_mismatch")
+        if target_existed and rollback is not None:
+            rollback.parent.mkdir(parents=True, exist_ok=True)
+            rollback_temporary = _private_copy(
+                target, rollback.parent, f".{rollback.name}.rollback-"
+            )
+            try:
+                _publish_backup(rollback_temporary, rollback, force=False)
+                rollback_created = True
+            finally:
+                if rollback_temporary.exists():
+                    rollback_temporary.unlink()
+        try:
+            os.replace(restored_temporary, target)
+            os.chmod(target, 0o600)
+        except OSError as exc:
+            raise BackupError("restore_publish_failed") from exc
+        try:
+            if verify_sqlite_backup(target) != report:
+                raise BackupError("restore_verification_failed")
+        except BackupError:
+            if rollback_created and rollback is not None:
+                emergency = _private_copy(rollback, target.parent, f".{target.name}.rollback-")
+                os.replace(emergency, target)
+                os.chmod(target, 0o600)
+            raise
+        return {
+            **report,
+            "target_existed": target_existed,
+            "rollback_created": rollback_created,
+        }
+    finally:
+        if restored_temporary.exists():
+            restored_temporary.unlink()
+
+
+def _private_copy(source: Path, directory: Path, prefix: str) -> Path:
+    descriptor, temporary_name = tempfile.mkstemp(prefix=prefix, dir=directory)
+    temporary = Path(temporary_name)
+    os.close(descriptor)
+    try:
+        shutil.copyfile(source, temporary)
+        os.chmod(temporary, 0o600)
+        return temporary
+    except OSError as exc:
+        if temporary.exists():
+            temporary.unlink()
+        raise BackupError("backup_copy_failed") from exc

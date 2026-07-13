@@ -7,7 +7,28 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.9`.
+No changes have been recorded after `v0.14.10`.
+
+## [0.14.10] - 2026-07-14
+
+### Added
+
+- Add `proofline restore-backup` for verified, atomic SQLite restore with a required rollback copy
+  when replacing an existing database.
+- Add installed-release receipt observations for restoring a backup and reversing that restore
+  from the preserved rollback database.
+
+### Changed
+
+- Refuse restore when SQLite sidecars suggest the target has not been cleanly stopped, when paths
+  overlap, or when the rollback destination already exists.
+- Publish restored databases with owner-only permissions and verify the exact schema after atomic
+  replacement.
+
+### Validation
+
+- Cover the full old-state restore and new-state rollback round trip, safe path/sidecar refusal,
+  CLI targeting and installed-package smoke behavior.
 
 ## [0.14.9] - 2026-07-14
 

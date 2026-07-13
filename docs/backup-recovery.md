@@ -109,17 +109,27 @@ source content. A failure exits nonzero with a stable content-free code.
 
 ## Restore a verified local backup
 
-1. Verify the candidate with `proofline verify-backup` using the same Proofline
-   version that will run it.
-2. Stop the Proofline API and workers.
-3. Preserve the current database as a separately named rollback copy.
-4. Copy the verified backup to the SQLite path configured by
-   `PROOFLINE_DATABASE_URL`, then set its mode to `0600`.
-5. Start Proofline and check `/health`, source and memory counts, one known
-   search, and the exact evidence span behind one known memory.
-6. Keep the rollback copy until the restored deployment has been validated.
+Stop the Proofline API and workers, then run the restore with the same Proofline version that will
+open the database:
 
-Example recovery drill using an isolated database path:
+```bash
+PROOFLINE_DATABASE_URL=sqlite:////absolute/proofline.db \
+  .venv/bin/proofline restore-backup proofline-backup.db \
+  --rollback-output /absolute/proofline-before-restore.db
+```
+
+The command verifies the candidate without migrating it, refuses an in-memory or non-SQLite
+target, refuses a live target with `-wal`, `-shm` or `-journal` sidecars, and requires a new rollback path when
+the target already exists. It copies the candidate with mode `0600`, verifies that copy, preserves
+the current target without overwrite, atomically replaces the configured database, and verifies
+the published result. Candidate, target, and rollback paths must be distinct.
+
+Start Proofline and check `/health`, source and memory counts, one known search, and the exact
+evidence span behind one known memory. Keep the rollback copy until the restored deployment has
+been validated. To reverse the restore, stop Proofline and run the same command with the rollback
+copy as the candidate and a new rollback-output path.
+
+Example read-only recovery inspection using an isolated database path:
 
 ```bash
 cp proofline-backup.db /tmp/proofline-recovery-drill.db
@@ -129,10 +139,10 @@ PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-recovery-drill.db \
   .venv/bin/proofline serve
 ```
 
-An online backup is a standalone SQLite database; do not copy a live database
-file manually and do not restore stale `-wal` or `-shm` sidecar files. A backup
-from a different schema version is rejected rather than silently migrated by
-the verifier.
+An online backup is a standalone SQLite database; do not copy a live database file manually. A
+backup from a different schema version is rejected rather than silently migrated by the verifier.
+The local release receipt exercises backup creation, restore to the older snapshot and a reverse
+restore from the preserved rollback copy through the installed wheel.
 
 ## Retention and deletion
 

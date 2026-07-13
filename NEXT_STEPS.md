@@ -1,8 +1,8 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** installed-wheel macOS lifecycle và OS-keyring qualification receipt đã
-hoàn thành cho `v0.14.9`; Windows, native packaging, production qualification, real-model
+**Trạng thái hiện tại:** installed-wheel macOS lifecycle, backup restore/rollback và OS-keyring
+qualification receipt đã hoàn thành cho `v0.14.10`; Windows, native packaging, production qualification, real-model
 evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -83,6 +83,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Migrate key cũ khỏi JSON, hỗ trợ replace/remove và rollback file + keyring cùng nhau.
 - [x] Hiển thị storage mode và thao tác xóa key trong Settings mà không trả lại secret.
 - [x] Ghi set/read/delete của real macOS Keychain vào installed-release receipt.
+
+### v0.14.10 — Verified backup restore and rollback
+
+- [x] Thêm CLI restore backup đã verify vào đúng SQLite target được cấu hình.
+- [x] Bắt buộc rollback copy khi thay database hiện có; không overwrite rollback cũ.
+- [x] Refuse path trùng, SQLite sidecar và candidate sai schema trước khi publish.
+- [x] Atomic replace với quyền owner-only và post-restore verification.
+- [x] Installed-release receipt restore về snapshot cũ rồi reverse bằng rollback copy.
 
 ## Việc nên làm đầu tiên ngày mai
 
