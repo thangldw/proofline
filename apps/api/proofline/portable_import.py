@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -42,6 +46,16 @@ DOMAIN_MODELS = (
     IngestionJobInput,
     ImportReceipt,
 )
+
+ID_COLLECTIONS = {
+    "sources": "source",
+    "source_versions": "source_version",
+    "memories": "memory",
+    "evidence": "evidence",
+    "model_runs": "model_run",
+    "audit_events": "audit_event",
+    "ingestion_jobs": "ingestion_job",
+}
 
 
 def load_verified_import(path: Path) -> dict[str, Any]:
@@ -102,8 +116,88 @@ def _insert_model_runs(session: Session, items: list[dict[str, Any]]) -> None:
         session.flush()
 
 
+def _merge_id(payload_hash: str, kind: str, value: str) -> str:
+    namespace = uuid.uuid5(uuid.NAMESPACE_URL, f"proofline:{payload_hash}")
+    return str(uuid.uuid5(namespace, f"{kind}:{value}"))
+
+
+def preview_portable_merge(session: Session, document: dict[str, Any]) -> dict[str, Any]:
+    """Return a stable, content-free remap plan without mutating the target."""
+    counts = verify_portable_export(document)
+    payload_hash = document["manifest"]["payload_sha256"]
+    remap = {
+        kind: {
+            item["id"]: _merge_id(payload_hash, kind, item["id"])
+            for item in document["payload"][collection]
+        }
+        for collection, kind in ID_COLLECTIONS.items()
+    }
+    existing = {
+        model.__tablename__: session.scalar(select(func.count()).select_from(model)) or 0
+        for model in DOMAIN_MODELS
+        if model is not ImportReceipt
+    }
+    plan_body = {
+        "schema": document["manifest"]["schema"],
+        "payload_sha256": payload_hash,
+        "counts": counts,
+        "target_counts": existing,
+        "strategy": "remap_all_ids_no_overwrite",
+        "remap": remap,
+    }
+    plan_body["preview_sha256"] = hashlib.sha256(
+        json.dumps(plan_body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    return plan_body
+
+
+def _remap_document(document: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    remapped = copy.deepcopy(document)
+    payload = remapped["payload"]
+    maps = plan["remap"]
+
+    for collection, kind in ID_COLLECTIONS.items():
+        for item in payload[collection]:
+            item["id"] = maps[kind][item["id"]]
+    for item in payload["sources"]:
+        item["identity_hash"] = hashlib.sha256(f"source:{item['id']}".encode()).hexdigest()
+        item["current_version_id"] = maps["source_version"][item["current_version_id"]]
+    for item in payload["source_versions"]:
+        item["source_id"] = maps["source"][item["source_id"]]
+    for item in payload["memories"]:
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+        if item["model_run_id"] is not None:
+            item["model_run_id"] = maps["model_run"][item["model_run_id"]]
+    for item in payload["evidence"]:
+        item["memory_id"] = maps["memory"][item["memory_id"]]
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    for item in payload["model_runs"]:
+        if item["parent_run_id"] is not None:
+            item["parent_run_id"] = maps["model_run"][item["parent_run_id"]]
+    for item in payload["audit_events"]:
+        object_kind = "memory" if item["object_type"] == "decision" else item["object_type"]
+        object_map = maps.get(object_kind)
+        if object_map and item["object_id"] in object_map:
+            item["object_id"] = object_map[item["object_id"]]
+    for item in payload["ingestion_jobs"]:
+        if item["source_id"] is not None:
+            item["source_id"] = maps["source"][item["source_id"]]
+        if item["source_version_id"] is not None:
+            item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    return remapped
+
+
 def _import_verified(
-    session: Session, document: dict[str, Any], counts: dict[str, int]
+    session: Session,
+    document: dict[str, Any],
+    counts: dict[str, int],
+    *,
+    verify_payload_equivalence: bool = True,
+    receipt_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = document["manifest"]
     payload = document["payload"]
@@ -232,19 +326,20 @@ def _import_verified(
                 item["content"],
             )
 
+        receipt = receipt_manifest or manifest
         session.add(
             ImportReceipt(
-                schema=manifest["schema"],
-                payload_sha256=manifest["payload_sha256"],
-                export_app_version=manifest["app_version"],
-                export_created_at=_datetime(manifest["created_at"]),
+                schema=receipt["schema"],
+                payload_sha256=receipt["payload_sha256"],
+                export_app_version=receipt["app_version"],
+                export_created_at=_datetime(receipt["created_at"]),
                 counts_json=counts,
             )
         )
         session.flush()
 
-        rebuilt = build_portable_export(session)
-        if payload_sha256(rebuilt["payload"]) != manifest["payload_sha256"]:
+        rebuilt = build_portable_export(session) if verify_payload_equivalence else None
+        if rebuilt and payload_sha256(rebuilt["payload"]) != manifest["payload_sha256"]:
             raise PortabilityError("import_verification_failed")
     except PortabilityError:
         raise
@@ -266,3 +361,38 @@ def import_portable_export(session: Session, document: dict[str, Any]) -> dict[s
         raise PortabilityError("target_not_empty")
     with session.begin_nested():
         return _import_verified(session, document, counts)
+
+
+def merge_portable_export(
+    session: Session,
+    document: dict[str, Any],
+    *,
+    expected_preview_sha256: str,
+) -> dict[str, Any]:
+    """Apply an explicitly acknowledged no-overwrite merge in one savepoint."""
+    plan = preview_portable_merge(session, document)
+    if plan["preview_sha256"] != expected_preview_sha256:
+        raise PortabilityError("merge_preview_changed")
+    receipt = session.scalar(
+        select(ImportReceipt).where(
+            ImportReceipt.payload_sha256 == document["manifest"]["payload_sha256"]
+        )
+    )
+    if receipt:
+        raise PortabilityError("payload_already_imported")
+    remapped = _remap_document(document, plan)
+    counts = document["manifest"]["counts"]
+    with session.begin_nested():
+        report = _import_verified(
+            session,
+            remapped,
+            counts,
+            verify_payload_equivalence=False,
+            receipt_manifest=document["manifest"],
+        )
+    return {
+        **report,
+        "merge": True,
+        "preview_sha256": plan["preview_sha256"],
+        "remap": plan["remap"],
+    }

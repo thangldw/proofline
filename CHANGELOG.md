@@ -7,6 +7,19 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
+No changes have been recorded after `v0.8.0`.
+
+## [0.8.0] - 2026-07-13
+
+### Added
+
+- Portable exports can be previewed and merged into a non-empty database through deterministic
+  all-ID remapping, with source identities and every provenance reference rewritten consistently.
+- Merge apply requires the exact preview digest, rejects changed targets and duplicate payloads,
+  never overwrites existing records, and owns a rollback savepoint for import failures.
+- The CLI exposes `proofline import --preview-merge` followed by explicit `--merge
+  --preview-sha256 DIGEST`; reports contain IDs and counts but no source content.
+
 ### Changed
 
 - Release tag pushes no longer start GitHub Actions automatically. Maintainers can run the guarded
@@ -192,7 +205,8 @@ semantic-versioning compatibility between pre-releases.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/thangldw/proofline/releases/tag/v0.8.0
 [0.7.0]: https://github.com/thangldw/proofline/releases/tag/v0.7.0
 [0.6.0]: https://github.com/thangldw/proofline/releases/tag/v0.6.0
 [0.5.0]: https://github.com/thangldw/proofline/releases/tag/v0.5.0

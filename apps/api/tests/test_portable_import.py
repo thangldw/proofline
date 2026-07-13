@@ -32,7 +32,12 @@ from proofline.portability import (
     build_portable_export,
     payload_sha256,
 )
-from proofline.portable_import import import_portable_export, load_verified_import
+from proofline.portable_import import (
+    import_portable_export,
+    load_verified_import,
+    merge_portable_export,
+    preview_portable_merge,
+)
 from proofline.retrieval import lexical_search
 from proofline.schemas import SourceCreate
 from sqlalchemy import func, select, text
@@ -175,6 +180,80 @@ def test_import_rejects_nonempty_target_without_mutation(session, tmp_path):
     engine.dispose()
 
 
+def test_merge_preview_remaps_all_ids_without_overwriting_existing_data(session, tmp_path):
+    document, source_id, _old_version_id, memory_id = _rich_document(session)
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target:
+        existing, _ = ingest_source(
+            target,
+            SourceCreate(
+                title="Existing target",
+                uri="file:///existing.md",
+                content="Decision: Preserve target data",
+            ),
+        )
+        existing_id = existing.id
+        plan = preview_portable_merge(target, document)
+        assert plan["strategy"] == "remap_all_ids_no_overwrite"
+        assert plan["remap"]["source"][source_id] != source_id
+        assert target.scalar(select(func.count()).select_from(ImportReceipt)) == 0
+
+    with factory() as target, target.begin():
+        report = merge_portable_export(
+            target,
+            document,
+            expected_preview_sha256=plan["preview_sha256"],
+        )
+
+    imported_source_id = report["remap"]["source"][source_id]
+    imported_memory_id = report["remap"]["memory"][memory_id]
+    with factory() as target:
+        assert target.get(Source, existing_id).title == "Existing target"
+        assert target.get(Source, imported_source_id).title == "Queue ADR revised"
+        imported_memory = target.get(Decision, imported_memory_id)
+        evidence = target.scalar(select(Evidence).where(Evidence.decision_id == imported_memory.id))
+        version = target.get(SourceVersion, evidence.source_version_id)
+        assert version.content[evidence.start_offset : evidence.end_offset] == evidence.quote
+        assert {hit.source_id for hit in lexical_search(target, "simplicity")} == {
+            imported_source_id
+        }
+        assert target.scalar(select(func.count()).select_from(Source)) == 2
+        assert target.scalar(select(func.count()).select_from(ImportReceipt)) == 1
+    assert verify_live_database(engine)["valid"] is True
+    engine.dispose()
+
+
+def test_merge_rejects_stale_preview_and_duplicate_payload(session, tmp_path):
+    document, *_ = _rich_document(session)
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target:
+        plan = preview_portable_merge(target, document)
+        ingest_source(target, SourceCreate(title="Changed target", content="Decision: Changed"))
+        with pytest.raises(PortabilityError, match="merge_preview_changed"):
+            merge_portable_export(
+                target,
+                document,
+                expected_preview_sha256=plan["preview_sha256"],
+            )
+
+    with factory() as target:
+        current = preview_portable_merge(target, document)
+        merge_portable_export(
+            target,
+            document,
+            expected_preview_sha256=current["preview_sha256"],
+        )
+        target.commit()
+    with factory() as target, pytest.raises(PortabilityError, match="payload_already_imported"):
+        current = preview_portable_merge(target, document)
+        merge_portable_export(
+            target,
+            document,
+            expected_preview_sha256=current["preview_sha256"],
+        )
+    engine.dispose()
+
+
 def test_import_rolls_back_and_hides_internal_failure(session, tmp_path, monkeypatch):
     document, *_ = _rich_document(session)
     engine, factory = _target_factory(tmp_path)
@@ -262,6 +341,38 @@ def test_import_cli_reports_safe_receipt_and_rejects_second_import(
 
     with pytest.raises(SystemExit, match="import failed: target_not_empty"):
         main(["import", str(export_path)])
+    engine.dispose()
+
+
+def test_import_cli_requires_matching_preview_before_merge(session, tmp_path, monkeypatch, capsys):
+    document, *_ = _rich_document(session)
+    export_path = tmp_path / "portable-merge.json"
+    atomic_write_export(export_path, document)
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target:
+        ingest_source(target, SourceCreate(title="Existing", content="Decision: Existing"))
+    monkeypatch.setattr(cli_module, "SessionLocal", factory)
+    monkeypatch.setattr(cli_module, "initialize_database", lambda: None)
+
+    main(["import", str(export_path), "--preview-merge"])
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["strategy"] == "remap_all_ids_no_overwrite"
+    assert preview["valid"] is True
+
+    with pytest.raises(SystemExit, match="import failed: merge_preview_required"):
+        main(["import", str(export_path), "--merge"])
+    main(
+        [
+            "import",
+            str(export_path),
+            "--merge",
+            "--preview-sha256",
+            preview["preview_sha256"],
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["merge"] is True
+    assert report["preview_sha256"] == preview["preview_sha256"]
     engine.dispose()
 
 
