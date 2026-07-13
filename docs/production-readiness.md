@@ -23,8 +23,8 @@ profile.
 | Area | Required evidence | Status | Current evidence or blocker |
 | --- | --- | --- | --- |
 | Public repository | License, community docs, current support policy, no contributor-machine paths, accurate implemented/planned claims | Partial | Hygiene corrections are prepared; repository metadata and visibility remain external changes |
-| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.8` GitHub assets and checksummed platform receipt |
-| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.8` installed-release platform receipt; native signing remains a separate gate |
+| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.9` GitHub assets and checksummed platform receipt |
+| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.9` installed-release platform receipt; native signing remains a separate gate |
 | Windows lifecycle | Same installed-artifact and recovery path on a real Windows target | Blocked | No Windows runner or machine receipt |
 | Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Blocked | Tauri remains deferred by ADR 0003 |
 | Data integrity | Versioned migrations, immutable source identity, exact spans, deletion cascade and semantic verification | Complete for tested local schema | Migration, provenance, deletion and integrity suites |
@@ -32,7 +32,7 @@ profile.
 | Offline core | Useful ingestion, retrieval, memory review and Studio behavior without external services | Complete for deterministic scope | Credential-free regression and UI suites |
 | Model quality | Frozen real corpus, pinned local/remote models, extraction/citation/abstention/latency/cost report | Blocked | Only `mock_integration` evidence exists |
 | External utility | Permissioned pilot with at least 25 questions, temporal cases, baseline and useful-answer metrics | Blocked | Templates exist; no external pilot evidence |
-| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Partial | Local owner-only config exists; macOS Keychain and Windows Credential Manager integration are missing |
+| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Complete on macOS; Windows receipt pending | `v0.14.9` supports OS keyring storage, migration, rollback and UI removal; macOS installed-wheel receipt exercises set/read/delete |
 | Operational support | Supported versions, issue handling, upgrade/rollback policy, data-loss escalation and release cadence | Partial | Pre-alpha boundary exists; production owners and commitments are not named |
 | Security qualification | Threat-boundary verification and release security assessment | Blocked | Explicitly excluded from the current work scope; production claim is impossible while excluded |
 
@@ -49,8 +49,7 @@ profile.
 
 1. Finish public repository hygiene and publish the next pre-release metadata accurately.
 2. Add durable macOS installed-release lifecycle and recovery receipts.
-3. Implement native secret storage and the desktop wrapper only after its lifecycle contract is
-   covered.
+3. Implement the desktop wrapper on top of the qualified lifecycle and OS-keyring contract.
 4. Obtain a real Windows environment and close the same receipt contract.
 5. Run the frozen real-model comparison and external pilot.
 6. Complete security qualification before changing the production claim.

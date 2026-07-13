@@ -3,14 +3,31 @@
 Proofline runs with model providers disabled by default. Use the Settings screen or
 `PUT /api/v1/model/configuration` to configure generation and embedding independently.
 
-The UI writes `.proofline/providers.json` atomically with owner-only permissions. Set
-`PROOFLINE_PROVIDER_CONFIG_PATH` to choose another local path. Environment variables retain
-precedence over the file, which keeps container and managed deployments declarative.
+Proofline defaults to writing `.proofline/providers.json` atomically with owner-only permissions.
+Set `PROOFLINE_PROVIDER_CONFIG_PATH` to choose another local path. Environment variables retain
+precedence over local storage, which keeps container and managed deployments declarative.
+
+Desktop wrappers should enable the operating-system credential store before startup:
+
+```bash
+export PROOFLINE_SECRET_STORE=os_keyring
+proofline serve --port 0 --data-dir "$HOME/Library/Application Support/Proofline"
+```
+
+The `os_keyring` mode uses macOS Keychain on macOS and Windows Credential Locker on Windows through
+the Python `keyring` backend. Non-secret provider settings remain in `providers.json`; generation
+and embedding API keys do not. The Settings screen reports which storage mode is active and lets
+the user replace or explicitly remove either saved key. On the first successful save in keyring
+mode, legacy keys are moved out of `providers.json`. If provider validation fails, both the file
+and keyring changes are rolled back. Startup fails explicitly when keyring mode is selected but no
+usable OS backend is available. Use `PROOFLINE_SECRET_STORE=file` (the default) only when the
+owner-only local file behavior is intended.
 
 Supported generation profiles are `qwen`, `deepseek`, `ollama`, `vllm`, and
 `openai_compatible`. Embedding profiles are `ollama`, `vllm`, and `openai_compatible`. Qwen,
 DeepSeek, and other non-loopback endpoints require `allow_remote_ai=true`. API keys are accepted
-on write, are never returned on read, and are not included in model-run diagnostics.
+on write, are never returned on read, and are not included in model-run diagnostics, portable
+exports, SQLite backups or platform receipts.
 
 Capability checks:
 

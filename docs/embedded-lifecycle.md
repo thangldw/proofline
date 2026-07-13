@@ -18,7 +18,9 @@ proofline serve \
 ```
 
 - `--port 0` asks the OS for an available port and avoids a fixed-port collision.
-- `--data-dir` owns the default `proofline.db` and `providers.json`. The equivalent environment
+- `--data-dir` owns the default `proofline.db` and `providers.json`. With
+  `PROOFLINE_SECRET_STORE=os_keyring`, that JSON contains only non-secret provider settings; file
+  mode may also keep API keys there with owner-only permissions. The equivalent environment
   variable is `PROOFLINE_HOME`; an explicit `PROOFLINE_DATABASE_URL` still overrides the database.
 - The bundled web UI, API, and `/health` share one origin. `--no-web` starts API-only mode;
   `--web-dir` explicitly replaces the bundled UI and must contain `index.html`.
@@ -58,5 +60,6 @@ database file directly and must keep rollback data until the restored process is
 
 This contract has local automated coverage for dynamic-port startup, readiness, bundled same-origin
 web serving from a cleanly installed wheel, data-directory creation, `/health`, graceful `SIGTERM`,
-and cleanup. Windows, installer
-signing, update rollback, native auto-launch, and production qualification remain unverified gates.
+and cleanup. The v0.14.9 macOS release receipt also exercises OS-keyring set/read/delete through
+the installed wheel. Windows, installer signing, update rollback, native auto-launch, and
+production qualification remain unverified gates.

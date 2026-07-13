@@ -66,6 +66,7 @@ platform_slug=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
   --python "$smoke_dir/venv/bin/python" \
   --artifact "$release_dir/proofline-$installed_version-py3-none-any.whl" \
   --expected-version "$installed_version" \
+  --qualify-os-keyring \
   --output "$release_dir/proofline-platform-$tag-$platform_slug.json" >/dev/null
 (
   cd "$release_dir"

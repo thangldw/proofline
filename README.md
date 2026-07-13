@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.8 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.9 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -254,10 +254,11 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.8` is the latest experimental pre-alpha release. It attaches a platform qualification
-receipt to the exact wheel exercised by the local release gate. The installed wheel contains the
-same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.8.md) and verify `SHA256SUMS` before installation.
+`v0.14.9` is the latest experimental pre-alpha release. It adds opt-in macOS Keychain and Windows
+Credential Locker storage for provider keys, while retaining the owner-only file mode for local
+development. Its platform receipt binds the exact installed wheel to lifecycle, recovery,
+integrity and OS-keyring observations on the release machine. See the
+[release notes](docs/releases/v0.14.9.md) and verify `SHA256SUMS` before installation.
 
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
@@ -278,7 +279,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.8
+make release-local TAG=v0.14.9
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an

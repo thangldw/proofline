@@ -1,6 +1,6 @@
 [project]
 name = "proofline"
-version = "0.14.8"
+version = "0.14.9"
 description = "Evidence-first engineering decision memory"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,6 +11,7 @@ keywords = ["engineering", "knowledge", "provenance", "retrieval", "local-first"
 dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
+  "keyring>=25,<26",
   "pydantic>=2.9,<3",
   "sqlalchemy>=2.0,<3",
   "uvicorn[standard]>=0.32,<1",
