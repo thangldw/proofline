@@ -6,6 +6,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import secret_store
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -102,6 +104,14 @@ def get_settings() -> Settings:
     database_url = os.getenv("PROOFLINE_DATABASE_URL", f"sqlite:///{default_db}")
     origins = os.getenv("PROOFLINE_CORS_ORIGINS", "http://localhost:5173")
     stored = load_provider_config()
+    config_path = provider_config_path()
+    platform_secrets = secret_store.get_provider_secret_store(config_path)
+    ai_api_key = (
+        platform_secrets.get("ai_api_key") if platform_secrets is not None else None
+    ) or stored.get("ai_api_key")
+    embedding_api_key = (
+        platform_secrets.get("embedding_api_key") if platform_secrets is not None else None
+    ) or stored.get("embedding_api_key")
     allow_remote_raw = os.getenv("PROOFLINE_ALLOW_REMOTE_AI")
     allow_remote_ai = (
         allow_remote_raw
@@ -127,7 +137,7 @@ def get_settings() -> Settings:
         ai_provider=os.getenv("PROOFLINE_AI_PROVIDER", stored.get("ai_provider", "disabled")),
         ai_base_url=os.getenv("PROOFLINE_AI_BASE_URL", stored.get("ai_base_url")),
         ai_model=os.getenv("PROOFLINE_AI_MODEL", stored.get("ai_model")),
-        ai_api_key=os.getenv("PROOFLINE_AI_API_KEY", stored.get("ai_api_key")),
+        ai_api_key=os.getenv("PROOFLINE_AI_API_KEY", ai_api_key),
         embedding_provider=os.getenv(
             "PROOFLINE_EMBEDDING_PROVIDER", stored.get("embedding_provider", "disabled")
         ),
@@ -135,8 +145,8 @@ def get_settings() -> Settings:
             "PROOFLINE_EMBEDDING_BASE_URL", stored.get("embedding_base_url")
         ),
         embedding_model=os.getenv("PROOFLINE_EMBEDDING_MODEL", stored.get("embedding_model")),
-        embedding_api_key=os.getenv("PROOFLINE_EMBEDDING_API_KEY", stored.get("embedding_api_key")),
+        embedding_api_key=os.getenv("PROOFLINE_EMBEDDING_API_KEY", embedding_api_key),
         allow_remote_ai=allow_remote_ai,
         folder_watch_interval_seconds=_folder_watch_interval(),
-        provider_config_path=provider_config_path(),
+        provider_config_path=config_path,
     )

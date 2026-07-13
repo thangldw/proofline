@@ -18,6 +18,7 @@ const configuration = {
   embedding_model: null,
   embedding_api_key_configured: false,
   allow_remote_ai: false,
+  secret_storage: "os_keyring" as const,
 };
 const status = (mode: "ready" | "degraded" | "disabled") => ({
   configured: mode !== "disabled",
@@ -57,6 +58,9 @@ describe("SettingsView", () => {
   it("configures explicit provider profiles and never displays stored keys", async () => {
     render(<SettingsView />);
     await screen.findByRole("heading", { name: "Model providers" });
+    expect(
+      screen.getByText("API keys: protected by this device's OS keyring"),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Generation provider"), {
       target: { value: "ollama" },
     });
@@ -74,5 +78,24 @@ describe("SettingsView", () => {
       ai_api_key: "private-key",
     });
     expect(screen.queryByText("private-key")).not.toBeInTheDocument();
+  });
+
+  it("can explicitly remove a stored key", async () => {
+    apiMock.providerConfiguration.mockResolvedValue({
+      ...configuration,
+      ai_api_key_configured: true,
+    });
+    render(<SettingsView />);
+    await screen.findByRole("heading", { name: "Model providers" });
+    fireEvent.click(screen.getByLabelText("Remove saved generation key"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save and check health" }),
+    );
+    await waitFor(() =>
+      expect(apiMock.saveProviderConfiguration).toHaveBeenCalled(),
+    );
+    expect(apiMock.saveProviderConfiguration.mock.calls[0][0]).toMatchObject({
+      ai_api_key: "",
+    });
   });
 });

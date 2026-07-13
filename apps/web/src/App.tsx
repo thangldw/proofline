@@ -731,6 +731,8 @@ export function SettingsView() {
   const [reranking, setReranking] = useState<ProviderStatus | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+  const [removeApiKey, setRemoveApiKey] = useState(false);
+  const [removeEmbeddingApiKey, setRemoveEmbeddingApiKey] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -763,15 +765,19 @@ export function SettingsView() {
         ai_provider: configuration.ai_provider,
         ai_base_url: configuration.ai_base_url || null,
         ai_model: configuration.ai_model || null,
-        ai_api_key: apiKey || undefined,
+        ai_api_key: removeApiKey ? "" : apiKey || undefined,
         embedding_provider: configuration.embedding_provider,
         embedding_base_url: configuration.embedding_base_url || null,
         embedding_model: configuration.embedding_model || null,
-        embedding_api_key: embeddingApiKey || undefined,
+        embedding_api_key: removeEmbeddingApiKey
+          ? ""
+          : embeddingApiKey || undefined,
         allow_remote_ai: configuration.allow_remote_ai,
       });
       setApiKey("");
       setEmbeddingApiKey("");
+      setRemoveApiKey(false);
+      setRemoveEmbeddingApiKey(false);
       await refreshProviders();
       setMessage(
         "Provider configuration saved and capability health refreshed.",
@@ -798,6 +804,11 @@ export function SettingsView() {
           <h2>Model providers</h2>
         </div>
         <span className="mode-badge">No automatic fallback</span>
+      </div>
+      <div className="settings-note" role="status">
+        API keys: {configuration.secret_storage === "os_keyring"
+          ? "protected by this device's OS keyring"
+          : "stored in an owner-only local file"}
       </div>
       <form
         className="model-run-filters"
@@ -851,14 +862,31 @@ export function SettingsView() {
           <input
             type="password"
             value={apiKey}
+            disabled={removeApiKey}
             placeholder={
               configuration.ai_api_key_configured
                 ? "Configured; leave blank to keep"
                 : "Optional"
             }
-            onChange={(event) => setApiKey(event.target.value)}
+            onChange={(event) => {
+              setApiKey(event.target.value);
+              setRemoveApiKey(false);
+            }}
           />
         </label>
+        {configuration.ai_api_key_configured && (
+          <label className="secret-removal">
+            <input
+              type="checkbox"
+              checked={removeApiKey}
+              onChange={(event) => {
+                setRemoveApiKey(event.target.checked);
+                if (event.target.checked) setApiKey("");
+              }}
+            />
+            Remove saved generation key
+          </label>
+        )}
         <label>
           Embedding provider
           <select
@@ -905,14 +933,31 @@ export function SettingsView() {
           <input
             type="password"
             value={embeddingApiKey}
+            disabled={removeEmbeddingApiKey}
             placeholder={
               configuration.embedding_api_key_configured
                 ? "Configured; leave blank to keep"
                 : "Optional"
             }
-            onChange={(event) => setEmbeddingApiKey(event.target.value)}
+            onChange={(event) => {
+              setEmbeddingApiKey(event.target.value);
+              setRemoveEmbeddingApiKey(false);
+            }}
           />
         </label>
+        {configuration.embedding_api_key_configured && (
+          <label className="secret-removal">
+            <input
+              type="checkbox"
+              checked={removeEmbeddingApiKey}
+              onChange={(event) => {
+                setRemoveEmbeddingApiKey(event.target.checked);
+                if (event.target.checked) setEmbeddingApiKey("");
+              }}
+            />
+            Remove saved embedding key
+          </label>
+        )}
         <label>
           <input
             type="checkbox"

@@ -9,7 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from .config import get_settings, load_provider_config, save_provider_config
+from . import secret_store
+from .config import get_settings, load_provider_config, provider_config_path, save_provider_config
 from .database import get_session
 from .embeddings import hybrid_search, index_current_embeddings
 from .extraction import (
@@ -1011,6 +1012,7 @@ def provider_configuration_read() -> ProviderConfigurationRead:
         embedding_model=settings.embedding_model,
         embedding_api_key_configured=bool(settings.embedding_api_key),
         allow_remote_ai=settings.allow_remote_ai,
+        secret_storage=secret_store.provider_secret_storage_kind(),
     )
 
 
@@ -1025,6 +1027,11 @@ def update_provider_configuration(
 ) -> ProviderConfigurationRead:
     existing = load_provider_config()
     values = payload.model_dump(exclude={"ai_api_key", "embedding_api_key"})
+    platform_secrets = secret_store.get_provider_secret_store(provider_config_path())
+    if platform_secrets is not None:
+        return _update_provider_configuration_with_secret_store(
+            payload, existing, values, platform_secrets
+        )
     for field in ("ai_api_key", "embedding_api_key"):
         supplied = getattr(payload, field)
         if supplied is not None:
@@ -1044,6 +1051,53 @@ def update_provider_configuration(
         save_provider_config(existing)
         raise HTTPException(status_code=422, detail="Provider configuration is invalid") from exc
     return provider_configuration_read()
+
+
+def _update_provider_configuration_with_secret_store(
+    payload: ProviderConfigurationUpdate,
+    existing: dict,
+    values: dict,
+    platform_secrets: secret_store.ProviderSecretStore,
+) -> ProviderConfigurationRead:
+    fields = ("ai_api_key", "embedding_api_key")
+    try:
+        previous_secrets = {field: platform_secrets.get(field) for field in fields}
+    except secret_store.ProviderSecretStoreError as exc:
+        raise HTTPException(status_code=503, detail="OS keyring is unavailable") from exc
+    candidate = existing | values
+    try:
+        for field in fields:
+            supplied = getattr(payload, field)
+            if supplied is not None:
+                if supplied:
+                    platform_secrets.set(field, supplied)
+                else:
+                    platform_secrets.delete(field)
+            elif previous_secrets[field] is None and existing.get(field):
+                platform_secrets.set(field, existing[field])
+            candidate.pop(field, None)
+        save_provider_config(candidate)
+        settings = get_settings()
+        build_generation_provider(settings)
+        build_embedding_provider(settings)
+    except (ProviderConfigurationError, secret_store.ProviderSecretStoreError) as exc:
+        save_provider_config(existing)
+        _restore_provider_secrets(platform_secrets, previous_secrets)
+        if isinstance(exc, secret_store.ProviderSecretStoreError):
+            raise HTTPException(status_code=503, detail="OS keyring is unavailable") from exc
+        raise HTTPException(status_code=422, detail="Provider configuration is invalid") from exc
+    return provider_configuration_read()
+
+
+def _restore_provider_secrets(
+    platform_secrets: secret_store.ProviderSecretStore,
+    previous: dict[str, str | None],
+) -> None:
+    for field, value in previous.items():
+        if value is None:
+            platform_secrets.delete(field)
+        else:
+            platform_secrets.set(field, value)
 
 
 @router.get("/model/reranking-provider", response_model=ProviderStatus)

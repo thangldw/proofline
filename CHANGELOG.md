@@ -7,7 +7,27 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.8`.
+No changes have been recorded after `v0.14.9`.
+
+## [0.14.9] - 2026-07-14
+
+### Added
+
+- Add opt-in operating-system keyring storage for generation and embedding API keys, backed by
+  macOS Keychain and Windows Credential Locker through the installed `keyring` dependency.
+- Expose the active secret-storage mode and explicit key removal controls in Settings.
+- Add OS-keyring set/read/delete observations to local platform release receipts.
+
+### Changed
+
+- Migrate legacy file-stored keys to the OS keyring on the next successful settings save and keep
+  non-secret provider configuration in the owner-only JSON file.
+- Roll back file and keyring mutations together when provider validation fails.
+
+### Validation
+
+- Cover migration, replacement, removal, secret-free JSON persistence and transactional rollback.
+- Exercise the real macOS Keychain backend during the local installed-wheel release gate.
 
 ## [0.14.8] - 2026-07-14
 

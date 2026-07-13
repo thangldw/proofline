@@ -388,4 +388,5 @@ export type ProviderConfiguration = {
   embedding_model: string | null;
   embedding_api_key_configured: boolean;
   allow_remote_ai: boolean;
+  secret_storage: "owner_only_file" | "os_keyring";
 };

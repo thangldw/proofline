@@ -15,6 +15,35 @@ from pathlib import Path
 
 SCHEMA = "proofline.platform-release-qualification.v1"
 
+KEYRING_QUALIFICATION = r"""
+import json
+import secrets
+import tempfile
+from pathlib import Path
+
+import keyring
+from proofline.secret_store import OSKeyringSecretStore
+
+with tempfile.TemporaryDirectory(prefix="proofline-keyring-qualification-") as directory:
+    store = OSKeyringSecretStore(Path(directory) / "providers.json")
+    account = "release_qualification"
+    expected = secrets.token_urlsafe(32)
+    store.set(account, expected)
+    try:
+        if store.get(account) != expected:
+            raise RuntimeError("OS keyring round trip failed")
+    finally:
+        store.delete(account)
+    if store.get(account) is not None:
+        raise RuntimeError("OS keyring deletion failed")
+    backend = keyring.get_keyring()
+    print(json.dumps({
+        "status": "ok",
+        "backend": f"{type(backend).__module__}.{type(backend).__name__}",
+        "set_read_delete": True,
+    }))
+"""
+
 
 def run_json(command: list[str], *, env: dict[str, str] | None = None) -> dict:
     completed = subprocess.run(
@@ -48,6 +77,10 @@ def artifact_identity(path: Path) -> dict[str, str | int]:
     }
 
 
+def qualify_os_keyring(python: Path) -> dict:
+    return run_json([str(python), "-c", KEYRING_QUALIFICATION])
+
+
 def write_receipt(path: Path, receipt: dict, *, force: bool) -> None:
     if path.exists() and not force:
         raise FileExistsError(path)
@@ -73,6 +106,7 @@ def main() -> None:
     parser.add_argument("--artifact", type=Path, required=True)
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--qualify-os-keyring", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
@@ -112,6 +146,9 @@ def main() -> None:
         integrity = run_json([str(args.proofline), "verify-integrity"], env=environment)
 
     system = platform.system()
+    os_keyring = (
+        qualify_os_keyring(args.python) if args.qualify_os_keyring else {"status": "not_run"}
+    )
     receipt = {
         "schema_version": SCHEMA,
         "observed_at": datetime.now(UTC).isoformat(),
@@ -128,10 +165,12 @@ def main() -> None:
         "lifecycle": lifecycle,
         "recovery": recovery,
         "integrity": integrity,
+        "os_keyring": os_keyring,
         "qualification": (
             f"Installed-release qualification for {system} {platform.machine()} only. "
             "It proves local lifecycle, bundled web, deterministic portability, backup and "
-            "integrity behavior for the identified artifact; it does not qualify another OS, "
+            + ("OS keyring set/read/delete, " if args.qualify_os_keyring else "")
+            + "integrity behavior for the identified artifact; it does not qualify another OS, "
             "native installer signing, real-model quality, external pilots or production support."
         ),
     }

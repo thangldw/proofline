@@ -661,6 +661,7 @@ class ProviderConfigurationRead(BaseModel):
     embedding_model: str | None
     embedding_api_key_configured: bool
     allow_remote_ai: bool
+    secret_storage: Literal["owner_only_file", "os_keyring"]
 
 
 class EmbeddingIndexResponse(BaseModel):

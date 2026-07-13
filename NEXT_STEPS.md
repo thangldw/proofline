@@ -1,9 +1,9 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** installed-wheel macOS qualification receipt đã hoàn thành cho `v0.14.8`;
-Windows, native packaging, production qualification, real-model evaluation và external pilot vẫn
-mở.
+**Trạng thái hiện tại:** installed-wheel macOS lifecycle và OS-keyring qualification receipt đã
+hoàn thành cho `v0.14.9`; Windows, native packaging, production qualification, real-model
+evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
 ## Mở rộng evidence-first đã được chấp thuận
@@ -76,6 +76,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Chạy immutable evidence, export/import, backup/restore và integrity trên cùng environment.
 - [x] Upload receipt cùng release assets và đưa receipt vào `SHA256SUMS`.
 
+### v0.14.9 — OS-backed provider secrets
+
+- [x] Thêm opt-in macOS Keychain và Windows Credential Locker qua `PROOFLINE_SECRET_STORE=os_keyring`.
+- [x] Giữ file mode quyền owner-only làm mặc định cho local development.
+- [x] Migrate key cũ khỏi JSON, hỗ trợ replace/remove và rollback file + keyring cùng nhau.
+- [x] Hiển thị storage mode và thao tác xóa key trong Settings mà không trả lại secret.
+- [x] Ghi set/read/delete của real macOS Keychain vào installed-release receipt.
+
 ## Việc nên làm đầu tiên ngày mai
 
 ### P0 — Git repository ingestion dạng read-only
@@ -132,6 +140,7 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [x] Thêm bounded transport retry cho lỗi transient.
 - [x] Thêm model-run dead-letter/retry workflow thay vì chỉ repair structured output.
 - [x] Không tự động chuyển từ local provider sang remote provider.
+- [x] Lưu provider API key bằng OS keyring cho desktop, có migration, rotation/removal và rollback.
 
 ### Retrieval quality
 
