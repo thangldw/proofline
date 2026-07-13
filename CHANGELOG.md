@@ -7,7 +7,23 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.10.0`.
+No changes have been recorded after `v0.11.0`.
+
+## [0.11.0] - 2026-07-13
+
+### Added
+
+- Python release artifacts now contain the reviewed web UI and serve it by default, enabling a
+  one-command local application without Node.js at runtime.
+- `proofline serve --no-web` provides an explicit API-only mode, while `--web-dir` can still select
+  a reviewed external build.
+- Release smoke now starts the cleanly installed wheel, checks its UI and API, and proves graceful
+  shutdown before a tag can be published.
+- The pre-alpha support boundary and evidence required for a future alpha claim are documented.
+
+### Changed
+
+- The quality gate rejects a Python web bundle that differs from the current production Vite build.
 
 ## [0.10.0] - 2026-07-13
 

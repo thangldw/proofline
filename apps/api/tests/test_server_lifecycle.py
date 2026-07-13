@@ -7,8 +7,11 @@ import time
 from pathlib import Path
 
 import httpx
+from fastapi.testclient import TestClient
 from proofline import __version__
 from proofline.config import get_settings, provider_config_path
+from proofline.database import make_engine
+from proofline.main import create_app
 
 
 def _wait_for_ready(process: subprocess.Popen[str], ready_file: Path) -> dict[str, object]:
@@ -33,11 +36,8 @@ def test_home_scopes_default_database_and_provider_config(monkeypatch, tmp_path)
     assert provider_config_path() == home / "providers.json"
 
 
-def test_embedded_server_publishes_dynamic_port_serves_web_and_cleans_readiness(tmp_path):
+def test_embedded_server_publishes_dynamic_port_serves_bundled_web_and_cleans_readiness(tmp_path):
     data_dir = tmp_path / "state"
-    web_dir = tmp_path / "web"
-    web_dir.mkdir()
-    (web_dir / "index.html").write_text("<main>Proofline embedded web</main>", encoding="utf-8")
     ready_file = tmp_path / "runtime" / "ready.json"
     process = subprocess.Popen(
         [
@@ -53,8 +53,6 @@ def test_embedded_server_publishes_dynamic_port_serves_web_and_cleans_readiness(
             str(data_dir),
             "--ready-file",
             str(ready_file),
-            "--web-dir",
-            str(web_dir),
             "--log-level",
             "warning",
         ],
@@ -76,7 +74,9 @@ def test_embedded_server_publishes_dynamic_port_serves_web_and_cleans_readiness(
             "status": "ok",
             "version": __version__,
         }
-        assert "Proofline embedded web" in httpx.get(base_url).text
+        web_response = httpx.get(base_url)
+        assert web_response.status_code == 200
+        assert '<div id="root"></div>' in web_response.text
         assert (data_dir / "proofline.db").is_file()
     finally:
         process.terminate()
@@ -86,3 +86,14 @@ def test_embedded_server_publishes_dynamic_port_serves_web_and_cleans_readiness(
     assert not ready_file.exists()
     stdout = process.stdout.read() if process.stdout else ""
     assert json.loads(stdout.strip().splitlines()[-1]) == ready
+
+
+def test_api_only_mode_does_not_mount_bundled_web(monkeypatch, tmp_path):
+    monkeypatch.setenv("PROOFLINE_DISABLE_WEB", "true")
+    engine = make_engine(f"sqlite:///{tmp_path / 'api-only.db'}")
+    try:
+        with TestClient(create_app(engine)) as client:
+            assert client.get("/health").status_code == 200
+            assert client.get("/").status_code == 404
+    finally:
+        engine.dispose()

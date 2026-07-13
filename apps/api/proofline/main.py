@@ -19,6 +19,20 @@ from .folder_watching import FolderWatcher
 from .ingestion import recover_orphaned_ingestion_jobs
 
 
+def web_directory() -> Path | None:
+    if os.getenv("PROOFLINE_DISABLE_WEB", "false").lower() in {"1", "true", "yes"}:
+        return None
+    configured = os.getenv("PROOFLINE_WEB_DIR")
+    web_dir = (
+        Path(configured).expanduser().resolve() if configured else Path(__file__).with_name("web")
+    )
+    if not (web_dir / "index.html").is_file():
+        if configured:
+            raise RuntimeError("PROOFLINE_WEB_DIR must contain index.html")
+        raise RuntimeError("bundled Proofline web UI is missing")
+    return web_dir
+
+
 def create_app(database_engine: Engine = engine) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -60,11 +74,8 @@ def create_app(database_engine: Engine = engine) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
 
-    web_dir_value = os.getenv("PROOFLINE_WEB_DIR")
-    if web_dir_value:
-        web_dir = Path(web_dir_value).expanduser().resolve()
-        if not (web_dir / "index.html").is_file():
-            raise RuntimeError("PROOFLINE_WEB_DIR must contain index.html")
+    web_dir = web_directory()
+    if web_dir is not None:
         application.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
     return application

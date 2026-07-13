@@ -12,6 +12,8 @@ way and trace every answer back to exact source evidence.
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [v0.11.0 notes](./releases/v0.11.0.md) | One-command installed app with bundled web UI | Pre-alpha |
+| [Alpha support boundary](./alpha-support-boundary.md) | Current exclusions and evidence required for alpha | Current |
 | [v0.10.0 notes](./releases/v0.10.0.md) | Embedded runtime lifecycle and same-origin web serving | Pre-alpha |
 | [Embedded lifecycle](./embedded-lifecycle.md) | Start, readiness, data directory, stop and recovery contract | Implemented locally |
 | [Roadmap evidence quality report](./reports/roadmap-evidence-quality-v0.10.0.html) | Metadata fitness of checked-in benchmark/platform receipts | Current report |
@@ -113,7 +115,7 @@ As of 2026-07-13:
   Windows remains unverified.
 - Also implemented: portable merge/remap, a local vector candidate index, optional reranking,
   workspace isolation, a benchmark-backed polling watcher decision, and an embedded start/ready/
-  stop lifecycle with same-origin web serving.
+  stop lifecycle with bundled same-origin web serving from the installed wheel.
 - Not yet completed: real-model/pilot evaluation, Windows verification, production support,
   signed desktop packaging, cloud services, or telemetry.
 

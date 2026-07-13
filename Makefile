@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format sync-web-bundle release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -54,7 +54,12 @@ check:
 	.venv/bin/ruff check .
 	.venv/bin/ruff format --check .
 	npm run build:web
+	.venv/bin/python scripts/sync_web_bundle.py --check
 	$(MAKE) eval
+
+sync-web-bundle:
+	npm run build:web
+	.venv/bin/python scripts/sync_web_bundle.py
 
 format:
 	.venv/bin/ruff check --fix .
