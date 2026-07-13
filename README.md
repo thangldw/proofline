@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.6 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.7 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -254,11 +254,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.6` is the latest experimental pre-alpha release. It adds an explicit offline mock path for
-real-model comparison preflight and pipeline integration while preserving the evidence boundary:
-mock receipts never count as real-model quality. The installed wheel contains the same-origin UI
-and API for a one-command local run. See the [release notes](docs/releases/v0.14.6.md) and verify
-`SHA256SUMS` before installation.
+`v0.14.7` is the latest experimental pre-alpha release. It makes the public support, portability
+and production-readiness claims consistent with the behavior already implemented. The installed
+wheel contains the same-origin UI and API for a one-command local run. See the
+[release notes](docs/releases/v0.14.7.md) and verify `SHA256SUMS` before installation.
 
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
@@ -279,7 +278,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.6
+make release-local TAG=v0.14.7
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
@@ -321,13 +320,15 @@ SQLite backup. Always verify the artifact after creating it:
 .venv/bin/proofline verify-integrity
 ```
 
-Portable import accepts schema v1 only and restores into a completely empty initialized database.
-It preserves exported IDs, immutable source versions, governed memories, evidence, safe model-run
-lineage, audit events, and terminal ingestion diagnostics in one transaction. It rebuilds
-deterministic chunks and FTS rows, but not embeddings, and records a payload-hash receipt. It does
-not merge, overwrite, remap IDs, or restore excluded private retry inputs. The SQLite backup remains
-the exact local recovery artifact and contains all local data, including sensitive source contents
-and private staged retry inputs. See the
+Portable import accepts schema v1. The default restore targets a completely empty initialized
+database and preserves exported IDs. A non-empty target requires an explicit content-free
+`--preview-merge`, followed by `--merge --preview-sha256 <digest>`; this deterministically remaps all
+incoming IDs without updating or deleting existing rows. Both paths preserve immutable source
+versions, governed memories, evidence, safe model-run lineage, audit events, and terminal ingestion
+diagnostics in one transaction. They rebuild deterministic chunks and FTS rows, but not embeddings,
+and record a payload-hash receipt. Neither path restores excluded private retry inputs. The SQLite
+backup remains the exact local recovery artifact and contains all local data, including sensitive
+source contents and private staged retry inputs. See the
 [backup and recovery guide](docs/backup-recovery.md) before storing or restoring
 either artifact.
 

@@ -11,14 +11,14 @@ Proofline produces two different artifacts:
 
 | Artifact | Purpose | Contains | Does not contain |
 | --- | --- | --- | --- |
-| Portable JSON export | Inspectable, provider-neutral knowledge snapshot and empty-database restore | immutable source versions, governed memories, exact evidence, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; merge/overwrite import is not implemented |
+| Portable JSON export | Inspectable, provider-neutral knowledge snapshot, empty-database restore, or explicit no-overwrite merge | immutable source versions, governed memories, exact evidence, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; overwrite import is not supported |
 | SQLite backup | Exact recovery of the current local deployment | the complete SQLite database, including source contents, historical versions, indexes, embeddings, audit data, model metadata, and staged ingestion inputs | external files or secrets stored outside SQLite |
 
-The portable export is restorable only into an empty initialized database. It is not an exact
-replacement for the SQLite backup because private retry inputs, embeddings, and derived index IDs
-are intentionally excluded. Its SHA-256 manifest detects accidental modification and the verifier
-checks internal references and exact evidence spans; it is not a digital signature or proof of
-authenticity.
+The portable export can restore an empty initialized database or be explicitly merged into a
+non-empty target with deterministic all-ID remapping. It is not an exact replacement for the
+SQLite backup because private retry inputs and embeddings are intentionally excluded. Its SHA-256
+manifest detects accidental modification and the verifier checks internal references and exact
+evidence spans; it is not a digital signature or proof of authenticity.
 
 ## Create and verify a portable export
 
@@ -46,11 +46,33 @@ hash. Any validation, constraint, indexing, or final payload-equivalence failure
 whole import.
 
 A target containing any domain data, index rows, retry inputs, or previous import receipt fails
-with `target_not_empty`. There is no merge, overwrite, `--force`, or ID-remapping mode. Source URIs
-are preserved as provenance metadata and may refer to paths that do not exist on the new machine.
-Terminal ingestion diagnostics preserve their historical `retryable` value for exact payload
-fidelity, but excluded staged inputs cannot be recreated. Retrying one fails closed to
-`dead_letter` with `ingestion_input_missing`; operators must re-ingest the authorized source.
+with `target_not_empty` unless the explicit merge workflow below is used. Source URIs are preserved
+as provenance metadata and may refer to paths that do not exist on the new machine. Terminal
+ingestion diagnostics preserve their historical `retryable` value for exact payload fidelity, but
+excluded staged inputs cannot be recreated. Retrying one fails closed to `dead_letter` with
+`ingestion_input_missing`; operators must re-ingest the authorized source.
+
+## Merge a portable export into a non-empty database
+
+First create a content-free preview against the target database:
+
+```bash
+PROOFLINE_DATABASE_URL=sqlite:///./target.db \
+  .venv/bin/proofline import proofline-export.json --preview-merge
+```
+
+Review the target/incoming counts, deterministic ID map and `preview_sha256`, then apply that exact
+plan:
+
+```bash
+PROOFLINE_DATABASE_URL=sqlite:///./target.db \
+  .venv/bin/proofline import proofline-export.json \
+  --merge --preview-sha256 <digest>
+```
+
+Every incoming domain ID and provenance reference is remapped consistently. Existing target rows
+are never updated or deleted. A stale preview, duplicate payload, validation failure, constraint
+failure or final provenance mismatch rolls back the complete merge savepoint.
 
 ## Create and verify a SQLite backup
 

@@ -1,8 +1,8 @@
 # Alpha release criteria and support boundary
 
-Proofline is pre-alpha through v0.11.0. Versioned GitHub artifacts are stable snapshots of their
-documented behavior, but they do not carry production support, compatibility, uptime, or data-loss
-guarantees.
+Proofline remains pre-alpha through the current `v0.14.7` release. Versioned GitHub artifacts are
+stable snapshots of their documented behavior, but they do not carry production support,
+compatibility, uptime, or data-loss guarantees.
 
 ## Current supported experiment
 
@@ -13,7 +13,8 @@ guarantees.
 - Deterministic ingestion, search, exact evidence, governed memory, export, backup, verification,
   and portable import/merge without requiring an external service.
 - macOS and Linux development use. The latest recorded hosted matrix covers macOS and Ubuntu for an
-  older revision; v0.11.0 itself is qualified by local macOS gates only.
+  older revision; `v0.14.7` itself is qualified by local macOS release, install, lifecycle and
+  integrity gates only.
 
 Use only approved, recoverable test data. Keep a verified backup outside the active data directory
 before migrations, restore drills, upgrades, or packaging experiments.
