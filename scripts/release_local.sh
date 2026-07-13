@@ -55,18 +55,22 @@ trap cleanup EXIT
 .venv/bin/python -m build --outdir "$release_dir"
 npm run build:web
 tar -czf "$release_dir/proofline-web-$tag.tar.gz" -C apps/web/dist .
+
+python3 -m venv "$smoke_dir/venv"
+"$smoke_dir/venv/bin/pip" install --quiet "$release_dir"/*.whl
+installed_version=$("$smoke_dir/venv/bin/proofline" --version)
+installed_version=${installed_version#proofline }
+platform_slug=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
+.venv/bin/python scripts/platform_release_receipt.py \
+  --proofline "$smoke_dir/venv/bin/proofline" \
+  --python "$smoke_dir/venv/bin/python" \
+  --artifact "$release_dir/proofline-$installed_version-py3-none-any.whl" \
+  --expected-version "$installed_version" \
+  --output "$release_dir/proofline-platform-$tag-$platform_slug.json" >/dev/null
 (
   cd "$release_dir"
   shasum -a 256 proofline-* > SHA256SUMS
 )
-
-python3 -m venv "$smoke_dir/venv"
-"$smoke_dir/venv/bin/pip" install --quiet "$release_dir"/*.whl
-"$smoke_dir/venv/bin/proofline" --version
-python3 scripts/installed_server_smoke.py --proofline "$smoke_dir/venv/bin/proofline"
-database_url="sqlite:///$smoke_dir/proofline.db"
-PROOFLINE_DATABASE_URL="$database_url" "$smoke_dir/venv/bin/proofline" seed >/dev/null
-PROOFLINE_DATABASE_URL="$database_url" "$smoke_dir/venv/bin/proofline" verify-integrity
 
 git tag -a "$tag" -m "Proofline $tag"
 if ! git push origin "$tag"; then

@@ -15,7 +15,7 @@ latest pre-release on a best-effort basis; there are no maintenance or backport 
 | Version | Support status |
 | --- | --- |
 | Default branch | Best-effort pre-alpha fixes |
-| `v0.14.7` | Best effort until the next pre-release |
+| `v0.14.8` | Best effort until the next pre-release |
 | Older tags and local forks | Not supported |
 
 ## Report a vulnerability privately
