@@ -7,7 +7,22 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.9.0`.
+No changes have been recorded after `v0.9.1`.
+
+## [0.9.1] - 2026-07-13
+
+### Changed
+
+- The web app now uses a bright Sky + Mint theme with ice-blue surfaces, aqua navigation,
+  accessible azure actions, mint provenance states, and navy typography.
+- Theme colors are consolidated into semantic CSS variables across search, decisions, sources,
+  settings, diagnostics, model runs, warnings, and failure states.
+- Mobile navigation and search controls no longer cause horizontal overflow at a 390 px viewport.
+
+### Quality
+
+- Browser comparison covers the selected visual target, desktop and mobile empty states, primary
+  navigation, console output, responsive overflow, and WCAG AA contrast for core color pairs.
 
 ## [0.9.0] - 2026-07-13
 
