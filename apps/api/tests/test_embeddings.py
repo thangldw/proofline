@@ -11,7 +11,7 @@ from proofline.embeddings import (
 )
 from proofline.ingestion import delete_source, ingest_source
 from proofline.model_gateway import FakeEmbeddingProvider
-from proofline.models import Chunk, ChunkEmbedding, SourceVersion
+from proofline.models import Chunk, ChunkEmbedding, ChunkVectorBucket, SourceVersion
 from proofline.schemas import SearchHit, SourceCreate
 from sqlalchemy import func, select
 
@@ -51,6 +51,7 @@ def test_incremental_embedding_index_and_semantic_retrieval(session):
     assert len(first.model_run_ids) == 2
     assert second.indexed == 0
     assert second.skipped == 2
+    assert session.scalar(select(func.count()).select_from(ChunkVectorBucket)) == 2
     assert semantic_only[0].source_id == storage.id
     assert semantic_only[0].retrieval_channels == ["semantic"]
     assert overlap[0].source_id == storage.id
@@ -62,6 +63,14 @@ def test_incremental_embedding_index_and_semantic_retrieval(session):
             select(func.count())
             .select_from(ChunkEmbedding)
             .where(ChunkEmbedding.source_id == messaging.id)
+        )
+        == 0
+    )
+    assert (
+        session.scalar(
+            select(func.count())
+            .select_from(ChunkVectorBucket)
+            .where(ChunkVectorBucket.source_id == messaging.id)
         )
         == 0
     )

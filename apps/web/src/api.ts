@@ -92,6 +92,7 @@ export const api = {
     if (scope?.ingestedFrom) params.set("ingested_from", scope.ingestedFrom);
     if (scope?.ingestedBefore)
       params.set("ingested_before", scope.ingestedBefore);
+    if (scope?.rerank) params.set("rerank", "true");
     return (
       await request<{ hits: SearchHit[] }>(
         `/api/v1/search?${params.toString()}`,
@@ -108,6 +109,7 @@ export const api = {
         ...(scope?.ingestedBefore
           ? { ingested_before: scope.ingestedBefore }
           : {}),
+        ...(scope?.rerank ? { rerank: true } : {}),
       }),
     }),
   importSource: (title: string, content: string, uri?: string) =>

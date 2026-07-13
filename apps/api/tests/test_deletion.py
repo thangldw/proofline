@@ -105,6 +105,7 @@ def test_deletion_impact_matches_complete_cascade_and_detaches_jobs(client, sess
         "versions": 2,
         "chunks": 2,
         "embeddings": 2,
+        "vector_index_rows": 0,
         "decisions": 2,
         "memories": 2,
         "evidence": 2,

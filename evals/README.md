@@ -2,6 +2,11 @@
 
 Evaluation datasets are versioned inputs, not product marketing claims.
 
+`reranking/seed-v1.json` and `benchmarks/reranker-token-overlap-v1.json` bind an optional local
+reranker to a synthetic MRR receipt. `benchmarks/vector-index-1000-v1.json` records local index,
+search, memory, storage, and update measurements for generated vectors. Neither is pilot or
+real-model evidence, and neither qualifies the 10,000-file/1-GB target.
+
 ## Synthetic pilot simulation
 
 `pilot-simulation/engineering-context-v1.json` contains invented sources and seven scripted tasks

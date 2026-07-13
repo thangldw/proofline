@@ -27,7 +27,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == list(range(1, 16))
+    assert versions == list(range(1, 17))
     assert {
         "sources",
         "source_versions",
@@ -42,6 +42,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "import_receipts",
         "git_repositories",
         "decision_relations",
+        "chunk_vector_buckets",
     } <= tables
     engine.dispose()
 
@@ -95,7 +96,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 16))
+    assert versions == list(range(1, 17))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -229,7 +230,7 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 16))
+    assert versions == list(range(1, 17))
     engine.dispose()
 
 
@@ -310,7 +311,7 @@ def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
             .all()
         )
     assert statuses == {"memory-v10": "obsolete", "memory-v10-custom": "candidate"}
-    assert versions == list(range(1, 16))
+    assert versions == list(range(1, 17))
     engine.dispose()
 
 
@@ -399,8 +400,55 @@ def test_v11_database_gains_persistent_unique_import_receipts(tmp_path):
     }
     assert columns["imported_at"]["default"] == "CURRENT_TIMESTAMP"
     assert indexes["ix_import_receipts_payload_sha256"] == 1
-    assert versions == list(range(1, 16))
+    assert versions == list(range(1, 17))
     reopened.dispose()
+
+
+def test_v16_backfills_vector_candidate_bands_for_existing_embeddings(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'vector-backfill.db'}")
+    initialize_database(engine)
+    now = "2026-07-14T00:00:00+00:00"
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM schema_migrations WHERE version = 16"))
+        connection.exec_driver_sql("DROP TABLE chunk_vector_buckets")
+        connection.execute(
+            text(
+                """INSERT INTO sources
+               (id,title,kind,content,content_hash,status,created_at,indexed_at,current_version_id)
+               VALUES ('s','S','text','x',:identity,'indexed',:now,:now,'v')"""
+            ),
+            {"identity": hashlib.sha256(b"source:s").hexdigest(), "now": now},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO source_versions
+               (id,source_id,content_hash,content,version_number,content_length,status,parser_version,created_at)
+               VALUES ('v','s',:hash,'x',1,1,'indexed','test',:now)"""
+            ),
+            {"hash": hashlib.sha256(b"x").hexdigest(), "now": now},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO chunks
+               (id,source_id,source_version_id,ordinal,content,start_offset,end_offset,start_line,end_line)
+               VALUES ('c','s','v',0,'x',0,1,1,1)"""
+            )
+        )
+        connection.execute(
+            text(
+                """INSERT INTO chunk_embeddings
+               (id,chunk_id,source_id,source_version_id,provider_id,model_id,dimensions,vector_json,content_hash,created_at)
+               VALUES ('e','c','s','v','p','m',4,'[1,-1,1,-1]',:hash,:now)"""
+            ),
+            {"hash": hashlib.sha256(b"x").hexdigest(), "now": now},
+        )
+    initialize_database(engine)
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT embedding_id,band_index,band_value FROM chunk_vector_buckets")
+        ).all()
+    assert rows == [("e", 0, "1010")]
+    engine.dispose()
 
 
 def test_populated_foundation_database_is_backfilled_without_changing_ids(tmp_path):

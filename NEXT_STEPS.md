@@ -63,12 +63,12 @@ Import local repo → index immutable commit/file sources → search → grounde
 
 ### Retrieval quality
 
-- [ ] Thiết kế reranker interface độc lập provider.
-- [ ] Benchmark một reranker local/cheap trên evaluation corpus trước khi chọn mặc định.
-- [ ] Thêm optional cross-encoder reranking sau RRF.
-- [ ] Đánh giá semantic entailment/contradiction check cho answer statements.
-- [ ] Thay JSON cosine scan bằng vector index phù hợp trước khi tuyên bố scale 10.000 files/1 GB.
-- [ ] Benchmark latency, memory và index-update cost; lưu receipt có version/model/config.
+- [x] Thiết kế reranker interface độc lập provider.
+- [x] Benchmark một reranker local/cheap trên evaluation corpus trước khi chọn mặc định.
+- [x] Thêm optional cross-encoder reranking sau RRF.
+- [x] Đánh giá semantic entailment/contradiction check cho answer statements.
+- [x] Thay full JSON cosine scan bằng vector candidate index trước khi tuyên bố scale.
+- [x] Benchmark latency, memory và index-update cost; lưu receipt có version/model/config.
 
 ### Ingestion và portability còn thiếu
 

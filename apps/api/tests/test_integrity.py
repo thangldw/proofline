@@ -47,6 +47,7 @@ def test_live_integrity_verifier_accepts_clean_provenance(session):
         "memories": 1,
         "evidence": 1,
         "embeddings": 0,
+        "vector_index_rows": 0,
     }
 
 
@@ -59,6 +60,7 @@ def test_live_integrity_verifier_accepts_owned_embedding(session):
 
     assert report["valid"] is True
     assert report["embeddings"] == 1
+    assert report["vector_index_rows"] == 1
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ export type SearchScope = {
   sourceIds: string[];
   ingestedFrom: string | null;
   ingestedBefore: string | null;
+  rerank?: boolean;
 };
 
 export type Source = {
@@ -37,6 +38,7 @@ export type SourceDeletionImpact = {
   versions: number;
   chunks: number;
   embeddings: number;
+  vector_index_rows?: number;
   decisions: number;
   memories: number;
   evidence: number;
@@ -142,6 +144,8 @@ export type SearchHit = {
   git_commit_sha?: string | null;
   git_path?: string | null;
   temporal_priority?: "current_decision" | "neutral";
+  rerank_rank?: number | null;
+  rerank_score?: number | null;
 };
 
 export type AnswerCitation = {
@@ -166,6 +170,7 @@ export type GroundedAnswer = {
     text: string;
     kind: "direct" | "synthesis" | "inference";
     evidence_ids: string[];
+    support_status?: "supported" | "uncertain" | "contradicted";
   }>;
   citations: AnswerCitation[];
   model_run_id: string | null;

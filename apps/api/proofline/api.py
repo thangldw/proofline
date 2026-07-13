@@ -50,6 +50,7 @@ from .models import (
     SourceVersion,
     utc_now,
 )
+from .reranking import DeterministicTokenReranker
 from .schemas import (
     AnswerRequest,
     AnswerResponse,
@@ -1039,6 +1040,7 @@ def search(
         allow_inf_nan=False,
     ),
     hybrid: bool = True,
+    rerank: bool = False,
     source_ids: list[str] | None = Query(default=None, alias="source_id"),
     ingested_from: datetime | None = Query(default=None),
     ingested_before: datetime | None = Query(default=None),
@@ -1067,6 +1069,7 @@ def search(
             source_ids=source_ids,
             ingested_from=ingested_from,
             ingested_before=ingested_before,
+            reranker=DeterministicTokenReranker() if rerank else None,
         )
     except (ProviderRequestError, EmbeddingValidationError) as exc:
         raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
@@ -1094,6 +1097,7 @@ def create_answer(
             payload.source_ids,
             payload.ingested_from,
             payload.ingested_before,
+            reranker=DeterministicTokenReranker() if payload.rerank else None,
         )
     except ProviderConfigurationError as exc:
         raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc

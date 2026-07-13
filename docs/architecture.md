@@ -72,7 +72,8 @@ Current and target boundaries are:
 - source catalog and ingestion coordinator — implemented for upload and registered roots;
 - read-only local Git ingestion — implemented for immutable commit metadata and tracked
   Markdown/text objects;
-- retrieval and answer service — implemented without reranking;
+- retrieval and answer service — implemented with optional post-RRF reranking, deterministic
+  statement-support assessment, and indexed semantic candidate selection;
 - governed memory review service — implemented for four memory kinds;
 - temporal decision relation service — implemented for typed, audited transitions, validity
   windows, timelines, and non-mutating contradiction/staleness candidates;
@@ -138,8 +139,9 @@ The foundation uses SQLite plus content uploaded from the browser or API:
   deletion removes content-bearing derived rows and preserves only detached safe job diagnostics.
 - Versioned chunk embeddings are implemented in a local SQLite table with provider/model,
   dimensions, content hash, and immutable source-version ownership. Indexing is incremental.
-  Dense search currently uses bounded in-process cosine scoring; a SQLite vector extension or
-  dedicated local index must replace it before claiming the 10,000-file scale envelope.
+  Dense search uses a SQLite locality-sensitive sign-vector band index to select candidates before
+  exact in-process cosine scoring. The checked-in 1,000-source synthetic receipt measures latency,
+  memory, storage, and update cost; it does not qualify the 10,000-file/1-GB envelope.
 
 No graph database is planned for the MVP. Typed relations are represented as adjacency rows
 and queried through the domain repository.

@@ -144,11 +144,13 @@ Before delivery work, record:
 
 ### Planned work
 
-- Benchmark and replace the implemented bounded SQLite JSON embedding storage when scale requires.
+- Maintain the implemented SQLite vector-band candidate index and 1,000-source synthetic
+  latency/memory/update receipt. A 10,000-file/1-GB qualification remains open.
 - Extend the implemented lexical/semantic retrieval and reciprocal-rank fusion with filters and
   diversity control. A deterministic soft per-source cap with ranked backfill is implemented;
   user-driven source-ID and indexed-time filters are implemented for search and answers.
-- Add optional reranking behind a capability interface.
+- Maintain optional post-RRF reranking behind its provider-neutral interface. The deterministic
+  local receipt is regression-only; a real cross-encoder comparison remains open.
 - Extend the implemented bounded lexical evidence packs and grounded answer generation to hybrid
   retrieval and context diversity. Hybrid retrieval, per-source diversity, 1,600-code-point chunk
   bounds, and hard 64 KiB/8 KiB runtime context budgets are implemented.

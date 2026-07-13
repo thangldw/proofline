@@ -1,0 +1,17 @@
+{
+  "candidate_result_count": 1,
+  "database_bytes": 4624384,
+  "dataset": "synthetic-generated-no-source-content",
+  "dimensions": 32,
+  "index_latency_ms": 2743.0639170343056,
+  "indexed": 1000,
+  "model": "synthetic-sign-vector-v1",
+  "no_op_update_latency_ms": 46.41062498558313,
+  "peak_python_memory_bytes": 6659250,
+  "provider": "fake_embedding",
+  "qualification": "synthetic local benchmark; not a 10,000-file or 1-GB scale claim",
+  "repeat_skipped": 1000,
+  "schema": "proofline-vector-index-benchmark-v1",
+  "search_latency_ms": 13.00308300415054,
+  "source_count": 1000
+}
