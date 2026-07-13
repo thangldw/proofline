@@ -219,6 +219,13 @@ Domain code requests a capability, not a vendor. Persisted model runs record pro
 prompt/template version, input content hashes, latency, token counts when available, and
 validation outcome. Secrets must never be written to logs or model-run records.
 
+The Settings surface persists explicit Qwen, DeepSeek, Ollama, vLLM, or generic compatible
+profiles in a local owner-readable file; environment variables override that file. Generation,
+embedding, and reranking report independent capability health. Transient transport failures use at
+most three attempts before the run becomes `dead_letter`. Manual extraction retry is allowed only
+for the same immutable input hash and exact provider/model, records parent lineage, and never falls
+back from local to remote inference.
+
 Structured results are parsed as untrusted data and validated against versioned schemas. Invalid
 results persist a failed model run without creating memory. Structured output is capped at 128 KiB;
 memory batches are capped at 64 candidates. Repairable schema, size, kind, and evidence-ID failures

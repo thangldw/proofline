@@ -2,6 +2,7 @@ import json
 
 import httpx
 import pytest
+from proofline.config import Settings
 from proofline.model_gateway import (
     MAX_STRUCTURED_OUTPUT_BYTES,
     ChatMessage,
@@ -14,6 +15,7 @@ from proofline.model_gateway import (
     OpenAICompatibleProvider,
     ProviderConfigurationError,
     StructuredOutputError,
+    build_generation_provider,
     run_embedding,
     run_generation,
 )
@@ -115,6 +117,48 @@ def test_openai_compatible_adapter_normalizes_response_without_storing_key():
     assert result.prompt_tokens == 4
     assert result.completion_tokens == 3
     assert "test-key" not in result.model_dump_json()
+
+
+def test_transient_generation_transport_retries_are_bounded_and_persist_dead_letter(session):
+    attempts = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(503, json={"error": "temporarily unavailable"})
+
+    provider = OpenAICompatibleProvider(
+        base_url="http://127.0.0.1:11434/v1",
+        model="local-model",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(Exception) as raised:
+        run_generation(session, provider, request_with_secret())
+    assert attempts == 3
+    run = session.get(ModelRun, raised.value.run_id)
+    assert run.status == "dead_letter"
+    assert run.error_code == "provider_transport_retry_exhausted"
+
+
+@pytest.mark.parametrize(
+    ("profile", "expected_url", "expected_model"),
+    [
+        ("qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "qwen-plus"),
+        ("deepseek", "https://api.deepseek.com/v1", "deepseek-chat"),
+        ("ollama", "http://127.0.0.1:11434/v1", "qwen2.5:7b"),
+    ],
+)
+def test_generation_profiles_resolve_without_provider_fallback(
+    profile, expected_url, expected_model
+):
+    provider = build_generation_provider(
+        Settings(
+            database_url="sqlite://", cors_origins=(), ai_provider=profile, allow_remote_ai=True
+        )
+    )
+    assert provider.id == profile
+    assert provider.base_url == expected_url
+    assert provider.model == expected_model
 
 
 def test_invalid_embedding_dimensions_fail_and_persist_diagnostics(session):

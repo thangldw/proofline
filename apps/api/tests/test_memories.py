@@ -245,3 +245,31 @@ def test_provider_failure_run_lineage_is_inspectable_and_source_remains_searchab
     assert search.status_code == 200
     assert search.json()["hits"][0]["source_id"] == source["id"]
     assert client.get("/api/v1/memories").json() == []
+
+    chunk_id = search.json()["hits"][0]["chunk_id"]
+    retry_provider = ScriptedGenerationProvider(
+        [
+            json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "kind": "decision",
+                            "statement": "Keep recovery searchable",
+                            "confidence": 0.9,
+                            "evidence_ids": [chunk_id],
+                        }
+                    ]
+                }
+            )
+        ]
+    )
+    monkeypatch.setattr(api_module, "build_generation_provider", lambda _settings: retry_provider)
+    retried = client.post(
+        f"/api/v1/model/runs/{last_run_id}/retry",
+        json={"source_id": source["id"], "operation": "extract_memories"},
+    )
+    assert retried.status_code == 200
+    retry_run = client.get(f"/api/v1/model/runs/{retried.json()['model_run_id']}").json()
+    assert retry_run["parent_run_id"] == last_run_id
+    assert retry_run["repair_reason"] == "manual_retry"
+    assert retry_run["provider_id"] == provider.id
