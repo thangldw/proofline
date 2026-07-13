@@ -41,3 +41,37 @@ def test_release_check_rejects_a_tag_that_does_not_match_metadata():
     )
     assert completed.returncode == 1
     assert "release check failed" in completed.stderr
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "release: local build [skip ci]",
+        "release: local build [CI SKIP]",
+        "release: local build [no ci]",
+        "release: local build [skip actions]",
+        "release: local build [actions skip]",
+        "release: local build\n\nskip-checks: true",
+    ],
+)
+def test_ci_skip_check_accepts_github_instructions(message):
+    completed = subprocess.run(
+        [sys.executable, "scripts/check_ci_skip.py", "--message", message],
+        cwd=repository_root(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_ci_skip_check_rejects_an_ordinary_commit_message():
+    completed = subprocess.run(
+        [sys.executable, "scripts/check_ci_skip.py", "--message", "release: local build"],
+        cwd=repository_root(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 1
+    assert "must contain a GitHub CI skip instruction" in completed.stderr

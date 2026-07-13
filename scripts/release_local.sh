@@ -24,6 +24,10 @@ if [[ $(git rev-parse HEAD) != $(git rev-parse origin/main) ]]; then
   echo "main must exactly match origin/main" >&2
   exit 2
 fi
+if ! .venv/bin/python scripts/check_ci_skip.py; then
+  echo "local releases require the main push to skip quota-limited GitHub Actions" >&2
+  exit 2
+fi
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   echo "tag already exists locally: $tag" >&2
   exit 2
