@@ -44,13 +44,13 @@ Import local repo → index immutable commit/file sources → search → grounde
 
 ### Temporal decision relations
 
-- [ ] Chốt ontology tối thiểu cho `supersedes`, `implements`, `contradicts`, `based_on`, `considered`.
-- [ ] Thêm relation model, migration, API và audit history.
-- [ ] Phân biệt thời gian ingest với `valid_from`/`valid_to` của quyết định.
-- [ ] Cho phép đánh dấu một decision bị thay thế bởi decision khác.
-- [ ] Retrieval ưu tiên decision đang có hiệu lực nhưng vẫn cho phép xem lịch sử.
-- [ ] Hiển thị decision timeline và evidence cho từng transition.
-- [ ] Phát hiện candidate contradiction/staleness; không tự động sửa memory đã được chấp nhận.
+- [x] Chốt ontology tối thiểu cho `supersedes`, `implements`, `contradicts`, `based_on`, `considered`.
+- [x] Thêm relation model, migration, API và audit history.
+- [x] Phân biệt thời gian ingest với `valid_from`/`valid_to` của quyết định.
+- [x] Cho phép đánh dấu một decision bị thay thế bởi decision khác.
+- [x] Retrieval ưu tiên decision đang có hiệu lực nhưng vẫn cho phép xem lịch sử.
+- [x] Hiển thị decision timeline và evidence cho từng transition.
+- [x] Phát hiện candidate contradiction/staleness; không tự động sửa memory đã được chấp nhận.
 
 ### Provider configuration và reliability
 

@@ -11,6 +11,7 @@ way and trace every answer back to exact source evidence.
 ## Start here
 
 | Document | Purpose | Status |
+| [v0.4.0 notes](./releases/v0.4.0.md) | Temporal decision relations and timelines | Pre-alpha |
 | [v0.3.0 notes](./releases/v0.3.0.md) | Immutable local Git repository ingestion | Pre-alpha |
 | --- | --- | --- |
 | [Product brief](./product-brief.md) | Problem, audience, value proposition, scope, and success measures | Baseline |

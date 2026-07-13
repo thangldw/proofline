@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
@@ -40,6 +41,7 @@ from .models import (
     AuditEvent,
     Chunk,
     Decision,
+    DecisionRelation,
     Evidence,
     GitRepository,
     IngestionJob,
@@ -53,6 +55,10 @@ from .schemas import (
     AnswerResponse,
     AuditEventRead,
     DecisionRead,
+    DecisionRelationCandidateRead,
+    DecisionRelationCreate,
+    DecisionRelationRead,
+    DecisionTimelineRead,
     DecisionUpdate,
     EmbeddingIndexResponse,
     FolderScanRequest,
@@ -120,6 +126,8 @@ def decision_snapshot(decision: Decision) -> dict[str, str | None]:
         "statement": decision.statement,
         "rationale": decision.rationale,
         "status": decision.status,
+        "valid_from": decision.valid_from.isoformat() if decision.valid_from else None,
+        "valid_to": decision.valid_to.isoformat() if decision.valid_to else None,
         "updated_at": decision.updated_at.isoformat(),
     }
 
@@ -733,6 +741,156 @@ def update_decision(
         object_type="decision",
         action="decision.updated",
     )
+
+
+@router.post(
+    "/decision-relations",
+    response_model=DecisionRelationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_decision_relation(
+    payload: DecisionRelationCreate,
+    session: Session = Depends(get_session),
+) -> DecisionRelation:
+    decisions = {
+        decision.id: decision
+        for decision in session.scalars(
+            select(Decision).where(
+                Decision.id.in_([payload.source_decision_id, payload.target_decision_id]),
+                Decision.kind == "decision",
+            )
+        ).all()
+    }
+    if len(decisions) != 2:
+        raise HTTPException(status_code=404, detail="One or more decisions were not found")
+    relation = DecisionRelation(**payload.model_dump(), created_by="local_user")
+    session.add(relation)
+    now = payload.valid_from or utc_now()
+    if payload.kind == "supersedes":
+        source = decisions[payload.source_decision_id]
+        target = decisions[payload.target_decision_id]
+        source_before = decision_snapshot(source)
+        target_before = decision_snapshot(target)
+        source.valid_from = source.valid_from or now
+        target.valid_to = now
+        target.status = "obsolete"
+        session.add_all(
+            [
+                AuditEvent(
+                    actor="local_user",
+                    action="decision.supersedes",
+                    object_type="decision",
+                    object_id=source.id,
+                    before_json=source_before,
+                    after_json=decision_snapshot(source),
+                ),
+                AuditEvent(
+                    actor="local_user",
+                    action="decision.superseded",
+                    object_type="decision",
+                    object_id=target.id,
+                    before_json=target_before,
+                    after_json=decision_snapshot(target),
+                ),
+            ]
+        )
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Decision relation already exists") from exc
+    session.refresh(relation)
+    return relation
+
+
+@router.get("/decision-relations", response_model=list[DecisionRelationRead])
+def list_decision_relations(
+    decision_id: str | None = None,
+    relation_kind: str | None = Query(default=None, alias="kind"),
+    session: Session = Depends(get_session),
+) -> list[DecisionRelation]:
+    query = select(DecisionRelation).order_by(DecisionRelation.created_at, DecisionRelation.id)
+    if decision_id:
+        query = query.where(
+            (DecisionRelation.source_decision_id == decision_id)
+            | (DecisionRelation.target_decision_id == decision_id)
+        )
+    if relation_kind:
+        query = query.where(DecisionRelation.kind == relation_kind)
+    return list(session.scalars(query).all())
+
+
+@router.get("/decisions/{decision_id}/timeline", response_model=DecisionTimelineRead)
+def get_decision_timeline(
+    decision_id: str, session: Session = Depends(get_session)
+) -> DecisionTimelineRead:
+    decision = session.scalar(
+        select(Decision)
+        .where(Decision.id == decision_id, Decision.kind == "decision")
+        .options(selectinload(Decision.evidence))
+    )
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    incoming = list(
+        session.scalars(
+            select(DecisionRelation)
+            .where(DecisionRelation.target_decision_id == decision_id)
+            .order_by(DecisionRelation.created_at, DecisionRelation.id)
+        ).all()
+    )
+    outgoing = list(
+        session.scalars(
+            select(DecisionRelation)
+            .where(DecisionRelation.source_decision_id == decision_id)
+            .order_by(DecisionRelation.created_at, DecisionRelation.id)
+        ).all()
+    )
+    title = session.scalar(select(Source.title).where(Source.id == decision.source_id))
+    return DecisionTimelineRead(
+        decision=decision_to_read(decision, title), incoming=incoming, outgoing=outgoing
+    )
+
+
+@router.get("/decision-relation-candidates", response_model=list[DecisionRelationCandidateRead])
+def list_decision_relation_candidates(
+    session: Session = Depends(get_session),
+) -> list[DecisionRelationCandidateRead]:
+    candidates: list[DecisionRelationCandidateRead] = []
+    relations = session.scalars(
+        select(DecisionRelation).where(DecisionRelation.kind == "contradicts")
+    ).all()
+    for relation in relations:
+        decisions = [
+            session.get(Decision, relation.source_decision_id),
+            session.get(Decision, relation.target_decision_id),
+        ]
+        if all(decision and decision.status != "obsolete" for decision in decisions):
+            candidates.append(
+                DecisionRelationCandidateRead(
+                    kind="contradiction",
+                    decision_ids=[relation.source_decision_id, relation.target_decision_id],
+                    relation_id=relation.id,
+                    reason="Both contradictory decisions are still non-obsolete; review required.",
+                )
+            )
+    now = utc_now().replace(tzinfo=None)
+    stale = session.scalars(
+        select(Decision).where(
+            Decision.kind == "decision",
+            Decision.status.in_(["active", "accepted"]),
+            Decision.valid_to.is_not(None),
+            Decision.valid_to <= now,
+        )
+    ).all()
+    candidates.extend(
+        DecisionRelationCandidateRead(
+            kind="stale",
+            decision_ids=[decision.id],
+            reason="Decision validity has ended but its review status is still current.",
+        )
+        for decision in stale
+    )
+    return candidates
 
 
 @router.get("/audit-events", response_model=list[AuditEventRead])
