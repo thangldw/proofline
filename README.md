@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.3 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.4 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -216,7 +216,19 @@ The command requires at least one local and one remote generation provider, hash
 datasets, locks the extraction and grounded-answer prompt versions, checks provider health, and
 writes an atomic receipt without credentials. Exit `0` means every endpoint is ready; exit `1`
 means the receipt was written with explicit blockers. A preflight receipt is not model-quality
-evidence. The actual token-spending comparison runner remains pending.
+evidence. Once preflight is ready, run the frozen comparison through the production extraction and
+grounded-answer paths:
+
+```bash
+.venv/bin/proofline eval-real-model \
+  --plan evals/real-model/comparison-v1.json \
+  --output evals/real-model/receipts/comparison.json
+```
+
+The comparison receipt includes per-kind extraction quality, exact-evidence resolution, grounded
+citation and abstention metrics, provider latency, token totals and estimated cost. Mock transport
+is available only through injected tests, is labeled `mock_integration`, and cannot use the normal
+real-provider transport accidentally.
 
 Remaining beta/production qualification gates include real-model and external-pilot evidence, a
 repository security-plugin scan, reranking, scalable vector indexing, Windows verification, and
@@ -227,10 +239,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.3` is the latest experimental pre-alpha release. It adds a credential-safe, versioned
-real-model comparison preflight on top of the existing evidence-first notes, study and proposal
-flows. The installed wheel contains the same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.3.md) and verify `SHA256SUMS` before installation.
+`v0.14.4` is the latest experimental pre-alpha release. It adds a credential-safe, versioned
+real-model comparison runner on top of the existing evidence-first notes, study and proposal flows.
+The installed wheel contains the same-origin UI and API for a one-command local run. See the
+[release notes](docs/releases/v0.14.4.md) and verify `SHA256SUMS` before installation.
 
 To derive study cards, place explicit adjacent pairs in any indexed source and select it under
 **Study**:
@@ -246,7 +258,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.3
+make release-local TAG=v0.14.4
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an

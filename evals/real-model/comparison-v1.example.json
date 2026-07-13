@@ -12,7 +12,8 @@
       "model_revision": "replace-with-provider-revision",
       "api_key_env": "DASHSCOPE_API_KEY",
       "input_usd_per_million_tokens": 0,
-      "output_usd_per_million_tokens": 0
+      "output_usd_per_million_tokens": 0,
+      "execution_mode": "real"
     },
     {
       "name": "qwen-local",
@@ -22,7 +23,8 @@
       "model_id": "replace-with-installed-ollama-model",
       "model_revision": "replace-with-ollama-content-digest",
       "input_usd_per_million_tokens": 0,
-      "output_usd_per_million_tokens": 0
+      "output_usd_per_million_tokens": 0,
+      "execution_mode": "real"
     }
   ]
 }
