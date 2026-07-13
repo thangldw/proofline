@@ -15,6 +15,8 @@ way and trace every answer back to exact source evidence.
 | [v0.7.0 notes](./releases/v0.7.0.md) | Workspace isolation and multi-worker scan leases | Pre-alpha |
 | [v0.8.0 notes](./releases/v0.8.0.md) | Portable non-empty merge with deterministic remapping | Pre-alpha |
 | [v0.9.0 notes](./releases/v0.9.0.md) | Workspace UI and evidence-based watcher decision | Pre-alpha |
+| [Roadmap evidence audit](./roadmap-evidence-2026-07-13.md) | Implemented milestones and external blockers | Current audit |
+| [ADR 0003](./adr/0003-defer-tauri-packaging.md) | Defer Tauri until platform and lifecycle gates pass | Accepted |
 | [v0.5.0 notes](./releases/v0.5.0.md) | Provider settings and model reliability | Pre-alpha |
 | [Provider configuration](./provider-configuration.md) | Profiles, keys, health and retry semantics | Implemented |
 | [v0.4.0 notes](./releases/v0.4.0.md) | Temporal decision relations and timelines | Pre-alpha |

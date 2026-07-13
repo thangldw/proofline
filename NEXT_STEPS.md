@@ -76,7 +76,7 @@ Import local repo → index immutable commit/file sources → search → grounde
   1.000 ms đã khóa trước (`evals/benchmarks/folder-watcher-1000-v1.json`).
 - [x] Thiết kế coordination cho nhiều API worker bằng SQLite workspace lease có expiry.
 - [x] Hỗ trợ portable import vào database không rỗng bằng explicit merge/remap workflow.
-- [ ] Không hỗ trợ overwrite phá hủy dữ liệu nếu chưa có preview và rollback semantics.
+- [x] Không hỗ trợ overwrite phá hủy dữ liệu; portable merge luôn preview, remap và rollback atomically.
 
 ### Workspace và packaging
 
@@ -84,7 +84,8 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [x] Quy định workspace-scoped source identity, search, model runs, audit và deletion.
 - [ ] Xác minh Windows trong CI hoặc máy thật.
 - [ ] Hoàn thiện production packaging; chưa tuyên bố production support.
-- [ ] Đánh giá Tauri desktop packaging sau khi local web/API workflow ổn định.
+- [x] Đánh giá Tauri desktop packaging; ADR 0003 hoãn triển khai cho đến khi Windows, lifecycle
+  API/web và production support boundary được chứng minh.
 
 ## P1 — Đánh giá bằng model và dữ liệu thật
 
