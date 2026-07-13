@@ -7,6 +7,8 @@ const apiMock = vi.hoisted(() => ({
   createNote: vi.fn(),
   updateNote: vi.fn(),
   noteBacklinks: vi.fn(),
+  noteVersions: vi.fn(),
+  sourceVersion: vi.fn(),
 }));
 vi.mock("./api", () => ({ api: apiMock }));
 
@@ -33,7 +35,10 @@ const note: Note = {
 };
 
 describe("NotesView", () => {
-  beforeEach(() => apiMock.noteBacklinks.mockResolvedValue([]));
+  beforeEach(() => {
+    apiMock.noteBacklinks.mockResolvedValue([]);
+    apiMock.noteVersions.mockResolvedValue([]);
+  });
 
   afterEach(() => {
     cleanup();
@@ -102,5 +107,30 @@ describe("NotesView", () => {
     fireEvent.click(screen.getByRole("button", { name: /Queue design/ }));
     expect(await screen.findByText("#architecture")).toBeInTheDocument();
     expect(await screen.findByText(/Worker rollout · L2–2 · version-/)).toBeInTheDocument();
+  });
+
+  it("filters by tag and previews an immutable revision read-only", async () => {
+    apiMock.noteVersions.mockResolvedValue([
+      {
+        id: note.current_version_id,
+        source_id: note.id,
+        content_hash: "a".repeat(64),
+        version_number: 1,
+        content_length: note.content.length,
+        status: "indexed",
+        parser_version: "deterministic-v2",
+        created_at: note.created_at,
+      },
+    ]);
+    apiMock.sourceVersion.mockResolvedValue({ content: note.content });
+    render(<NotesView notes={[note]} onChanged={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Filter notes by title or tag"), {
+      target: { value: "#architecture" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Queue design/ }));
+    const revision = await screen.findByRole("button", { name: /v1 ·/ });
+    fireEvent.click(revision);
+    expect(await screen.findByLabelText("Immutable revision preview")).toHaveTextContent(note.content);
+    expect(apiMock.sourceVersion).toHaveBeenCalledWith(note.id, note.current_version_id);
   });
 });

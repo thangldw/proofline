@@ -7,7 +7,21 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.1`.
+No changes have been recorded after `v0.14.2`.
+
+## [0.14.2] - 2026-07-13
+
+### Added
+
+- Local Notes filtering by title or deterministic hashtag.
+- Notes list every immutable source revision with version number and content length.
+- A read-only historical revision preview loads through the workspace-scoped source/version API
+  and displays a shortened immutable content hash.
+
+### Documentation
+
+- Study/proposal portable JSON is explicitly deferred because it requires validator, canonical
+  ordering and full merge/remap graph changes rather than a safe incremental patch.
 
 ## [0.14.1] - 2026-07-13
 
