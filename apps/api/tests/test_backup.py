@@ -4,11 +4,17 @@ import shutil
 import sqlite3
 import stat
 from datetime import UTC, datetime
+from pathlib import Path
 
 import proofline.backup as backup_module
 import proofline.cli as cli_module
 import pytest
-from proofline.backup import BackupError, create_sqlite_backup, verify_sqlite_backup
+from proofline.backup import (
+    BackupError,
+    create_sqlite_backup,
+    restore_sqlite_backup,
+    verify_sqlite_backup,
+)
 from proofline.cli import main
 from proofline.ingestion import ingest_source
 from proofline.models import (
@@ -175,6 +181,79 @@ def test_backup_recovery_exercise_preserves_exact_evidence_and_hashes(session, t
         )
 
 
+def test_restore_backup_preserves_rollback_and_can_reverse_the_restore(session, tmp_path):
+    raw_backup_fixture(session)
+    engine = session.get_bind()
+    target = Path(engine.url.database)
+    backup = tmp_path / "before-change.db"
+    rollback = tmp_path / "before-restore.db"
+    reverse_rollback = tmp_path / "before-rollback.db"
+    create_sqlite_backup(engine, backup)
+
+    ingest_source(
+        session,
+        SourceCreate(
+            title="Post-backup state",
+            uri="file:///post-backup.md",
+            content="Decision: this state must survive in the rollback copy.",
+        ),
+    )
+    assert session.scalar(select(func.count()).select_from(Decision)) == 3
+    session.close()
+    engine.dispose()
+
+    restored = restore_sqlite_backup(backup, target, rollback_output=rollback)
+    assert restored["target_existed"] is True
+    assert restored["rollback_created"] is True
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+    with read_only(target) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 2
+    with read_only(rollback) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 3
+
+    reversed_report = restore_sqlite_backup(
+        rollback,
+        target,
+        rollback_output=reverse_rollback,
+    )
+    assert reversed_report["rollback_created"] is True
+    with read_only(target) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 3
+    with read_only(reverse_rollback) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 2
+
+
+def test_restore_backup_requires_safe_distinct_paths_and_no_sqlite_sidecars(session, tmp_path):
+    raw_backup_fixture(session)
+    engine = session.get_bind()
+    target = Path(engine.url.database)
+    backup = tmp_path / "backup.db"
+    rollback = tmp_path / "rollback.db"
+    create_sqlite_backup(engine, backup)
+    session.close()
+    engine.dispose()
+
+    new_target = tmp_path / "new-target.db"
+    created = restore_sqlite_backup(backup, new_target)
+    assert created["target_existed"] is False
+    assert created["rollback_created"] is False
+    assert verify_sqlite_backup(new_target)["migration_version"] >= 1
+
+    with pytest.raises(BackupError, match="rollback_output_required"):
+        restore_sqlite_backup(backup, target)
+    with pytest.raises(BackupError, match="restore_paths_must_be_distinct"):
+        restore_sqlite_backup(backup, target, rollback_output=backup)
+    rollback.write_bytes(b"do not overwrite")
+    with pytest.raises(BackupError, match="rollback_output_exists"):
+        restore_sqlite_backup(backup, target, rollback_output=rollback)
+    rollback.unlink()
+    sidecar = Path(f"{target}-wal")
+    sidecar.touch()
+    with pytest.raises(BackupError, match="restore_target_has_sidecars"):
+        restore_sqlite_backup(backup, target, rollback_output=rollback)
+    sidecar.unlink()
+
+
 def test_backup_verifier_rejects_corruption_truncation_and_old_schema(tmp_path):
     corrupted = tmp_path / "corrupted.db"
     corrupted.write_bytes(b"not a sqlite database")
@@ -288,3 +367,34 @@ def test_backup_cli_passes_and_fails_with_safe_codes(session, tmp_path, monkeypa
 
     with pytest.raises(SystemExit, match="backup failed: output_exists"):
         main(["backup", "--output", str(output)])
+
+
+def test_restore_backup_cli_targets_configured_sqlite_and_reports_rollback(
+    session, tmp_path, monkeypatch, capsys
+):
+    raw_backup_fixture(session)
+    engine = session.get_bind()
+    target = Path(engine.url.database)
+    backup = tmp_path / "cli-restore-source.db"
+    rollback = tmp_path / "cli-rollback.db"
+    create_sqlite_backup(engine, backup)
+    ingest_source(
+        session,
+        SourceCreate(
+            title="After CLI backup",
+            uri="file:///after-cli-backup.md",
+            content="Decision: preserve this only in the CLI rollback copy.",
+        ),
+    )
+    session.close()
+    monkeypatch.setattr(cli_module, "engine", engine)
+
+    main(["restore-backup", str(backup), "--rollback-output", str(rollback)])
+
+    report = json.loads(capsys.readouterr().out)
+    assert report["valid"] is True
+    assert report["rollback_created"] is True
+    with read_only(target) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 2
+    with read_only(rollback) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 3

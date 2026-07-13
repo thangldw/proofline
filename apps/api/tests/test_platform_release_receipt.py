@@ -45,6 +45,8 @@ def test_platform_release_receipt_qualifies_identified_installed_artifact(tmp_pa
     assert len(receipt["artifact"]["sha256"]) == 64
     assert receipt["lifecycle"]["graceful_shutdown"] is True
     assert receipt["recovery"]["source_versions"] == 2
+    assert receipt["recovery"]["backup_restore"] is True
+    assert receipt["recovery"]["rollback_restore"] is True
     assert receipt["integrity"]["valid"] is True
     assert receipt["os_keyring"] == {"status": "not_run"}
     assert "another OS" in receipt["qualification"]

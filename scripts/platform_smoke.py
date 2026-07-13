@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -17,7 +18,11 @@ def main() -> None:
         os.environ["PROOFLINE_EMBEDDING_PROVIDER"] = "disabled"
         os.environ["PROOFLINE_ALLOW_REMOTE_AI"] = "false"
 
-        from proofline.backup import create_sqlite_backup, verify_sqlite_backup
+        from proofline.backup import (
+            create_sqlite_backup,
+            restore_sqlite_backup,
+            verify_sqlite_backup,
+        )
         from proofline.database import SessionLocal, engine, initialize_database, make_engine
         from proofline.ingestion import ingest_source
         from proofline.portability import (
@@ -91,6 +96,50 @@ def main() -> None:
         backup_path = root / "proofline-backup.db"
         backup_report = create_sqlite_backup(engine, backup_path)
         assert verify_sqlite_backup(backup_path) == backup_report
+        live_path = root / "proofline.db"
+        rollback_path = root / "proofline-before-restore.db"
+        restored_path = root / "restored-from-backup.db"
+        shutil.copy2(live_path, restored_path)
+        drill_engine = make_engine(f"sqlite:///{restored_path}")
+        drill_sessions = sessionmaker(bind=drill_engine, expire_on_commit=False)
+        with drill_sessions() as drill:
+            extra_source, extra_created = ingest_source(
+                drill,
+                SourceCreate(
+                    title="Restore drill marker",
+                    uri="smoke://platform/restore-drill",
+                    content="Decision: Preserve rollbackmarkerx during a restore drill.",
+                ),
+            )
+            assert extra_created
+            extra_source_id = extra_source.id
+        drill_engine.dispose()
+        restore_report = restore_sqlite_backup(
+            backup_path,
+            restored_path,
+            rollback_output=rollback_path,
+        )
+        assert restore_report["rollback_created"] is True
+        assert verify_sqlite_backup(restored_path) == backup_report
+        restored_engine = make_engine(f"sqlite:///{restored_path}")
+        restored_sessions = sessionmaker(bind=restored_engine, expire_on_commit=False)
+        with restored_sessions() as restored:
+            assert not lexical_search(restored, "rollbackmarkerx", limit=5)
+        restored_engine.dispose()
+        rollback_drill_path = root / "proofline-before-rollback.db"
+        rollback_report = restore_sqlite_backup(
+            rollback_path,
+            restored_path,
+            rollback_output=rollback_drill_path,
+        )
+        assert rollback_report["rollback_created"] is True
+        assert verify_sqlite_backup(restored_path) == backup_report
+        rolled_back_engine = make_engine(f"sqlite:///{restored_path}")
+        rolled_back_sessions = sessionmaker(bind=rolled_back_engine, expire_on_commit=False)
+        with rolled_back_sessions() as rolled_back:
+            rolled_back_hits = lexical_search(rolled_back, "rollbackmarkerx", limit=5)
+            assert rolled_back_hits and rolled_back_hits[0].source_id == extra_source_id
+        rolled_back_engine.dispose()
 
         print(
             json.dumps(
@@ -100,6 +149,8 @@ def main() -> None:
                     "source_versions": export_counts["source_versions"],
                     "import_payload_sha256": import_report["payload_sha256"],
                     "migration_version": backup_report["migration_version"],
+                    "backup_restore": True,
+                    "rollback_restore": True,
                 },
                 sort_keys=True,
             )

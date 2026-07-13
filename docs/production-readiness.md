@@ -23,16 +23,16 @@ profile.
 | Area | Required evidence | Status | Current evidence or blocker |
 | --- | --- | --- | --- |
 | Public repository | License, community docs, current support policy, no contributor-machine paths, accurate implemented/planned claims | Partial | Hygiene corrections are prepared; repository metadata and visibility remain external changes |
-| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.9` GitHub assets and checksummed platform receipt |
-| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.9` installed-release platform receipt; native signing remains a separate gate |
+| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.10` GitHub assets and checksummed platform receipt |
+| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.10` installed-release platform receipt; native signing remains a separate gate |
 | Windows lifecycle | Same installed-artifact and recovery path on a real Windows target | Blocked | No Windows runner or machine receipt |
 | Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Blocked | Tauri remains deferred by ADR 0003 |
 | Data integrity | Versioned migrations, immutable source identity, exact spans, deletion cascade and semantic verification | Complete for tested local schema | Migration, provenance, deletion and integrity suites |
-| Backup/recovery | Encrypted retention policy plus successful backup, restore and rollback drills from release artifacts | Partial | Commands/tests exist; operator policy and versioned release-artifact drill are missing |
+| Backup/recovery | Encrypted retention policy plus successful backup, restore and rollback drills from release artifacts | Partial | `v0.14.10` receipt proves atomic restore and rollback from the installed artifact; encrypted retention policy remains operator-owned and unqualified |
 | Offline core | Useful ingestion, retrieval, memory review and Studio behavior without external services | Complete for deterministic scope | Credential-free regression and UI suites |
 | Model quality | Frozen real corpus, pinned local/remote models, extraction/citation/abstention/latency/cost report | Blocked | Only `mock_integration` evidence exists |
 | External utility | Permissioned pilot with at least 25 questions, temporal cases, baseline and useful-answer metrics | Blocked | Templates exist; no external pilot evidence |
-| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Complete on macOS; Windows receipt pending | `v0.14.9` supports OS keyring storage, migration, rollback and UI removal; macOS installed-wheel receipt exercises set/read/delete |
+| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Complete on macOS; Windows receipt pending | `v0.14.10` includes OS keyring storage, migration, rollback and UI removal; macOS installed-wheel receipt exercises set/read/delete |
 | Operational support | Supported versions, issue handling, upgrade/rollback policy, data-loss escalation and release cadence | Partial | Pre-alpha boundary exists; production owners and commitments are not named |
 | Security qualification | Threat-boundary verification and release security assessment | Blocked | Explicitly excluded from the current work scope; production claim is impossible while excluded |
 

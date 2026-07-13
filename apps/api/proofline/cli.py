@@ -7,7 +7,12 @@ from importlib.resources import files
 from pathlib import Path
 
 from . import __version__
-from .backup import BackupError, create_sqlite_backup, verify_sqlite_backup
+from .backup import (
+    BackupError,
+    create_sqlite_backup,
+    restore_sqlite_backup,
+    verify_sqlite_backup,
+)
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .embeddings import index_current_embeddings
@@ -171,6 +176,12 @@ def main(argv: list[str] | None = None) -> None:
     backup.add_argument("--force", action="store_true")
     verify_backup = subcommands.add_parser("verify-backup", help="Verify a SQLite backup")
     verify_backup.add_argument("path", type=Path)
+    restore_backup = subcommands.add_parser(
+        "restore-backup",
+        help="Atomically restore a verified SQLite backup while preserving rollback data",
+    )
+    restore_backup.add_argument("path", type=Path)
+    restore_backup.add_argument("--rollback-output", type=Path)
     subcommands.add_parser(
         "verify-integrity", help="Verify live SQLite provenance without changing it"
     )
@@ -331,6 +342,21 @@ def main(argv: list[str] | None = None) -> None:
             report = verify_sqlite_backup(args.path)
         except BackupError as exc:
             raise SystemExit(f"backup verification failed: {exc.code}") from exc
+        print(json.dumps({"valid": True, **report}, sort_keys=True))
+    elif args.command == "restore-backup":
+        if engine.dialect.name != "sqlite" or not engine.url.database:
+            raise SystemExit("backup restore failed: sqlite_file_required")
+        if engine.url.database == ":memory:":
+            raise SystemExit("backup restore failed: sqlite_file_required")
+        engine.dispose()
+        try:
+            report = restore_sqlite_backup(
+                args.path,
+                Path(engine.url.database),
+                rollback_output=args.rollback_output,
+            )
+        except BackupError as exc:
+            raise SystemExit(f"backup restore failed: {exc.code}") from exc
         print(json.dumps({"valid": True, **report}, sort_keys=True))
     elif args.command == "verify-integrity":
         try:
