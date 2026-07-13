@@ -1,0 +1,28 @@
+{
+  "schema_version": "proofline.real-model-comparison.v1",
+  "extraction_dataset": "../extraction/seed-v1.json",
+  "grounded_dataset": "../grounded-qa/seed-v1.json",
+  "providers": [
+    {
+      "name": "qwen-remote",
+      "locality": "remote",
+      "provider": "qwen",
+      "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "model_id": "replace-with-pinned-qwen-model-id",
+      "model_revision": "replace-with-provider-revision",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "input_usd_per_million_tokens": 0,
+      "output_usd_per_million_tokens": 0
+    },
+    {
+      "name": "qwen-local",
+      "locality": "local",
+      "provider": "ollama",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "model_id": "replace-with-installed-ollama-model",
+      "model_revision": "replace-with-ollama-content-digest",
+      "input_usd_per_million_tokens": 0,
+      "output_usd_per_million_tokens": 0
+    }
+  ]
+}

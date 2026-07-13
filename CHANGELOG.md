@@ -7,7 +7,22 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.2`.
+No changes have been recorded after `v0.14.3`.
+
+## [0.14.3] - 2026-07-13
+
+### Added
+
+- Add a versioned real-model comparison preflight manifest requiring local and remote providers.
+- Persist dataset hashes, declared model revisions, prompt versions, pricing and explicit readiness
+  blockers without storing provider credentials.
+- Add an atomic `eval-real-model-preflight` CLI receipt with non-zero exit status when any provider
+  is unavailable or a remote credential is missing.
+
+### Documentation
+
+- Record the metric contract and explicitly distinguish preflight readiness from model-quality or
+  pilot evidence.
 
 ## [0.14.2] - 2026-07-13
 
@@ -348,7 +363,8 @@ No changes have been recorded after `v0.14.2`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/thangldw/proofline/releases/tag/v0.14.3
 [0.9.0]: https://github.com/thangldw/proofline/releases/tag/v0.9.0
 [0.8.0]: https://github.com/thangldw/proofline/releases/tag/v0.8.0
 [0.7.0]: https://github.com/thangldw/proofline/releases/tag/v0.7.0
