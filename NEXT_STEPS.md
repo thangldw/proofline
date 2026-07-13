@@ -73,14 +73,14 @@ Import local repo → index immutable commit/file sources → search → grounde
 ### Ingestion và portability còn thiếu
 
 - [ ] Nâng polling watcher lên native filesystem notifications nếu benchmark cho thấy cần thiết.
-- [ ] Thiết kế coordination cho nhiều API worker; watcher hiện chỉ an toàn trong một process.
+- [x] Thiết kế coordination cho nhiều API worker bằng SQLite workspace lease có expiry.
 - [ ] Hỗ trợ portable import vào database không rỗng bằng explicit merge/remap workflow.
 - [ ] Không hỗ trợ overwrite phá hủy dữ liệu nếu chưa có preview và rollback semantics.
 
 ### Workspace và packaging
 
-- [ ] Thêm workspace abstraction; hiện chỉ có một local workspace.
-- [ ] Quy định workspace-scoped source identity, search, model runs, audit và deletion.
+- [x] Thêm workspace abstraction và default local workspace tương thích dữ liệu cũ.
+- [x] Quy định workspace-scoped source identity, search, model runs, audit và deletion.
 - [ ] Xác minh Windows trong CI hoặc máy thật.
 - [ ] Hoàn thiện production packaging; chưa tuyên bố production support.
 - [ ] Đánh giá Tauri desktop packaging sau khi local web/API workflow ổn định.

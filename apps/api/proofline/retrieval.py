@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, bindparam, text
 from sqlalchemy.orm import Session
 
+from .models import DEFAULT_WORKSPACE_ID
 from .schemas import SearchHit
 
 ENGLISH_QUERY_STOPWORDS = {
@@ -34,6 +35,7 @@ def lexical_search(
     source_ids: list[str] | None = None,
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
 ) -> list[SearchHit]:
     """Search current source versions while treating user input as terms, not FTS syntax."""
     raw_terms = re.findall(r"[\w\-]+", query, flags=re.UNICODE)
@@ -45,8 +47,12 @@ def lexical_search(
     if source_ids == []:
         return []
     fts_query = " OR ".join(f'"{term}"' for term in terms)
-    filters = ["chunk_search MATCH :query", "c.source_version_id = s.current_version_id"]
-    parameters: dict = {"query": fts_query, "limit": limit}
+    filters = [
+        "chunk_search MATCH :query",
+        "c.source_version_id = s.current_version_id",
+        "s.workspace_id = :workspace_id",
+    ]
+    parameters: dict = {"query": fts_query, "limit": limit, "workspace_id": workspace_id}
     if source_ids is not None:
         filters.append("c.source_id IN :source_ids")
         parameters["source_ids"] = source_ids

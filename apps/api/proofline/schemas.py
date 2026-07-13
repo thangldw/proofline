@@ -6,6 +6,21 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MemoryKind = Literal["decision", "assumption", "constraint", "alternative"]
+DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
+
+
+class WorkspaceCreate(BaseModel):
+    slug: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    title: str = Field(min_length=1, max_length=200)
+
+
+class WorkspaceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    slug: str
+    title: str
+    created_at: datetime
 
 
 def normalize_retrieval_filters(
@@ -38,6 +53,7 @@ class SourceCreate(BaseModel):
     content: str = Field(min_length=1, max_length=5_000_000)
     kind: str = Field(default="markdown", pattern="^(markdown|text)$")
     uri: str | None = Field(default=None, max_length=4_096)
+    workspace_id: str = Field(default=DEFAULT_WORKSPACE_ID, min_length=36, max_length=36)
 
 
 class FolderScanRequest(BaseModel):
@@ -45,6 +61,7 @@ class FolderScanRequest(BaseModel):
     path: str | None = Field(default=None, max_length=4_096)
     delete_missing: bool = False
     confirmed_missing_source_ids: list[str] | None = Field(default=None, max_length=10_000)
+    workspace_id: str = Field(default=DEFAULT_WORKSPACE_ID, min_length=36, max_length=36)
 
 
 class FolderScanFileResult(BaseModel):
@@ -101,6 +118,7 @@ class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    workspace_id: str
     title: str
     kind: str
     uri: str | None
@@ -121,12 +139,14 @@ class GitRepositoryCreate(BaseModel):
     path: str = Field(min_length=1, max_length=4_096)
     title: str | None = Field(default=None, min_length=1, max_length=300)
     revision: str = Field(default="HEAD", min_length=1, max_length=200)
+    workspace_id: str = Field(default=DEFAULT_WORKSPACE_ID, min_length=36, max_length=36)
 
 
 class GitRepositoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    workspace_id: str
     title: str
     path: str
     current_commit_sha: str | None
@@ -404,6 +424,7 @@ class IngestionJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    workspace_id: str
     source_id: str | None
     source_version_id: str | None
     kind: str
@@ -425,6 +446,7 @@ class AuditEventRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    workspace_id: str
     actor: str
     action: str
     object_type: str
@@ -482,6 +504,7 @@ class ModelRunRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    workspace_id: str
     provider_id: str
     model_id: str
     operation: str

@@ -27,7 +27,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 19))
     assert {
         "sources",
         "source_versions",
@@ -43,6 +43,8 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "git_repositories",
         "decision_relations",
         "chunk_vector_buckets",
+        "workspaces",
+        "workspace_leases",
     } <= tables
     engine.dispose()
 
@@ -96,7 +98,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 17))
+        assert versions == list(range(1, 19))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -230,7 +232,7 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 19))
     engine.dispose()
 
 
@@ -311,7 +313,7 @@ def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
             .all()
         )
     assert statuses == {"memory-v10": "obsolete", "memory-v10-custom": "candidate"}
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 19))
     engine.dispose()
 
 
@@ -400,7 +402,7 @@ def test_v11_database_gains_persistent_unique_import_receipts(tmp_path):
     }
     assert columns["imported_at"]["default"] == "CURRENT_TIMESTAMP"
     assert indexes["ix_import_receipts_payload_sha256"] == 1
-    assert versions == list(range(1, 17))
+    assert versions == list(range(1, 19))
     reopened.dispose()
 
 

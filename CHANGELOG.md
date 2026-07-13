@@ -7,7 +7,18 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.6.0`.
+No changes have been recorded after `v0.7.0`.
+
+## [0.7.0] - 2026-07-13
+
+### Added
+
+- A local workspace API and `X-Proofline-Workspace-ID` request boundary scope sources, ingestion
+  jobs, search, grounded answers, decisions, model runs, audit history, Git imports, and deletion.
+- SQLite-backed expiring folder-scan leases prevent overlapping scans across API workers while
+  preserving the existing in-process coordinator and explicit `scan_in_progress` failure.
+- Migration 17 backfills all existing records into the immutable default local workspace;
+  migration 18 adds durable worker leases without requiring an external service.
 
 ## [0.6.0] - 2026-07-14
 
@@ -177,7 +188,8 @@ No changes have been recorded after `v0.6.0`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/thangldw/proofline/releases/tag/v0.7.0
 [0.6.0]: https://github.com/thangldw/proofline/releases/tag/v0.6.0
 [0.5.0]: https://github.com/thangldw/proofline/releases/tag/v0.5.0
 [0.4.0]: https://github.com/thangldw/proofline/releases/tag/v0.4.0

@@ -50,9 +50,18 @@ def import_git_repository(
         raise GitIngestionError("repository_root_required", "Register the Git repository root.")
     commit_sha = str(_git(root, "rev-parse", "--verify", f"{payload.revision}^{{commit}}")).strip()
     canonical_path = str(root)
-    repository = session.scalar(select(GitRepository).where(GitRepository.path == canonical_path))
+    repository = session.scalar(
+        select(GitRepository).where(
+            GitRepository.workspace_id == payload.workspace_id,
+            GitRepository.path == canonical_path,
+        )
+    )
     if repository is None:
-        repository = GitRepository(title=payload.title or root.name, path=canonical_path)
+        repository = GitRepository(
+            workspace_id=payload.workspace_id,
+            title=payload.title or root.name,
+            path=canonical_path,
+        )
         session.add(repository)
         session.commit()
 
@@ -98,11 +107,19 @@ def import_git_repository(
     created_count = unchanged_count = 0
     for kind, title, locator, content in items:
         uri = f"git+file://{root.as_posix()}?commit={commit_sha}#path={locator}"
-        existing = session.scalar(select(Source).where(Source.uri == uri))
+        existing = session.scalar(
+            select(Source).where(Source.workspace_id == payload.workspace_id, Source.uri == uri)
+        )
         try:
             source, created, _job = run_ingestion_job(
                 session,
-                SourceCreate(title=title[:300], content=content, kind="text", uri=uri),
+                SourceCreate(
+                    title=title[:300],
+                    content=content,
+                    kind="text",
+                    uri=uri,
+                    workspace_id=payload.workspace_id,
+                ),
             )
         except (IngestionConflict, IngestionExecutionError):
             failures.append({"path": locator, "error_code": "git_source_ingestion_failed"})

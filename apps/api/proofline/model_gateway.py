@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from .config import Settings
-from .models import ModelRun, utc_now
+from .models import DEFAULT_WORKSPACE_ID, ModelRun, utc_now
 
 MAX_STRUCTURED_OUTPUT_BYTES = 128 * 1024
 MAX_GENERATION_ATTEMPTS = 2
@@ -43,6 +43,7 @@ class GenerationRequest(BaseModel):
     input_hashes: list[str] = Field(default_factory=list)
     response_schema: dict[str, Any] | None = None
     temperature: float = Field(default=0, ge=0, le=2)
+    workspace_id: str = DEFAULT_WORKSPACE_ID
 
 
 class GenerationResult(BaseModel):
@@ -55,6 +56,7 @@ class EmbeddingRequest(BaseModel):
     texts: list[str] = Field(min_length=1)
     input_hashes: list[str] = Field(default_factory=list)
     template_version: str = Field(default="embedding-v1", min_length=1, max_length=80)
+    workspace_id: str = DEFAULT_WORKSPACE_ID
 
 
 class EmbeddingResult(BaseModel):
@@ -450,6 +452,7 @@ def run_generation(
     if output_type and request.response_schema is None:
         request = request.model_copy(update={"response_schema": output_type.model_json_schema()})
     run = ModelRun(
+        workspace_id=request.workspace_id,
         provider_id=provider.id,
         model_id=provider.model,
         operation="generate",
@@ -516,6 +519,7 @@ def run_embedding(
     request: EmbeddingRequest,
 ) -> tuple[EmbeddingResult, ModelRun]:
     run = ModelRun(
+        workspace_id=request.workspace_id,
         provider_id=provider.id,
         model_id=provider.model,
         operation="embed",

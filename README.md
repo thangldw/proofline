@@ -194,13 +194,13 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.6.0` is the latest experimental pre-alpha release. It adds optional reranking, statement
-support assessment, and a locality-sensitive semantic vector candidate index with benchmark receipts.
+`v0.7.0` is the latest experimental pre-alpha release. It adds local workspace isolation and
+SQLite-backed multi-worker folder-scan coordination while preserving offline operation.
 Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
 archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
 reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
 proven two-process development workflow above. See the
-[release notes](docs/releases/v0.6.0.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.7.0.md) and verify `SHA256SUMS` before installation.
 
 ### Data portability and recovery
 
