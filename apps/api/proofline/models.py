@@ -30,12 +30,31 @@ class Source(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     indexed_at: Mapped[datetime] = mapped_column(default=utc_now)
     current_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    git_repository_id: Mapped[str | None] = mapped_column(
+        ForeignKey("git_repositories.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    git_commit_sha: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    git_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     versions: Mapped[list[SourceVersion]] = relationship(
         cascade="all, delete-orphan", foreign_keys="SourceVersion.source_id"
     )
     chunks: Mapped[list[Chunk]] = relationship(cascade="all, delete-orphan")
     decisions: Mapped[list[Decision]] = relationship(cascade="all, delete-orphan")
+
+
+class GitRepository(Base):
+    __tablename__ = "git_repositories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(300))
+    path: Mapped[str] = mapped_column(Text, unique=True)
+    current_commit_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="indexed")
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    indexed_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+    sources: Mapped[list[Source]] = relationship(cascade="all, delete-orphan")
 
 
 class SourceVersion(Base):

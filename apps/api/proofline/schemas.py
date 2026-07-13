@@ -112,6 +112,39 @@ class SourceRead(BaseModel):
     chunk_count: int = 0
     decision_count: int = 0
     memory_count: int = 0
+    git_repository_id: str | None = None
+    git_commit_sha: str | None = None
+    git_path: str | None = None
+
+
+class GitRepositoryCreate(BaseModel):
+    path: str = Field(min_length=1, max_length=4_096)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    revision: str = Field(default="HEAD", min_length=1, max_length=200)
+
+
+class GitRepositoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    path: str
+    current_commit_sha: str | None
+    status: str
+    created_at: datetime
+    indexed_at: datetime
+    source_count: int = 0
+    file_count: int = 0
+    commit_count: int = 0
+
+
+class GitRepositoryImportResponse(BaseModel):
+    repository: GitRepositoryRead
+    commit_sha: str
+    created_count: int
+    unchanged_count: int
+    failed_count: int
+    failures: list[dict[str, str]] = []
 
 
 class SourceDeletionImpactRead(BaseModel):
@@ -196,6 +229,9 @@ class SearchHit(BaseModel):
     semantic_rank: int | None = None
     semantic_score: float | None = None
     fused_score: float | None = None
+    source_kind: str | None = None
+    git_commit_sha: str | None = None
+    git_path: str | None = None
 
 
 class SearchResponse(BaseModel):
@@ -243,6 +279,9 @@ class AnswerCitation(BaseModel):
     end_offset: int
     start_line: int
     end_line: int
+    source_kind: str | None = None
+    git_commit_sha: str | None = None
+    git_path: str | None = None
 
     @classmethod
     def from_hit(cls, hit: SearchHit) -> AnswerCitation:
@@ -256,6 +295,9 @@ class AnswerCitation(BaseModel):
             end_offset=hit.end_offset,
             start_line=hit.start_line,
             end_line=hit.end_line,
+            source_kind=hit.source_kind,
+            git_commit_sha=hit.git_commit_sha,
+            git_path=hit.git_path,
         )
 
 

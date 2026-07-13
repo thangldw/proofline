@@ -15,6 +15,7 @@ from .extraction import (
     extract_memory_candidates,
 )
 from .folder_scanning import FolderScanError
+from .git_ingestion import GitIngestionError, import_git_repository
 from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
@@ -40,6 +41,7 @@ from .models import (
     Chunk,
     Decision,
     Evidence,
+    GitRepository,
     IngestionJob,
     ModelRun,
     Source,
@@ -56,6 +58,9 @@ from .schemas import (
     FolderScanRequest,
     FolderScanResponse,
     FolderWatchStatus,
+    GitRepositoryCreate,
+    GitRepositoryImportResponse,
+    GitRepositoryRead,
     IngestionJobRead,
     MemoryKind,
     MemoryRead,
@@ -73,6 +78,16 @@ from .schemas import (
 )
 
 router = APIRouter(prefix="/api/v1")
+
+
+def git_repository_to_read(repository: GitRepository) -> GitRepositoryRead:
+    return GitRepositoryRead.model_validate(repository).model_copy(
+        update={
+            "source_count": len(repository.sources),
+            "file_count": sum(source.kind == "git_file" for source in repository.sources),
+            "commit_count": sum(source.kind == "git_commit" for source in repository.sources),
+        }
+    )
 
 
 def source_to_read(source: Source) -> SourceRead:
@@ -248,6 +263,61 @@ def create_folder_scan(
             status_code=status_code,
             detail={"code": exc.code, "message": str(exc)},
         ) from exc
+
+
+@router.post(
+    "/git-repositories",
+    response_model=GitRepositoryImportResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_git_repository(
+    payload: GitRepositoryCreate,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> GitRepositoryImportResponse:
+    try:
+        repository, commit_sha, created, unchanged, failures = import_git_repository(
+            session, payload
+        )
+    except GitIngestionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    if unchanged:
+        response.status_code = status.HTTP_200_OK
+    session.refresh(repository, attribute_names=["sources"])
+    return GitRepositoryImportResponse(
+        repository=git_repository_to_read(repository),
+        commit_sha=commit_sha,
+        created_count=created,
+        unchanged_count=unchanged,
+        failed_count=len(failures),
+        failures=failures,
+    )
+
+
+@router.get("/git-repositories", response_model=list[GitRepositoryRead])
+def list_git_repositories(session: Session = Depends(get_session)) -> list[GitRepositoryRead]:
+    repositories = session.scalars(
+        select(GitRepository)
+        .options(selectinload(GitRepository.sources))
+        .order_by(GitRepository.indexed_at.desc())
+    ).all()
+    return [git_repository_to_read(repository) for repository in repositories]
+
+
+@router.delete("/git-repositories/{repository_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_git_repository(repository_id: str, session: Session = Depends(get_session)) -> Response:
+    repository = session.get(GitRepository, repository_id)
+    if not repository:
+        raise HTTPException(status_code=404, detail="Git repository not found")
+    for source in list(repository.sources):
+        delete_source(session, source)
+    session.expire(repository, ["sources"])
+    session.delete(repository)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/folder-watch", response_model=FolderWatchStatus)
