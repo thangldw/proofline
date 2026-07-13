@@ -27,6 +27,7 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  Workspace,
 } from "./types";
 
 type View = "search" | "memories" | "sources" | "model runs" | "settings";
@@ -57,6 +58,8 @@ export function App() {
   } | null>(null);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaceId, setWorkspaceId] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -80,7 +83,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void (async () => {
+      try {
+        const available = await api.workspaces();
+        const selected = available[0]?.id ?? "";
+        setWorkspaces(available);
+        setWorkspaceId(selected);
+        if (selected) api.setWorkspace(selected);
+        await refresh();
+      } catch (reason) {
+        setError(
+          reason instanceof Error ? reason.message : "Cannot reach Proofline API",
+        );
+      }
+    })();
   }, [refresh]);
 
   async function importFile(file: File) {
@@ -116,7 +132,28 @@ export function App() {
         </div>
         <div className="workspace">
           <span>LOCAL WORKSPACE</span>
-          <strong>Engineering memory</strong>
+          <label htmlFor="workspace-select" className="sr-only">
+            Active workspace
+          </label>
+          <select
+            id="workspace-select"
+            aria-label="Active workspace"
+            value={workspaceId}
+            disabled={workspaces.length < 2}
+            onChange={(event) => {
+              const selected = event.target.value;
+              api.setWorkspace(selected);
+              setWorkspaceId(selected);
+              setEvidence(null);
+              void refresh();
+            }}
+          >
+            {workspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.title}
+              </option>
+            ))}
+          </select>
         </div>
         <nav aria-label="Primary navigation">
           <Nav

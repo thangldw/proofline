@@ -21,6 +21,8 @@ const apiMock = vi.hoisted(() => ({
   deletionImpact: vi.fn(),
   deleteSource: vi.fn(),
   sourceVersion: vi.fn(),
+  workspaces: vi.fn(),
+  setWorkspace: vi.fn(),
 }));
 
 vi.mock("./api", () => ({ api: apiMock }));
@@ -80,6 +82,14 @@ const deletionImpact = {
 describe("source ingestion diagnostics", () => {
   beforeEach(() => {
     for (const mock of Object.values(apiMock)) mock.mockReset();
+    apiMock.workspaces.mockResolvedValue([
+      {
+        id: "00000000-0000-0000-0000-000000000001",
+        slug: "local",
+        title: "Local workspace",
+        created_at: "2026-07-13T00:00:00Z",
+      },
+    ]);
   });
 
   afterEach(() => cleanup());

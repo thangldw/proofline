@@ -6,6 +6,13 @@ export type Overview = {
   evidence: number;
 };
 
+export type Workspace = {
+  id: string;
+  slug: string;
+  title: string;
+  created_at: string;
+};
+
 export type SearchScope = {
   sourceIds: string[];
   ingestedFrom: string | null;

@@ -72,7 +72,8 @@ Import local repo → index immutable commit/file sources → search → grounde
 
 ### Ingestion và portability còn thiếu
 
-- [ ] Nâng polling watcher lên native filesystem notifications nếu benchmark cho thấy cần thiết.
+- [x] Benchmark polling watcher; giữ polling vì median no-op 1.000 file là 403 ms, dưới ngưỡng
+  1.000 ms đã khóa trước (`evals/benchmarks/folder-watcher-1000-v1.json`).
 - [x] Thiết kế coordination cho nhiều API worker bằng SQLite workspace lease có expiry.
 - [x] Hỗ trợ portable import vào database không rỗng bằng explicit merge/remap workflow.
 - [ ] Không hỗ trợ overwrite phá hủy dữ liệu nếu chưa có preview và rollback semantics.

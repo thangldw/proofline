@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval simulate-pilot check format release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -45,6 +45,10 @@ benchmark-retrieval:
 		--output evals/benchmarks/reranker-token-overlap-v1.json
 	.venv/bin/python scripts/benchmark_vector_index.py \
 		--sources 1000 --output evals/benchmarks/vector-index-1000-v1.json
+
+benchmark-watcher:
+	.venv/bin/python scripts/benchmark_folder_watcher.py --files 1000 \
+		--output evals/benchmarks/folder-watcher-1000-v1.json
 
 check:
 	.venv/bin/ruff check .
