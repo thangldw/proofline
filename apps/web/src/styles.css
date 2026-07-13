@@ -233,6 +233,97 @@ summary:focus-visible,
 .study-view {
   max-width: 880px;
 }
+.proposals-view {
+  max-width: 900px;
+}
+.proposal-form,
+.proposal-card {
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: var(--color-surface);
+  padding: 24px;
+  box-shadow: 0 9px 30px rgb(18 104 222 / 8%);
+}
+.proposal-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 18px;
+}
+.proposal-form h2 {
+  margin: 6px 0;
+}
+.proposal-form p,
+.proposal-message {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.proposal-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.proposal-form textarea {
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+}
+.proposal-form button,
+.proposal-card footer button {
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 10px 13px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  cursor: pointer;
+}
+.proposal-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+.proposal-card h3 {
+  margin: 8px 0 15px;
+}
+.proposal-body {
+  font-size: 16px;
+  line-height: 1.6;
+}
+.proposal-citations {
+  display: grid;
+  gap: 8px;
+}
+.proposal-citations div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-left: 3px solid var(--color-mint);
+  background: var(--color-mint-soft);
+  font-size: 12px;
+}
+.proposal-citations small {
+  color: var(--color-mint-strong);
+  font-family: var(--font-mono);
+}
+.proposal-card footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+.proposal-card footer button:first-child {
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+@media (max-width: 900px) {
+  .proposal-form {
+    grid-template-columns: 1fr;
+  }
+}
 .study-toolbar {
   display: flex;
   justify-content: space-between;

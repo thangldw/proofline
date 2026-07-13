@@ -613,6 +613,52 @@ def _add_evidence_first_study_cards(connection: Connection) -> None:
     )
 
 
+def _add_grounded_action_proposals(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS action_proposals (
+            id VARCHAR(36) PRIMARY KEY,
+            workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+            goal TEXT NOT NULL,
+            body TEXT NOT NULL,
+            status VARCHAR(30) NOT NULL,
+            model_run_id VARCHAR(36) NOT NULL REFERENCES model_runs(id) ON DELETE CASCADE,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            CHECK(status IN ('candidate', 'accepted', 'rejected'))
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_action_proposals_workspace_status "
+        "ON action_proposals (workspace_id, status, created_at)"
+    )
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS proposal_citations (
+            id VARCHAR(36) PRIMARY KEY,
+            proposal_id VARCHAR(36) NOT NULL REFERENCES action_proposals(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL
+                REFERENCES source_versions(id) ON DELETE CASCADE,
+            chunk_id VARCHAR(36) NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+            source_title VARCHAR(300) NOT NULL,
+            quote TEXT NOT NULL,
+            quote_hash VARCHAR(64) NOT NULL,
+            start_offset INTEGER NOT NULL,
+            end_offset INTEGER NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            UNIQUE(proposal_id, chunk_id)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_proposal_citations_proposal_id "
+        "ON proposal_citations (proposal_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_proposal_citations_source_id "
+        "ON proposal_citations (source_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -633,6 +679,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (17, "workspace scoped records", _add_workspace_scope),
     (18, "multi-worker workspace leases", _add_workspace_leases),
     (19, "evidence-first study cards", _add_evidence_first_study_cards),
+    (20, "grounded human-reviewed action proposals", _add_grounded_action_proposals),
 )
 
 

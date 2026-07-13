@@ -91,6 +91,9 @@ parallel provenance model.
 The Learning Brain slice deterministically derives study cards from explicit `Q:`/`A:` pairs. Each
 answer is an exact immutable source span, reviews are append-only, and source revisions supersede
 rather than rewrite historical cards. Optional model-generated questions remain unimplemented.
+The Third Brain slice persists only citation-grounded action proposals from the existing validated
+generation pipeline. Candidates retain model-run lineage, require explicit human accept/reject,
+and cannot write back to sources or governed memory.
 
 ## MVP outcome
 

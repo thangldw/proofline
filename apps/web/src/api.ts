@@ -1,5 +1,6 @@
 import type {
   DecisionTimeline,
+  ActionProposal,
   GroundedAnswer,
   IngestionJob,
   Memory,
@@ -45,6 +46,17 @@ export const api = {
   sources: () => request<Source[]>("/api/v1/sources"),
   notes: () => request<Note[]>("/api/v1/notes"),
   studyCards: () => request<StudyCard[]>("/api/v1/study-cards"),
+  actionProposals: () => request<ActionProposal[]>("/api/v1/action-proposals"),
+  createActionProposal: (question: string) =>
+    request<ActionProposal>("/api/v1/action-proposals", {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+  reviewActionProposal: (id: string, status: "accepted" | "rejected") =>
+    request<ActionProposal>(`/api/v1/action-proposals/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
   createStudyCards: (sourceId: string) =>
     request<StudyCard[]>(`/api/v1/sources/${sourceId}/study-cards`, {
       method: "POST",

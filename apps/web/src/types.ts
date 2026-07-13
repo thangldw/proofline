@@ -85,6 +85,30 @@ export type StudyCard = {
   updated_at: string;
 };
 
+export type ActionProposal = {
+  id: string;
+  workspace_id: string;
+  goal: string;
+  body: string;
+  status: "candidate" | "accepted" | "rejected";
+  model_run_id: string;
+  created_at: string;
+  updated_at: string;
+  citations: Array<{
+    id: string;
+    source_id: string;
+    source_version_id: string;
+    chunk_id: string;
+    source_title: string;
+    quote: string;
+    quote_hash: string;
+    start_offset: number;
+    end_offset: number;
+    start_line: number;
+    end_line: number;
+  }>;
+};
+
 export type SourceDeletionImpact = {
   source_id: string;
   title: string;
@@ -99,6 +123,8 @@ export type SourceDeletionImpact = {
   decision_relations?: number;
   study_cards?: number;
   study_reviews?: number;
+  action_proposals?: number;
+  proposal_citations?: number;
   ingestion_jobs_to_detach: number;
   audit_events_to_delete: number;
   fts_rows: number;

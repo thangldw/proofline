@@ -22,7 +22,8 @@ exact source span. Thứ tự phát hành tiếp theo:
 
 - [x] **v0.13 Learning Brain:** flashcard deterministic từ `Q:`/`A:` có immutable exact evidence,
   append-only review history, scheduling state và superseded handling.
-- [ ] **v0.14 Third Brain AI:** suggestion/plan có citation, human review, không autonomous write-back.
+- [x] **v0.14 Third Brain AI:** grounded action proposal giữ model run + immutable exact citations,
+  human accept/reject audit và không autonomous write-back.
 - [ ] **v0.15 Team Brain:** chỉ bắt đầu sau authentication, RBAC, organization audit và permission-aware retrieval.
 
 Không mốc nào ở trên cho phép rich-text editor, canvas, graph database hoặc generic agent.

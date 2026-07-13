@@ -416,6 +416,16 @@ A newer source version marks older cards superseded without rewriting them. Revi
 bounded deterministic interval while preserving each before/after interval in a review event.
 Deleting the source cascades through both tables and exposes their counts in the deletion preview.
 
+### Human-governed action proposals
+
+Migration 20 adds `action_proposals` and `proposal_citations`. Creation reuses the grounded-answer
+pipeline, including provider isolation, bounded repair, server-owned evidence IDs and semantic
+support validation. Insufficient evidence or a missing provider never creates a partial proposal.
+Each candidate records its model run and copies immutable citation identity, quote hash and exact
+span. Human accept/reject changes only proposal governance state and appends an audit event; it has
+no write path to sources or governed memories. Deleting any cited source deletes the complete
+proposal so a partially evidenced action cannot survive.
+
 Planned MVP operations (exact contracts remain undecided):
 
 ```text

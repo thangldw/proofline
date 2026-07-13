@@ -219,6 +219,40 @@ class StudyReviewRead(BaseModel):
     reviewed_at: datetime
 
 
+class ProposalCitationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_id: str
+    source_version_id: str
+    chunk_id: str
+    source_title: str
+    quote: str
+    quote_hash: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+
+
+class ActionProposalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    goal: str
+    body: str
+    status: Literal["candidate", "accepted", "rejected"]
+    model_run_id: str
+    created_at: datetime
+    updated_at: datetime
+    citations: list[ProposalCitationRead] = []
+
+
+class ActionProposalReview(BaseModel):
+    status: Literal["accepted", "rejected"]
+
+
 class GitRepositoryCreate(BaseModel):
     path: str = Field(min_length=1, max_length=4_096)
     title: str | None = Field(default=None, min_length=1, max_length=300)
@@ -265,6 +299,8 @@ class SourceDeletionImpactRead(BaseModel):
     decision_relations: int = Field(ge=0)
     study_cards: int = Field(ge=0)
     study_reviews: int = Field(ge=0)
+    action_proposals: int = Field(ge=0)
+    proposal_citations: int = Field(ge=0)
     ingestion_jobs_to_detach: int = Field(ge=0)
     audit_events_to_delete: int = Field(ge=0)
     fts_rows: int = Field(ge=0)
@@ -426,6 +462,10 @@ class AnswerRequest(BaseModel):
             self.ingested_before,
         )
         return self
+
+
+class ActionProposalCreate(AnswerRequest):
+    pass
 
 
 class AnswerStatement(BaseModel):
