@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .studio import StudioKind
+
 MemoryKind = Literal["decision", "assumption", "constraint", "alternative"]
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -219,6 +221,45 @@ class StudyReviewRead(BaseModel):
     reviewed_at: datetime
 
 
+class StudioArtifactCreate(BaseModel):
+    source_id: str = Field(min_length=36, max_length=36)
+    kind: StudioKind
+
+
+class StudioCitationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_id: str
+    source_version_id: str
+    source_title: str
+    ordinal: int
+    quote: str
+    quote_hash: str
+    start_offset: int
+    end_offset: int
+    start_line: int
+    end_line: int
+
+
+class StudioArtifactRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    source_id: str
+    source_version_id: str
+    source_title: str
+    kind: StudioKind
+    title: str
+    content: dict
+    status: Literal["ready"]
+    generation_method: str
+    created_at: datetime
+    updated_at: datetime
+    citations: list[StudioCitationRead]
+
+
 class ProposalCitationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -301,6 +342,8 @@ class SourceDeletionImpactRead(BaseModel):
     study_reviews: int = Field(ge=0)
     action_proposals: int = Field(ge=0)
     proposal_citations: int = Field(ge=0)
+    studio_artifacts: int = Field(ge=0)
+    studio_citations: int = Field(ge=0)
     ingestion_jobs_to_detach: int = Field(ge=0)
     audit_events_to_delete: int = Field(ge=0)
     fts_rows: int = Field(ge=0)

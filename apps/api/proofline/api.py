@@ -54,6 +54,8 @@ from .models import (
     ProposalCitation,
     Source,
     SourceVersion,
+    StudioArtifact,
+    StudioCitation,
     StudyCard,
     StudyReview,
     Workspace,
@@ -102,6 +104,9 @@ from .schemas import (
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
+    StudioArtifactCreate,
+    StudioArtifactRead,
+    StudioCitationRead,
     StudyCardRead,
     StudyReviewCreate,
     StudyReviewRead,
@@ -109,6 +114,7 @@ from .schemas import (
     WorkspaceRead,
     normalize_retrieval_filters,
 )
+from .studio import build_studio_draft
 
 router = APIRouter(prefix="/api/v1")
 
@@ -581,6 +587,152 @@ def list_note_backlinks(
 
 def study_card_to_read(card: StudyCard, source_title: str | None = None) -> StudyCardRead:
     return StudyCardRead.model_validate(card).model_copy(update={"source_title": source_title})
+
+
+def studio_artifact_to_read(artifact: StudioArtifact, source_title: str) -> StudioArtifactRead:
+    return StudioArtifactRead(
+        id=artifact.id,
+        workspace_id=artifact.workspace_id,
+        source_id=artifact.source_id,
+        source_version_id=artifact.source_version_id,
+        source_title=source_title,
+        kind=artifact.kind,
+        title=artifact.title,
+        content=artifact.content_json,
+        status=artifact.status,
+        generation_method=artifact.generation_method,
+        created_at=artifact.created_at,
+        updated_at=artifact.updated_at,
+        citations=[
+            StudioCitationRead(
+                id=citation.id,
+                source_id=citation.source_id,
+                source_version_id=citation.source_version_id,
+                source_title=source_title,
+                ordinal=citation.ordinal,
+                quote=citation.quote,
+                quote_hash=citation.quote_hash,
+                start_offset=citation.start_offset,
+                end_offset=citation.end_offset,
+                start_line=citation.start_line,
+                end_line=citation.end_line,
+            )
+            for citation in sorted(artifact.citations, key=lambda item: item.ordinal)
+        ],
+    )
+
+
+@router.post(
+    "/studio-artifacts",
+    response_model=StudioArtifactRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_studio_artifact(
+    payload: StudioArtifactCreate,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> StudioArtifactRead:
+    source = get_workspace_source(session, payload.source_id, workspace_id)
+    version = session.get(SourceVersion, source.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=409, detail="Source has no current immutable version")
+    try:
+        draft = build_studio_draft(payload.kind, source.title, version.content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    artifact = session.scalar(
+        select(StudioArtifact)
+        .where(
+            StudioArtifact.source_version_id == version.id,
+            StudioArtifact.kind == payload.kind,
+        )
+        .options(selectinload(StudioArtifact.citations))
+    )
+    if artifact is None:
+        artifact = StudioArtifact(
+            workspace_id=workspace_id,
+            source_id=source.id,
+            source_version_id=version.id,
+            kind=payload.kind,
+            title=draft.title,
+            content_json=draft.content,
+            status="ready",
+            generation_method="deterministic-v1",
+        )
+        session.add(artifact)
+    else:
+        return studio_artifact_to_read(artifact, source.title)
+    for ordinal, citation in enumerate(draft.citations):
+        artifact.citations.append(
+            StudioCitation(
+                source_id=source.id,
+                source_version_id=version.id,
+                ordinal=ordinal,
+                quote=citation.text,
+                quote_hash=citation.quote_hash,
+                start_offset=citation.start_offset,
+                end_offset=citation.end_offset,
+                start_line=citation.start_line,
+                end_line=citation.end_line,
+            )
+        )
+    session.commit()
+    session.refresh(artifact)
+    return studio_artifact_to_read(artifact, source.title)
+
+
+@router.get("/studio-artifacts", response_model=list[StudioArtifactRead])
+def list_studio_artifacts(
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> list[StudioArtifactRead]:
+    rows = session.execute(
+        select(StudioArtifact, Source.title)
+        .join(Source, Source.id == StudioArtifact.source_id)
+        .where(StudioArtifact.workspace_id == workspace_id)
+        .options(selectinload(StudioArtifact.citations))
+        .order_by(StudioArtifact.updated_at.desc(), StudioArtifact.id)
+    ).all()
+    return [studio_artifact_to_read(artifact, title) for artifact, title in rows]
+
+
+@router.get("/studio-artifacts/{artifact_id}", response_model=StudioArtifactRead)
+def get_studio_artifact(
+    artifact_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> StudioArtifactRead:
+    row = session.execute(
+        select(StudioArtifact, Source.title)
+        .join(Source, Source.id == StudioArtifact.source_id)
+        .where(
+            StudioArtifact.id == artifact_id,
+            StudioArtifact.workspace_id == workspace_id,
+        )
+        .options(selectinload(StudioArtifact.citations))
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Studio artifact not found")
+    return studio_artifact_to_read(*row)
+
+
+@router.delete("/studio-artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_studio_artifact(
+    artifact_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> Response:
+    artifact = session.scalar(
+        select(StudioArtifact).where(
+            StudioArtifact.id == artifact_id,
+            StudioArtifact.workspace_id == workspace_id,
+        )
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Studio artifact not found")
+    session.delete(artifact)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/sources/{source_id}/study-cards", response_model=list[StudyCardRead])

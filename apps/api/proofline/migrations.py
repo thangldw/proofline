@@ -659,6 +659,58 @@ def _add_grounded_action_proposals(connection: Connection) -> None:
     )
 
 
+def _add_evidence_first_studio(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS studio_artifacts (
+            id VARCHAR(36) PRIMARY KEY,
+            workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL
+                REFERENCES source_versions(id) ON DELETE CASCADE,
+            kind VARCHAR(40) NOT NULL,
+            title VARCHAR(400) NOT NULL,
+            content_json TEXT NOT NULL,
+            status VARCHAR(30) NOT NULL,
+            generation_method VARCHAR(40) NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE(source_version_id, kind)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_studio_artifacts_workspace_created "
+        "ON studio_artifacts (workspace_id, created_at)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_studio_artifacts_source_id ON studio_artifacts (source_id)"
+    )
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS studio_citations (
+            id VARCHAR(36) PRIMARY KEY,
+            artifact_id VARCHAR(36) NOT NULL
+                REFERENCES studio_artifacts(id) ON DELETE CASCADE,
+            source_id VARCHAR(36) NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            source_version_id VARCHAR(36) NOT NULL
+                REFERENCES source_versions(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL,
+            quote TEXT NOT NULL,
+            quote_hash VARCHAR(64) NOT NULL,
+            start_offset INTEGER NOT NULL,
+            end_offset INTEGER NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            UNIQUE(artifact_id, ordinal)
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_studio_citations_artifact_id "
+        "ON studio_citations (artifact_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_studio_citations_source_id ON studio_citations (source_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -680,6 +732,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (18, "multi-worker workspace leases", _add_workspace_leases),
     (19, "evidence-first study cards", _add_evidence_first_study_cards),
     (20, "grounded human-reviewed action proposals", _add_grounded_action_proposals),
+    (21, "evidence-first deterministic studio", _add_evidence_first_studio),
 )
 
 

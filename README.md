@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.4 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.5 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -239,10 +239,16 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.4` is the latest experimental pre-alpha release. It adds a credential-safe, versioned
-real-model comparison runner on top of the existing evidence-first notes, study and proposal flows.
+`v0.14.5` is the latest experimental pre-alpha release. It adds a local evidence-first Studio for
+audio narration, presentations, video storyboards, mind maps, reports, flashcards, quizzes,
+infographics and data tables on top of the existing notes, study and proposal flows.
 The installed wheel contains the same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.4.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.14.5.md) and verify `SHA256SUMS` before installation.
+
+Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
+and local in this release. Every section opens the immutable source version and exact cited lines.
+Audio uses the browser's installed speech engine; video is an interactive storyboard preview.
+Proofline does not yet export downloadable audio/video, `.pptx`, or raster infographic files.
 
 To derive study cards, place explicit adjacent pairs in any indexed source and select it under
 **Study**:
@@ -258,7 +264,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.4
+make release-local TAG=v0.14.5
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an

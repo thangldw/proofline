@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -347,6 +347,50 @@ class StudyReview(Base):
     previous_interval_days: Mapped[int] = mapped_column(Integer)
     next_interval_days: Mapped[int] = mapped_column(Integer)
     reviewed_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
+class StudioArtifact(Base):
+    __tablename__ = "studio_artifacts"
+    __table_args__ = (
+        UniqueConstraint("source_version_id", "kind", name="uq_studio_artifact_version_kind"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(40), index=True)
+    title: Mapped[str] = mapped_column(String(400))
+    content_json: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(30), default="ready")
+    generation_method: Mapped[str] = mapped_column(String(40), default="deterministic-v1")
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now)
+    citations: Mapped[list[StudioCitation]] = relationship(cascade="all, delete-orphan")
+
+
+class StudioCitation(Base):
+    __tablename__ = "studio_citations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("studio_artifacts.id", ondelete="CASCADE"), index=True
+    )
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    quote: Mapped[str] = mapped_column(Text)
+    quote_hash: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
 
 
 class ActionProposal(Base):

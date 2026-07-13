@@ -114,6 +114,8 @@ def test_deletion_impact_matches_complete_cascade_and_detaches_jobs(client, sess
         "study_reviews": 0,
         "action_proposals": 0,
         "proposal_citations": 0,
+        "studio_artifacts": 0,
+        "studio_citations": 0,
         "ingestion_jobs_to_detach": 2,
         "audit_events_to_delete": 3,
         "fts_rows": 2,

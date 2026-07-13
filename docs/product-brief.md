@@ -94,6 +94,9 @@ rather than rewrite historical cards. Optional model-generated questions remain 
 The Third Brain slice persists only citation-grounded action proposals from the existing validated
 generation pipeline. Candidates retain model-run lineage, require explicit human accept/reject,
 and cannot write back to sources or governed memory.
+The Studio slice derives nine local artifact views from one immutable source version. Every report
+section, slide, storyboard scene, mind-map branch, card, quiz answer, infographic fact and table row
+retains an exact source span. Audio narration uses browser speech and is not a generated media file.
 
 ## MVP outcome
 
@@ -164,7 +167,7 @@ identify a source version and a bounded span that the user can inspect.
 - Email, calendar, Slack, Teams, Jira, or Confluence connectors.
 - Managed cloud sync, billing, SSO, RBAC, or enterprise control plane.
 - A custom model runtime or graph database.
-- Audio generation or podcast features.
+- Server-rendered or downloadable podcast audio, video and presentation files.
 - Silent autonomous mutation of approved memories.
 
 ## Trust and governance requirements

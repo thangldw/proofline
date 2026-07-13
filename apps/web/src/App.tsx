@@ -6,6 +6,7 @@ import {
   FileSearch,
   GitBranch,
   GraduationCap,
+  LayoutGrid,
   Search,
   Settings,
   Sparkles,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "./api";
+import { StudioView } from "./StudioView";
 import type {
   DecisionTimeline,
   ActionProposal,
@@ -34,6 +36,7 @@ import type {
   Source,
   SourceDeletionImpact,
   SourceVersion,
+  StudioArtifact,
   StudyCard,
   Workspace,
 } from "./types";
@@ -42,6 +45,7 @@ type View =
   | "search"
   | "notes"
   | "study"
+  | "studio"
   | "proposals"
   | "memories"
   | "sources"
@@ -68,6 +72,7 @@ export function App() {
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [studyCards, setStudyCards] = useState<StudyCard[]>([]);
+  const [studioArtifacts, setStudioArtifacts] = useState<StudioArtifact[]>([]);
   const [proposals, setProposals] = useState<ActionProposal[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
@@ -82,12 +87,13 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextProposals, nextMemories, nextJobs] =
+      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextStudioArtifacts, nextProposals, nextMemories, nextJobs] =
         await Promise.all([
           api.overview(),
           api.sources(),
           api.notes(),
           api.studyCards(),
+          api.studioArtifacts?.() ?? Promise.resolve([]),
           api.actionProposals(),
           api.memories(),
           api.jobs(),
@@ -96,6 +102,7 @@ export function App() {
       setSources(nextSources);
       setNotes(nextNotes);
       setStudyCards(nextStudyCards);
+      setStudioArtifacts(nextStudioArtifacts);
       setProposals(nextProposals);
       setMemories(nextMemories);
       setJobs(nextJobs);
@@ -198,6 +205,14 @@ export function App() {
             Study
           </Nav>
           <Nav
+            icon={<LayoutGrid size={18} />}
+            active={view === "studio"}
+            onClick={() => setView("studio")}
+            count={studioArtifacts.length}
+          >
+            Studio
+          </Nav>
+          <Nav
             icon={<Sparkles size={18} />}
             active={view === "proposals"}
             onClick={() => setView("proposals")}
@@ -293,6 +308,9 @@ export function App() {
             sources={sources}
             onChanged={refresh}
           />
+        )}
+        {view === "studio" && (
+          <StudioView artifacts={studioArtifacts} sources={sources} onChanged={refresh} />
         )}
         {view === "proposals" && (
           <ProposalsView proposals={proposals} onChanged={refresh} />
@@ -2368,6 +2386,8 @@ function DeletionDialog({
         ["Study reviews", state.impact.study_reviews ?? 0],
         ["Action proposals", state.impact.action_proposals ?? 0],
         ["Proposal citations", state.impact.proposal_citations ?? 0],
+        ["Studio artifacts", state.impact.studio_artifacts ?? 0],
+        ["Studio citations", state.impact.studio_citations ?? 0],
         ["Jobs detached", state.impact.ingestion_jobs_to_detach],
         ["Audit events", state.impact.audit_events_to_delete],
         ["FTS rows", state.impact.fts_rows],
