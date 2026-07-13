@@ -1,0 +1,34 @@
+{
+  "version": "mock-model-grounded-v1",
+  "provenance": "synthetic-scripted-mock-integration",
+  "description": "Synthetic fixture for the explicit scripted mock comparison path; not model-quality or pilot evidence.",
+  "sources": [
+    {
+      "title": "Mock storage ADR",
+      "uri": "mock://grounded/storage",
+      "content": "SQLite is the local metadata store."
+    }
+  ],
+  "queries": [
+    {
+      "id": "mock-grounded-storage",
+      "question": "What is the local metadata store?",
+      "expected_status": "grounded",
+      "expected_statements": [
+        {
+          "text": "SQLite is the local metadata store.",
+          "kind": "direct",
+          "supporting_source_uris": [
+            "mock://grounded/storage"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mock-abstain-broker",
+      "question": "Which Kafka broker is deployed?",
+      "expected_status": "insufficient_evidence",
+      "expected_statements": []
+    }
+  ]
+}

@@ -339,11 +339,38 @@ def test_plan_rejects_mixed_mock_and_real_evidence_classes(tmp_path):
 
 
 def test_mock_plan_cannot_call_real_transport_without_an_injected_factory(tmp_path):
-    with pytest.raises(ValueError, match="requires an injected provider factory"):
+    with pytest.raises(ValueError, match="requires --allow-mock"):
         run_real_model_comparison(
             mock_comparison_plan(tmp_path),
             environ={"TEST_REMOTE_KEY": "mock-api-key"},
         )
+
+
+def test_mock_preflight_requires_explicit_allow_mock(tmp_path):
+    plan = mock_comparison_plan(tmp_path)
+    with pytest.raises(ValueError, match="mock preflight requires --allow-mock"):
+        preflight_real_model_plan(plan, environ={"TEST_REMOTE_KEY": "mock-api-key"})
+
+    receipt = preflight_real_model_plan(
+        plan,
+        allow_mock=True,
+        environ={"TEST_REMOTE_KEY": "mock-api-key"},
+    )
+    assert receipt.status == "ready"
+    assert all(provider.execution_mode == "mock" for provider in receipt.providers)
+
+
+def test_explicit_allow_mock_runs_scripted_provider_without_real_transport(tmp_path):
+    receipt = run_real_model_comparison(
+        mock_comparison_plan(tmp_path),
+        allow_mock=True,
+        environ={"TEST_REMOTE_KEY": "mock-api-key"},
+    )
+
+    assert receipt.status == "completed"
+    assert receipt.evidence_class == "mock_integration"
+    assert all(provider.status == "completed" for provider in receipt.providers)
+    assert "mock-api-key" not in receipt.model_dump_json()
 
 
 def test_comparison_cli_writes_the_qualified_receipt(tmp_path, monkeypatch, capsys):
@@ -353,7 +380,9 @@ def test_comparison_cli_writes_the_qualified_receipt(tmp_path, monkeypatch, caps
         health_check=lambda provider: True,
         provider_factory=lambda spec, api_key: MockComparisonProvider(spec.provider, spec.model_id),
     )
-    monkeypatch.setattr(cli_module, "run_real_model_comparison", lambda path: receipt)
+    monkeypatch.setattr(
+        cli_module, "run_real_model_comparison", lambda path, allow_mock=False: receipt
+    )
     output = tmp_path / "comparison-receipt.json"
 
     main(
@@ -370,6 +399,28 @@ def test_comparison_cli_writes_the_qualified_receipt(tmp_path, monkeypatch, caps
     persisted = json.loads(output.read_text(encoding="utf-8"))
     assert stdout["evidence_class"] == "mock_integration"
     assert persisted["status"] == "completed"
+
+
+def test_comparison_cli_requires_explicit_mock_flag(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("TEST_REMOTE_KEY", "mock-api-key")
+    output = tmp_path / "comparison-receipt.json"
+
+    main(
+        [
+            "eval-real-model",
+            "--plan",
+            str(mock_comparison_plan(tmp_path)),
+            "--output",
+            str(output),
+            "--allow-mock",
+        ]
+    )
+
+    stdout = json.loads(capsys.readouterr().out)
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert stdout["evidence_class"] == "mock_integration"
+    assert persisted["qualification"].startswith("Mock integration receipt.")
+    assert "mock-api-key" not in output.read_text(encoding="utf-8")
 
 
 def test_provider_failure_is_sanitized_and_does_not_discard_other_results(tmp_path):

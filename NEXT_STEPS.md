@@ -1,9 +1,8 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** evidence-first Studio local đã hoàn thành cho `v0.14.5`; Windows,
-production
-qualification, real-model evaluation và external pilot vẫn mở.
+**Trạng thái hiện tại:** mock-qualified model comparison CLI đã hoàn thành cho `v0.14.6`;
+Windows, production qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
 ## Mở rộng evidence-first đã được chấp thuận
@@ -53,6 +52,13 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Xóa source báo trước và cascade Studio artifact/citation.
 - [ ] Downloadable audio/video, `.pptx`, ảnh infographic và model-enhanced generation để lại cho mốc
   media production sau khi có provider/dữ liệu thật.
+
+### v0.14.6 — Explicit offline model-comparison mock
+
+- [x] Preflight và comparison mock chỉ chạy khi có `--allow-mock`.
+- [x] Scripted provider chạy in-process, không gọi QwenCloud hoặc Ollama.
+- [x] Fixture extraction/grounded-QA và comparison plan được version hóa.
+- [x] Receipt giữ qualification `mock_integration`; điểm fixture không được tính là model quality.
 
 ## Việc nên làm đầu tiên ngày mai
 
@@ -160,7 +166,9 @@ Nền tảng preflight đã triển khai ngày 2026-07-13:
 - [x] Runner dùng production extraction/grounded paths và cô lập failure theo provider.
 - [x] Aggregate precision/recall theo kind, citation, abstention, latency, token và estimated cost.
 - [x] Mock API-key/transport integration có qualification riêng, không thể bị coi là real evidence.
-- [ ] Chưa chọn model thật vì máy hiện tại không có Ollama model và không có Qwen/DeepSeek key.
+- [x] Mock preflight/comparison có CLI `--allow-mock`, fixture versioned và không gọi network.
+- [ ] Qwen workspace key đã có nhưng region endpoint/model revision chưa được xác nhận; máy hiện
+  tại vẫn chưa có Ollama model.
 - [ ] Chưa chạy extraction/grounded comparison với model thật; mock không được tính là quality evidence.
 
 ### Problem corpus và pilot

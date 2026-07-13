@@ -7,7 +7,27 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.5`.
+No changes have been recorded after `v0.14.6`.
+
+## [0.14.6] - 2026-07-13
+
+### Added
+
+- Add explicit `--allow-mock` preflight and comparison CLI paths backed by an in-process scripted
+  provider that never calls remote or local model transports.
+- Add versioned synthetic extraction, grounded-QA and local/remote comparison fixtures for running
+  the complete model-evaluation pipeline without a working provider credential.
+
+### Changed
+
+- Mock preflight receipts now state that they prove scripted wiring and frozen fixture identity,
+  not endpoint readiness or model quality.
+- Keep mock execution opt-in and preserve `mock_integration` qualification on comparison receipts.
+
+### Validation
+
+- Cover the explicit mock boundary, credential non-persistence, scripted provider execution and
+  CLI receipt output while retaining the guard against accidental mock execution.
 
 ## [0.14.5] - 2026-07-13
 

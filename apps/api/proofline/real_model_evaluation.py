@@ -35,6 +35,7 @@ from .model_gateway import (
     GenerationProvider,
     GenerationRequest,
     GenerationResult,
+    ModelCapabilities,
     build_generation_provider,
     is_loopback_url,
 )
@@ -274,9 +275,61 @@ def _build_provider(spec: RealModelProviderSpec, api_key: str | None) -> Generat
     return provider
 
 
+class ScriptedMockGenerationProvider:
+    """Credential-free scripted transport for comparison-pipeline integration only."""
+
+    def __init__(self, provider_id: str, model: str) -> None:
+        self.id = provider_id
+        self.model = model
+
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities()
+
+    def health(self) -> bool:
+        return True
+
+    def generate(self, request: GenerationRequest) -> GenerationResult:
+        payload = json.loads(request.messages[-1].content)
+        evidence = payload["evidence"]
+        if request.template_version.startswith("memory-candidate-extraction"):
+            content = " ".join(item["content"] for item in evidence)
+            candidates = (
+                []
+                if "No architectural choice" in content
+                else [
+                    {
+                        "kind": "decision",
+                        "statement": "Use SQLite for local metadata.",
+                        "rationale": None,
+                        "confidence": 0.9,
+                        "evidence_ids": [evidence[0]["evidence_id"]],
+                    }
+                ]
+            )
+            response = {"candidates": candidates}
+        else:
+            response = {
+                "statements": [
+                    {
+                        "text": "SQLite is the local metadata store.",
+                        "kind": "direct",
+                        "evidence_ids": [evidence[0]["evidence_id"]],
+                    }
+                ]
+            }
+        return GenerationResult(content=json.dumps(response), prompt_tokens=11, completion_tokens=7)
+
+
+def _build_scripted_mock_provider(
+    spec: RealModelProviderSpec, api_key: str | None
+) -> GenerationProvider:
+    return ScriptedMockGenerationProvider(spec.provider, spec.model_id)
+
+
 def preflight_real_model_plan(
     path: Path,
     *,
+    allow_mock: bool = False,
     environ: dict[str, str] | None = None,
     health_check: Callable[[GenerationProvider], bool] | None = None,
     provider_factory: Callable[
@@ -284,6 +337,10 @@ def preflight_real_model_plan(
     ] = _build_provider,
 ) -> RealModelPreflightReceipt:
     plan, raw = load_real_model_plan(path)
+    if plan.providers[0].execution_mode == "mock" and provider_factory is _build_provider:
+        if not allow_mock:
+            raise ValueError("mock preflight requires --allow-mock or an injected provider factory")
+        provider_factory = _build_scripted_mock_provider
     environment = os.environ if environ is None else environ
     check = health_check or (lambda provider: provider.health())
     datasets = [
@@ -317,6 +374,7 @@ def preflight_real_model_plan(
             )
         )
     ready = all(provider.status == "ready" for provider in provider_receipts)
+    mock = plan.providers[0].execution_mode == "mock"
     return RealModelPreflightReceipt(
         schema_version=REAL_MODEL_SCHEMA,
         observed_at=datetime.now(UTC),
@@ -325,8 +383,12 @@ def preflight_real_model_plan(
         plan_sha256=_sha256(raw),
         status="ready" if ready else "blocked",
         qualification=(
-            "Preflight only. This receipt proves configuration and endpoint readiness; it does "
-            "not contain real-model quality, latency, cost, or pilot evidence."
+            "Mock preflight only. This receipt proves scripted comparison wiring and frozen "
+            "fixture identity; it does not prove endpoint readiness or contain real-model "
+            "quality, latency, cost, or pilot evidence."
+            if mock
+            else "Preflight only. This receipt proves configuration and endpoint readiness; it "
+            "does not contain real-model quality, latency, cost, or pilot evidence."
         ),
         datasets=datasets,
         providers=provider_receipts,
@@ -539,6 +601,7 @@ def _abstention_accuracy(report: GroundedEvaluationReport) -> float:
 def run_real_model_comparison(
     path: Path,
     *,
+    allow_mock: bool = False,
     environ: dict[str, str] | None = None,
     health_check: Callable[[GenerationProvider], bool] | None = None,
     provider_factory: Callable[
@@ -547,10 +610,15 @@ def run_real_model_comparison(
 ) -> RealModelComparisonReceipt:
     plan, raw = load_real_model_plan(path)
     if plan.providers[0].execution_mode == "mock" and provider_factory is _build_provider:
-        raise ValueError("mock comparison requires an injected provider factory")
+        if not allow_mock:
+            raise ValueError(
+                "mock comparison requires --allow-mock or an injected provider factory"
+            )
+        provider_factory = _build_scripted_mock_provider
     environment = os.environ if environ is None else environ
     preflight = preflight_real_model_plan(
         path,
+        allow_mock=allow_mock,
         environ=environment,
         health_check=health_check,
         provider_factory=provider_factory,
