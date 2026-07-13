@@ -7,7 +7,24 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.3`.
+No changes have been recorded after `v0.14.4`.
+
+## [0.14.4] - 2026-07-13
+
+### Added
+
+- Run preflighted local/remote providers through the production memory-extraction and grounded-QA
+  paths with per-provider failure isolation.
+- Record extraction metrics by memory kind, exact evidence resolution, citation precision,
+  abstention accuracy, transport latency, provider-reported tokens and estimated cost.
+- Support explicitly mock-qualified integration comparisons through injected test transport while
+  preventing mock manifests from using real transport accidentally.
+
+### Validation
+
+- Add a balanced mock corpus covering positive extraction, negative extraction, grounded citation
+  and insufficient-evidence abstention.
+- Keep mock receipts permanently distinct from real-model and external-pilot evidence.
 
 ## [0.14.3] - 2026-07-13
 
@@ -363,7 +380,8 @@ No changes have been recorded after `v0.14.3`.
 Future releases must move reviewed entries out of `Unreleased`, describe only observable behavior,
 and keep planned behavior out of shipped release notes.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.14.3...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v0.14.4...HEAD
+[0.14.4]: https://github.com/thangldw/proofline/releases/tag/v0.14.4
 [0.14.3]: https://github.com/thangldw/proofline/releases/tag/v0.14.3
 [0.9.0]: https://github.com/thangldw/proofline/releases/tag/v0.9.0
 [0.8.0]: https://github.com/thangldw/proofline/releases/tag/v0.8.0

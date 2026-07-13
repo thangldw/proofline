@@ -1,7 +1,8 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** real-model comparison preflight đã triển khai cho `v0.14.3`; Windows, production
+**Trạng thái hiện tại:** real-model comparison runner đã mock-validated cho `v0.14.4`; Windows,
+production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -145,8 +146,11 @@ Nền tảng preflight đã triển khai ngày 2026-07-13:
 - [x] Receipt khóa dataset SHA-256, declared model revision, prompt version và token pricing.
 - [x] Credential chỉ đọc từ tên biến môi trường; receipt không ghi secret.
 - [x] Endpoint/credential failure được ghi `blocked` với error code và CLI exit khác 0.
+- [x] Runner dùng production extraction/grounded paths và cô lập failure theo provider.
+- [x] Aggregate precision/recall theo kind, citation, abstention, latency, token và estimated cost.
+- [x] Mock API-key/transport integration có qualification riêng, không thể bị coi là real evidence.
 - [ ] Chưa chọn model thật vì máy hiện tại không có Ollama model và không có Qwen/DeepSeek key.
-- [ ] Chưa chạy extraction/grounded comparison; preflight không được tính là quality evidence.
+- [ ] Chưa chạy extraction/grounded comparison với model thật; mock không được tính là quality evidence.
 
 ### Problem corpus và pilot
 

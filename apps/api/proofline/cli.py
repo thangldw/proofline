@@ -34,7 +34,12 @@ from .portable_import import (
     merge_portable_export,
     preview_portable_merge,
 )
-from .real_model_evaluation import preflight_real_model_plan, write_preflight_receipt
+from .real_model_evaluation import (
+    preflight_real_model_plan,
+    run_real_model_comparison,
+    write_comparison_receipt,
+    write_preflight_receipt,
+)
 from .schemas import SourceCreate
 from .server import run_server
 
@@ -125,6 +130,13 @@ def main(argv: list[str] | None = None) -> None:
     real_model_preflight.add_argument("--plan", type=Path, required=True)
     real_model_preflight.add_argument("--output", type=Path, required=True)
     real_model_preflight.add_argument("--force", action="store_true")
+    real_model = subcommands.add_parser(
+        "eval-real-model",
+        help="Run a preflighted local/remote model comparison through production paths",
+    )
+    real_model.add_argument("--plan", type=Path, required=True)
+    real_model.add_argument("--output", type=Path, required=True)
+    real_model.add_argument("--force", action="store_true")
     benchmark = subcommands.add_parser(
         "benchmark", help="Measure local SQLite FTS5 lexical search latency"
     )
@@ -213,6 +225,15 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(f"real-model preflight failed: {type(exc).__name__}") from exc
         print(receipt.model_dump_json(indent=2))
         if receipt.status != "ready":
+            raise SystemExit(1)
+    elif args.command == "eval-real-model":
+        try:
+            receipt = run_real_model_comparison(args.plan)
+            write_comparison_receipt(args.output, receipt, force=args.force)
+        except (FileExistsError, OSError, ValueError) as exc:
+            raise SystemExit(f"real-model comparison failed: {type(exc).__name__}") from exc
+        print(receipt.model_dump_json(indent=2))
+        if receipt.status != "completed":
             raise SystemExit(1)
     elif args.command == "benchmark":
         try:

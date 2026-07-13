@@ -1,21 +1,26 @@
-# Real-model comparison — preflight foundation
+# Real-model comparison — mock integration validation
 
 ## Technical summary
 
-Proofline can now validate and freeze a local-versus-remote evaluation plan before any paid model
-request is sent. No real model was available on 2026-07-13, so this report contains no quality,
-latency or cost result and makes no model recommendation.
+Proofline can now validate, freeze and execute a local-versus-remote evaluation plan through the
+production extraction and grounded-QA paths. A deterministic injected transport and fake API key
+validated the runner on 2026-07-13. No real model was available, so this report makes no model
+recommendation.
 
-## No comparative finding exists yet
+## Perfect mock scores validate wiring, not model quality
 
-The current machine had no reachable Ollama endpoint and no configured Qwen or DeepSeek credential.
-The preflight path therefore correctly reports explicit blockers instead of substituting synthetic
-fixtures. A chart would be misleading with zero real-model observations, so no visualization is
-included.
+Each mock profile produced one matched extraction from one expected memory and no extraction from
+one negative source: precision and recall were therefore `1 / 1 = 100%`, while negative-source
+accuracy was `1 / 1 = 100%`. The grounded fixture resolved one relevant citation from one emitted
+citation and correctly abstained on one of one insufficient-evidence query, also yielding 100%.
+
+Both mock profiles use the same deterministic behavior, so a comparison chart would imply a model
+difference that does not exist. No visualization is included. These exact 100% values are expected
+for the fixture and are not evidence of general model quality.
 
 ## Scope and metric definitions
 
-The planned comparison uses the checked-in extraction and grounded-QA datasets, identified by
+The comparison uses versioned extraction and grounded-QA datasets, identified by
 version, provenance and SHA-256 in every receipt. Primary metrics are extraction precision/recall
 and grounded-answer citation precision. Guardrails are abstention accuracy, validation failure rate,
 per-run latency and estimated cost from provider-reported token counts and declared prices.
@@ -32,19 +37,31 @@ price per million tokens. API keys are resolved only from a named environment va
 serialized. Preflight hashes the raw datasets, records the Proofline version and Git revision, locks
 the extraction and grounded-answer prompt versions, and checks endpoint health.
 
+The mock calculation spot-check used three provider calls per profile: two extraction sources and
+one grounded question requiring generation. At 11 prompt and 7 completion tokens per mock response,
+the aggregate is 33 prompt and 21 completion tokens. With declared remote prices of `$0.10` and
+`$0.20` per million tokens, the independently recomputed estimate is
+`(33 × 0.10 + 21 × 0.20) / 1,000,000 = $0.0000075`.
+
 ## Limitations and robustness
 
 - Model IDs, revisions and prices are operator-declared and must be reconciled with provider records.
-- Endpoint health proves availability only; it does not prove structured-output compliance.
-- The current receipt type is explicitly `preflight` and cannot satisfy any roadmap quality gate.
+- Mock endpoint health and structured output prove test transport behavior only.
+- Mock receipts are explicitly `mock_integration` and cannot satisfy any roadmap quality gate.
 - No result should be shared as a model comparison until both providers run the same frozen corpus.
 
 ## Recommended next steps
 
 1. Install and pin one Ollama/vLLM model, recording its content digest.
 2. Provide one Qwen or DeepSeek API key through the manifest-named environment variable.
-3. Implement the token-spending runner using the production extraction and grounded-answer paths.
+3. Run the implemented comparison command against the frozen real providers and corpus.
 4. Validate aggregate metrics against per-source/per-question rows before recommending a default.
+
+## Validation assessment
+
+**Ready to share as mock integration evidence only.** Numerators, denominators, token totals and the
+cost formula were independently spot-checked. **Needs real-model evidence before any model-selection
+decision.** The missing model endpoints and credentials remain hard blockers, not caveats.
 
 ## Further questions
 

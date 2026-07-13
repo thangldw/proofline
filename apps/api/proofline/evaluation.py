@@ -17,10 +17,12 @@ from .database import initialize_database, make_engine
 from .grounding import GroundingValidationError, answer_question
 from .ingestion import ingest_source
 from .model_gateway import (
+    GenerationProvider,
     GenerationRequest,
     GenerationResult,
     ProviderRequestError,
     StructuredOutputError,
+    parse_structured_content,
 )
 from .models import Decision, ModelRun, SourceVersion
 from .retrieval import lexical_search
@@ -334,6 +336,36 @@ class DatasetScriptedGenerationProvider:
         )
 
 
+class ObservedGenerationProvider:
+    """Record only cited IDs from model output; never retain prompts or generated text."""
+
+    def __init__(self, provider: GenerationProvider) -> None:
+        self.provider = provider
+        self.id = provider.id
+        self.model = provider.model
+        self.last_emitted_evidence_ids: list[str] = []
+
+    def capabilities(self):
+        return self.provider.capabilities()
+
+    def health(self) -> bool:
+        return self.provider.health()
+
+    def generate(self, request: GenerationRequest) -> GenerationResult:
+        result = self.provider.generate(request)
+        emitted: list[str] = []
+        try:
+            payload = parse_structured_content(result.content)
+            rows = payload.get("statements", []) if isinstance(payload, dict) else []
+            for row in rows:
+                if isinstance(row, dict) and isinstance(row.get("evidence_ids"), list):
+                    emitted.extend(item for item in row["evidence_ids"] if isinstance(item, str))
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            emitted = []
+        self.last_emitted_evidence_ids = list(dict.fromkeys(emitted))
+        return result
+
+
 def discounted_cumulative_gain(grades: list[int]) -> float:
     return sum((2**grade - 1) / math.log2(index + 2) for index, grade in enumerate(grades))
 
@@ -435,6 +467,7 @@ def evaluate_dataset(dataset_path: Path, k: int = 10) -> EvaluationReport:
 def evaluate_grounded_dataset(
     dataset_path: Path,
     limit: int = 8,
+    provider: GenerationProvider | None = None,
 ) -> GroundedEvaluationReport:
     """Run a credential-free synthetic grounded-QA corpus through the production answer path."""
     if not 1 <= limit <= 12:
@@ -457,6 +490,7 @@ def evaluate_grounded_dataset(
                         title_by_uri,
                         source_uri_by_id,
                         limit,
+                        provider,
                     )
                     for query in dataset.queries
                 ]
@@ -815,8 +849,13 @@ def _evaluate_grounded_query(
     title_by_uri: dict[str, str],
     source_uri_by_id: dict[str, str],
     limit: int,
+    supplied_provider: GenerationProvider | None = None,
 ) -> GroundedQueryResult:
-    provider = DatasetScriptedGenerationProvider(query, title_by_uri)
+    provider = (
+        ObservedGenerationProvider(supplied_provider)
+        if supplied_provider is not None
+        else DatasetScriptedGenerationProvider(query, title_by_uri)
+    )
     before_runs = session.scalar(select(func.count()).select_from(ModelRun)) or 0
     answer = None
     error_code = None
