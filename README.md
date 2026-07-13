@@ -221,18 +221,21 @@ Q: Why preserve immutable source versions?
 A: Historical citations must continue to resolve to the exact original text.
 ```
 
-When GitHub Actions minutes are unavailable, a release can be built and published from a clean,
-up-to-date local `main` checkout without starting CI:
+When GitHub Actions minutes are unavailable, put a GitHub-supported skip instruction on the
+release commit before pushing `main`, then build and publish from a clean, up-to-date checkout:
 
 ```bash
-make release-local TAG=v0.8.0
+git commit -m "feat: describe the release [skip ci]"
+git push origin main
+make release-local TAG=v0.14.2
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
 immutable annotated tag, pushes only that tag, and uploads versioned artifacts through `gh`.
 Tag pushes intentionally do not trigger the release workflow; `workflow_dispatch` remains available
 when hosted CI capacity returns. The command refuses dirty, divergent, duplicate-tag, and duplicate-
-release states. It does not run the optional security test suite.
+release states, and refuses a HEAD commit without `[skip ci]` (or another skip instruction supported
+by GitHub). It does not run the optional security test suite.
 
 ### Data portability and recovery
 
