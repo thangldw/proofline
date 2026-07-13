@@ -5,11 +5,12 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session
 
 from .model_gateway import EmbeddingProvider, EmbeddingRequest, run_embedding
-from .models import Chunk, ChunkEmbedding, Source, SourceVersion
+from .models import Chunk, ChunkEmbedding, ChunkVectorBucket, Source, SourceVersion
+from .reranking import Reranker, apply_reranking
 from .retrieval import lexical_search
 from .schemas import SearchHit
 
@@ -23,6 +24,15 @@ class EmbeddingIndexReport:
 
 def chunk_fingerprint(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def vector_bands(vector: list[float], band_width: int = 16) -> list[tuple[int, str]]:
+    bits = "".join("1" if value >= 0 else "0" for value in vector[:64])
+    return [
+        (index // band_width, bits[index : index + band_width])
+        for index in range(0, len(bits), band_width)
+        if bits[index : index + band_width]
+    ]
 
 
 def index_current_embeddings(
@@ -75,17 +85,30 @@ def index_current_embeddings(
                     ChunkEmbedding.model_id == provider.model,
                 )
             )
-            session.add(
-                ChunkEmbedding(
+            embedding = ChunkEmbedding(
+                chunk_id=chunk.id,
+                source_id=chunk.source_id,
+                source_version_id=chunk.source_version_id,
+                provider_id=provider.id,
+                model_id=provider.model,
+                dimensions=len(vector),
+                vector_json=vector,
+                content_hash=fingerprint,
+            )
+            session.add(embedding)
+            session.flush()
+            session.add_all(
+                ChunkVectorBucket(
+                    embedding_id=embedding.id,
                     chunk_id=chunk.id,
                     source_id=chunk.source_id,
                     source_version_id=chunk.source_version_id,
                     provider_id=provider.id,
                     model_id=provider.model,
-                    dimensions=len(vector),
-                    vector_json=vector,
-                    content_hash=fingerprint,
+                    band_index=band_index,
+                    band_value=band_value,
                 )
+                for band_index, band_value in vector_bands(vector)
             )
         session.commit()
     return EmbeddingIndexReport(len(pending), skipped, run_ids)
@@ -125,8 +148,21 @@ def semantic_search(
         raise ValueError("min_semantic_score must be finite and between 0 and 1")
     if source_ids == []:
         return []
+    query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()
+    result, _run = run_embedding(
+        session,
+        provider,
+        EmbeddingRequest(
+            texts=[query], input_hashes=[query_hash], template_version="query-embedding-v1"
+        ),
+    )
+    query_vector = result.vectors[0]
+    bands = vector_bands(query_vector)
+    if not bands:
+        return []
     statement = (
         select(ChunkEmbedding, Chunk, Source)
+        .join(ChunkVectorBucket, ChunkVectorBucket.embedding_id == ChunkEmbedding.id)
         .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
         .join(Source, Source.id == Chunk.source_id)
         .join(SourceVersion, SourceVersion.id == Chunk.source_version_id)
@@ -134,7 +170,18 @@ def semantic_search(
             ChunkEmbedding.provider_id == provider.id,
             ChunkEmbedding.model_id == provider.model,
             Chunk.source_version_id == Source.current_version_id,
+            or_(
+                *[
+                    and_(
+                        ChunkVectorBucket.band_index == band_index,
+                        ChunkVectorBucket.band_value == band_value,
+                    )
+                    for band_index, band_value in bands
+                ]
+            ),
         )
+        .distinct()
+        .limit(max(limit * 20, 100))
     )
     if source_ids is not None:
         statement = statement.where(Chunk.source_id.in_(source_ids))
@@ -145,15 +192,6 @@ def semantic_search(
     rows = session.execute(statement).all()
     if not rows:
         return []
-    query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()
-    result, _run = run_embedding(
-        session,
-        provider,
-        EmbeddingRequest(
-            texts=[query], input_hashes=[query_hash], template_version="query-embedding-v1"
-        ),
-    )
-    query_vector = result.vectors[0]
     candidates = []
     for embedding, chunk, source in rows:
         score = cosine_similarity(query_vector, embedding.vector_json)
@@ -211,6 +249,7 @@ def hybrid_search(
     source_ids: list[str] | None = None,
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
+    reranker: Reranker | None = None,
 ) -> list[SearchHit]:
     lexical = lexical_search(
         session,
@@ -269,7 +308,7 @@ def hybrid_search(
             break
     if len(selected_ids) < limit:
         selected_ids.extend(deferred_ids[: limit - len(selected_ids)])
-    return [
+    result = [
         hits_by_id[chunk_id].model_copy(
             update={
                 "rank": -scores[chunk_id],
@@ -292,3 +331,4 @@ def hybrid_search(
         )
         for chunk_id in selected_ids
     ]
+    return apply_reranking(query, result, reranker) if reranker and result else result

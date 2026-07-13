@@ -6,9 +6,11 @@ from proofline.embeddings import index_current_embeddings
 from proofline.grounding import (
     MAX_EVIDENCE_ITEM_BYTES,
     MAX_EVIDENCE_PACK_BYTES,
+    DraftStatement,
     EvidenceIntegrityError,
     GroundingValidationError,
     answer_question,
+    semantic_support_status,
 )
 from proofline.ingestion import ingest_source
 from proofline.model_gateway import (
@@ -22,6 +24,39 @@ from proofline.models import Chunk, ModelRun
 from proofline.retrieval import lexical_search
 from proofline.schemas import SearchHit, SourceCreate
 from sqlalchemy import select
+
+
+def test_semantic_support_marks_direct_negation_conflicts_and_paraphrase_uncertainty():
+    hit = SearchHit(
+        chunk_id="e1",
+        source_id="s1",
+        source_version_id="v1",
+        source_title="ADR",
+        content="Decision: workers must not write customer secrets to logs",
+        start_offset=0,
+        end_offset=57,
+        start_line=1,
+        end_line=1,
+        rank=-1,
+    )
+    assert (
+        semantic_support_status(
+            DraftStatement(
+                text="Workers write customer secrets to logs", kind="direct", evidence_ids=["e1"]
+            ),
+            [hit],
+        )
+        == "contradicted"
+    )
+    assert (
+        semantic_support_status(
+            DraftStatement(
+                text="Logging remains privacy-aware", kind="synthesis", evidence_ids=["e1"]
+            ),
+            [hit],
+        )
+        == "uncertain"
+    )
 
 
 class ScriptedGenerationProvider:

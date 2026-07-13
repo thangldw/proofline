@@ -1,0 +1,11 @@
+{
+  "dataset": "evals/reranking/seed-v1.json",
+  "dataset_sha256": "6925e6b4a1d0dc2723679e6dd4b12c6cc05125c57e12069573e17e12be064467",
+  "median_latency_ms": 0.018457998521625996,
+  "model": "token-overlap-v1",
+  "mrr": 1.0,
+  "qualification": "synthetic regression only; not real-model or pilot evidence",
+  "query_count": 3,
+  "reranker_id": "deterministic_token",
+  "schema": "proofline-reranking-benchmark-v1"
+}

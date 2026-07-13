@@ -24,6 +24,8 @@ REPAIRABLE_OUTPUT_CODES = frozenset(
         "structured_output_too_large",
         "grounding_missing_citation",
         "grounding_unknown_evidence",
+        "grounding_entailment_failed",
+        "grounding_contradiction_detected",
         "candidate_kind_not_allowed",
         "candidate_unknown_evidence",
     }

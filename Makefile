@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval simulate-pilot check format release-check
+.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval simulate-pilot check format release-check
 
 setup:
 	python3 -m venv .venv
@@ -39,6 +39,13 @@ simulate-pilot:
 	@.venv/bin/python scripts/simulate_pilot.py \
 		--dataset evals/pilot-simulation/engineering-context-v1.json
 
+benchmark-retrieval:
+	.venv/bin/python scripts/benchmark_reranker.py \
+		--dataset evals/reranking/seed-v1.json \
+		--output evals/benchmarks/reranker-token-overlap-v1.json
+	.venv/bin/python scripts/benchmark_vector_index.py \
+		--sources 1000 --output evals/benchmarks/vector-index-1000-v1.json
+
 check:
 	.venv/bin/ruff check .
 	.venv/bin/ruff format --check .
@@ -50,5 +57,5 @@ format:
 	.venv/bin/ruff format .
 
 release-check:
-	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.5.0"; exit 2)
+	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.6.0"; exit 2)
 	.venv/bin/python scripts/release_check.py --tag "$(TAG)"
