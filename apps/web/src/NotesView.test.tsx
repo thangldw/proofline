@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotesView } from "./App";
 import type { Note } from "./types";
 
 const apiMock = vi.hoisted(() => ({
   createNote: vi.fn(),
   updateNote: vi.fn(),
+  noteBacklinks: vi.fn(),
 }));
 vi.mock("./api", () => ({ api: apiMock }));
 
@@ -32,6 +33,8 @@ const note: Note = {
 };
 
 describe("NotesView", () => {
+  beforeEach(() => apiMock.noteBacklinks.mockResolvedValue([]));
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -78,5 +81,26 @@ describe("NotesView", () => {
       ),
     );
     expect(await screen.findByText("Saved immutable revision 2.")).toBeInTheDocument();
+  });
+
+  it("shows deterministic note metadata and exact-version backlinks", async () => {
+    apiMock.noteBacklinks.mockResolvedValue([
+      {
+        target_title: note.title,
+        quote: "[[Queue design]]",
+        start_offset: 4,
+        end_offset: 20,
+        start_line: 2,
+        end_line: 2,
+        resolved_source_id: note.id,
+        source_id: "linking-note",
+        source_version_id: "version-backlink",
+        source_title: "Worker rollout",
+      },
+    ]);
+    render(<NotesView notes={[note]} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Queue design/ }));
+    expect(await screen.findByText("#architecture")).toBeInTheDocument();
+    expect(await screen.findByText(/Worker rollout · L2–2 · version-/)).toBeInTheDocument();
   });
 });

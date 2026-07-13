@@ -84,3 +84,16 @@ def test_duplicate_titles_leave_wiki_links_explicitly_unresolved(client):
     ).json()
     assert linking["links"][0]["resolved_source_id"] is None
     assert client.get(f"/api/v1/notes/{first['id']}/backlinks").json() == []
+
+
+def test_title_only_note_edit_updates_metadata_without_fake_revision(client):
+    note = client.post(
+        "/api/v1/notes", json={"title": "Draft title", "content": "Stable content"}
+    ).json()
+    updated = client.put(
+        f"/api/v1/notes/{note['id']}",
+        json={"title": "Final title", "content": "Stable content"},
+    ).json()
+    assert updated["title"] == "Final title"
+    assert updated["current_version_id"] == note["current_version_id"]
+    assert updated["version_count"] == 1

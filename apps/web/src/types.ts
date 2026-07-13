@@ -65,6 +65,12 @@ export type Note = {
   links: NoteLink[];
 };
 
+export type NoteBacklink = NoteLink & {
+  source_id: string;
+  source_version_id: string;
+  source_title: string;
+};
+
 export type StudyCard = {
   id: string;
   workspace_id: string;

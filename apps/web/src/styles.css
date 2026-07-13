@@ -482,6 +482,24 @@ summary:focus-visible,
   align-items: center;
   gap: 16px;
 }
+.note-provenance {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface-subtle);
+}
+.note-provenance div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+  font-size: 12px;
+}
+.note-provenance span {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
 .note-form-footer button:disabled {
   opacity: 0.6;
 }

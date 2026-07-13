@@ -1,7 +1,7 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** các lát cắt P1 nội bộ đã phát hành đến `v0.11.0`; Windows, production
+**Trạng thái hiện tại:** các lát cắt evidence-first nội bộ đã phát hành đến `v0.14.1`; Windows, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -27,6 +27,13 @@ exact source span. Thứ tự phát hành tiếp theo:
 - [ ] **v0.15 Team Brain:** chỉ bắt đầu sau authentication, RBAC, organization audit và permission-aware retrieval.
 
 Không mốc nào ở trên cho phép rich-text editor, canvas, graph database hoặc generic agent.
+
+### v0.14.1 — usability/reliability follow-up
+
+- [x] Hiển thị hashtag, resolved/unresolved wiki-link và exact-version backlink trong Notes UI.
+- [x] Title-only note edit không tạo source revision hoặc thay ingestion timestamp giả.
+- [x] Study queue mặc định chỉ tải card đã đến hạn.
+- [x] Expose append-only study review history qua workspace-scoped API.
 
 ## Việc nên làm đầu tiên ngày mai
 
