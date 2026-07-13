@@ -158,10 +158,23 @@ def semantic_search(
     for embedding, chunk, source in rows:
         score = cosine_similarity(query_vector, embedding.vector_json)
         if score is not None and score >= min_semantic_score:
-            candidates.append((score, chunk, source))
+            current = any(
+                decision.kind == "decision"
+                and decision.source_version_id == source.current_version_id
+                and decision.status in {"active", "accepted"}
+                and decision.valid_to is None
+                for decision in source.decisions
+            )
+            obsolete = any(
+                decision.kind == "decision"
+                and decision.source_version_id == source.current_version_id
+                and (decision.status == "obsolete" or decision.valid_to is not None)
+                for decision in source.decisions
+            )
+            candidates.append((score, current, obsolete, chunk, source))
     scored = sorted(
         candidates,
-        key=lambda item: (-item[0], item[1].id),
+        key=lambda item: (int(item[2]), -item[0], item[3].id),
     )[:limit]
     return [
         SearchHit(
@@ -181,8 +194,9 @@ def semantic_search(
             source_kind=source.kind,
             git_commit_sha=source.git_commit_sha,
             git_path=source.git_path,
+            temporal_priority="current_decision" if current else "neutral",
         )
-        for index, (score, chunk, source) in enumerate(scored, start=1)
+        for index, (score, current, _obsolete, chunk, source) in enumerate(scored, start=1)
     ]
 
 

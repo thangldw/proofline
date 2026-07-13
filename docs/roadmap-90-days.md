@@ -119,6 +119,8 @@ Before delivery work, record:
 - Continue hardening the implemented generalized memory candidate queue and audit-backed review
   actions. The filterable memory registry and review API already cover decisions, assumptions,
   constraints, and alternatives.
+- Maintain the implemented typed temporal decision relations, atomic superseding transitions,
+  timeline inspection, and non-mutating contradiction/staleness candidate diagnostics.
 - Maintain the implemented credential-free deterministic extraction gate for all four memory kinds,
   exact evidence/hashes, multilingual markers, and negative prose. Evaluation across at least one
   remote and one local/cheap model remains open.

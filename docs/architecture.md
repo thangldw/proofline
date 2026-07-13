@@ -74,6 +74,8 @@ Current and target boundaries are:
   Markdown/text objects;
 - retrieval and answer service — implemented without reranking;
 - governed memory review service — implemented for four memory kinds;
+- temporal decision relation service — implemented for typed, audited transitions, validity
+  windows, timelines, and non-mutating contradiction/staleness candidates;
 - provider gateway plus safe model-run API and web diagnostics — implemented, with provider settings UI planned;
 - job status, retry, and source diagnostics — implemented; and
 - deletion impact/cascade plus portable export/import and SQLite backup services — implemented
@@ -141,6 +143,12 @@ The foundation uses SQLite plus content uploaded from the browser or API:
 
 No graph database is planned for the MVP. Typed relations are represented as adjacency rows
 and queried through the domain repository.
+
+`decision_relations` stores directed `supersedes`, `implements`, `contradicts`, `based_on`, and
+`considered` edges. `source_decision_id` is the newer/acting decision for `supersedes`; creating
+that edge closes the target's validity and marks it obsolete in the same transaction. Ingestion
+time remains separate from decision validity. Retrieval demotes obsolete/ended decisions, while
+timeline reads keep historical evidence inspectable. Candidate diagnostics never mutate memory.
 
 ### Registered-root folder scanning
 
