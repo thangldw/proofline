@@ -88,6 +88,9 @@ The bounded Personal Second Brain slice adds plain Markdown quick capture as a `
 Notes use generated stable identities, immutable content revisions, deterministic exact-span tags
 and wiki-links, and current-version backlinks; they do not introduce a rich-text editor or a
 parallel provenance model.
+The Learning Brain slice deterministically derives study cards from explicit `Q:`/`A:` pairs. Each
+answer is an exact immutable source span, reviews are append-only, and source revisions supersede
+rather than rewrite historical cards. Optional model-generated questions remain unimplemented.
 
 ## MVP outcome
 

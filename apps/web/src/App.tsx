@@ -5,6 +5,7 @@ import {
   Database,
   FileSearch,
   GitBranch,
+  GraduationCap,
   Search,
   Settings,
   StickyNote,
@@ -29,12 +30,14 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  StudyCard,
   Workspace,
 } from "./types";
 
 type View =
   | "search"
   | "notes"
+  | "study"
   | "memories"
   | "sources"
   | "model runs"
@@ -59,6 +62,7 @@ export function App() {
   });
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [studyCards, setStudyCards] = useState<StudyCard[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [evidence, setEvidence] = useState<{
@@ -72,17 +76,19 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextNotes, nextMemories, nextJobs] =
+      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextMemories, nextJobs] =
         await Promise.all([
           api.overview(),
           api.sources(),
           api.notes(),
+          api.studyCards(),
           api.memories(),
           api.jobs(),
         ]);
       setOverview(nextOverview);
       setSources(nextSources);
       setNotes(nextNotes);
+      setStudyCards(nextStudyCards);
       setMemories(nextMemories);
       setJobs(nextJobs);
       setError("");
@@ -176,6 +182,14 @@ export function App() {
             Notes
           </Nav>
           <Nav
+            icon={<GraduationCap size={18} />}
+            active={view === "study"}
+            onClick={() => setView("study")}
+            count={studyCards.length}
+          >
+            Study
+          </Nav>
+          <Nav
             icon={<Search size={18} />}
             active={view === "search"}
             onClick={() => setView("search")}
@@ -257,6 +271,13 @@ export function App() {
           />
         )}
         {view === "notes" && <NotesView notes={notes} onChanged={refresh} />}
+        {view === "study" && (
+          <StudyView
+            cards={studyCards}
+            sources={sources}
+            onChanged={refresh}
+          />
+        )}
         {view === "memories" && (
           <MemoryView
             memories={memories}
@@ -318,6 +339,80 @@ type RunLineage = {
   parent: ModelRun | null;
   children: ModelRun[];
 };
+
+export function StudyView({
+  cards,
+  sources,
+  onChanged,
+}: {
+  cards: StudyCard[];
+  sources: Source[];
+  onChanged: () => Promise<void>;
+}) {
+  const [sourceId, setSourceId] = useState(sources[0]?.id ?? "");
+  const [revealed, setRevealed] = useState(false);
+  const [message, setMessage] = useState("");
+  const card = cards[0] ?? null;
+
+  async function generate() {
+    try {
+      const generated = await api.createStudyCards(sourceId);
+      setMessage(`${generated.length} evidence-backed card${generated.length === 1 ? "" : "s"} ready.`);
+      await onChanged();
+    } catch (reason) {
+      setMessage(errorMessage(reason, "Could not derive study cards"));
+    }
+  }
+
+  async function review(rating: "again" | "hard" | "good" | "easy") {
+    if (!card) return;
+    await api.reviewStudyCard(card.id, rating);
+    setRevealed(false);
+    setMessage(`Review recorded: ${rating}.`);
+    await onChanged();
+  }
+
+  return (
+    <section className="content study-view" aria-label="Evidence-backed study">
+      <div className="study-toolbar">
+        <div>
+          <span className="eyebrow">LEARNING BRAIN</span>
+          <h2>Deterministic study cards</h2>
+          <p>Derive cards only from adjacent <code>Q:</code> and <code>A:</code> lines.</p>
+        </div>
+        <div className="study-source">
+          <label htmlFor="study-source">Source</label>
+          <select id="study-source" value={sourceId} onChange={(event) => setSourceId(event.target.value)}>
+            {sources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
+          </select>
+          <button type="button" disabled={!sourceId} onClick={() => void generate()}>Derive cards</button>
+        </div>
+      </div>
+      {message && <p className="study-message">{message}</p>}
+      {card ? (
+        <article className="study-card">
+          <span className="eyebrow">DUE NOW · {card.source_title}</span>
+          <h3>{card.question}</h3>
+          {revealed ? (
+            <>
+              <div className="study-answer">{card.answer}</div>
+              <p className="study-proof">Exact evidence · L{card.start_line}–{card.end_line} · immutable version {card.source_version_id.slice(0, 8)}</p>
+              <div className="study-ratings">
+                {(["again", "hard", "good", "easy"] as const).map((rating) => (
+                  <button key={rating} type="button" onClick={() => void review(rating)}>{rating}</button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <button className="reveal-answer" type="button" onClick={() => setRevealed(true)}>Reveal answer</button>
+          )}
+        </article>
+      ) : (
+        <div className="empty-card">No active study cards. Add Q:/A: pairs to a source, then derive cards.</div>
+      )}
+    </section>
+  );
+}
 
 export function NotesView({
   notes,
@@ -2080,6 +2175,8 @@ function DeletionDialog({
         ["Decisions", state.impact.decisions],
         ["Evidence", state.impact.evidence],
         ["Decision relations", state.impact.decision_relations ?? 0],
+        ["Study cards", state.impact.study_cards ?? 0],
+        ["Study reviews", state.impact.study_reviews ?? 0],
         ["Jobs detached", state.impact.ingestion_jobs_to_detach],
         ["Audit events", state.impact.audit_events_to_delete],
         ["FTS rows", state.impact.fts_rows],

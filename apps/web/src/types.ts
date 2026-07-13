@@ -65,6 +65,26 @@ export type Note = {
   links: NoteLink[];
 };
 
+export type StudyCard = {
+  id: string;
+  workspace_id: string;
+  source_id: string;
+  source_version_id: string;
+  source_title: string | null;
+  question: string;
+  answer: string;
+  quote_hash: string;
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+  state: string;
+  interval_days: number;
+  due_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SourceDeletionImpact = {
   source_id: string;
   title: string;
@@ -77,6 +97,8 @@ export type SourceDeletionImpact = {
   memories: number;
   evidence: number;
   decision_relations?: number;
+  study_cards?: number;
+  study_reviews?: number;
   ingestion_jobs_to_detach: number;
   audit_events_to_delete: number;
   fts_rows: number;

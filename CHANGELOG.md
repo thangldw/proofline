@@ -7,7 +7,23 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.12.0`.
+No changes have been recorded after `v0.13.0`.
+
+## [0.13.0] - 2026-07-13
+
+### Added
+
+- Deterministic study-card derivation from explicit adjacent `Q:` and `A:` source lines; every
+  answer records its immutable source version, exact offsets/lines and SHA-256 quote hash.
+- A Learning Brain review screen with answer reveal, evidence locator and four deterministic
+  review ratings.
+- Persistent append-only review history, due dates and intervals through migration 19.
+
+### Changed
+
+- Re-deriving after a source revision supersedes prior-version cards while keeping their evidence
+  and review history; superseded cards cannot receive new reviews.
+- Source deletion preview now reports study cards and review events covered by cascade deletion.
 
 ## [0.12.0] - 2026-07-13
 

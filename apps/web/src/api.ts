@@ -13,6 +13,7 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  StudyCard,
   Workspace,
 } from "./types";
 
@@ -43,6 +44,16 @@ export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
   notes: () => request<Note[]>("/api/v1/notes"),
+  studyCards: () => request<StudyCard[]>("/api/v1/study-cards"),
+  createStudyCards: (sourceId: string) =>
+    request<StudyCard[]>(`/api/v1/sources/${sourceId}/study-cards`, {
+      method: "POST",
+    }),
+  reviewStudyCard: (cardId: string, rating: "again" | "hard" | "good" | "easy") =>
+    request(`/api/v1/study-cards/${cardId}/reviews`, {
+      method: "POST",
+      body: JSON.stringify({ rating }),
+    }),
   createNote: (title: string, content: string) =>
     request<Note>("/api/v1/notes", {
       method: "POST",
