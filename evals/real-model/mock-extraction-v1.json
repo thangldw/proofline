@@ -1,0 +1,26 @@
+{
+  "version": "mock-model-extraction-v1",
+  "provenance": "synthetic-scripted-mock-integration",
+  "description": "Synthetic fixture for the explicit scripted mock comparison path; not model-quality or pilot evidence.",
+  "sources": [
+    {
+      "title": "Mock storage decision",
+      "uri": "mock://extraction/storage",
+      "content": "Use SQLite for local metadata.",
+      "expected_memories": [
+        {
+          "kind": "decision",
+          "statement": "Use SQLite for local metadata.",
+          "status": "active",
+          "evidence_quote": "Use SQLite for local metadata."
+        }
+      ]
+    },
+    {
+      "title": "Mock negative source",
+      "uri": "mock://extraction/negative",
+      "content": "No architectural choice is recorded here.",
+      "expected_memories": []
+    }
+  ]
+}

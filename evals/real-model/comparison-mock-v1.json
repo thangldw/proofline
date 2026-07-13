@@ -1,0 +1,30 @@
+{
+  "schema_version": "proofline.real-model-comparison.v1",
+  "extraction_dataset": "mock-extraction-v1.json",
+  "grounded_dataset": "mock-grounded-v1.json",
+  "providers": [
+    {
+      "name": "scripted-qwen-remote",
+      "locality": "remote",
+      "provider": "qwen",
+      "base_url": "https://mock.invalid/compatible-mode/v1",
+      "model_id": "scripted-qwen-mock-v1",
+      "model_revision": "scripted-qwen-mock-v1",
+      "api_key_env": "PROOFLINE_MOCK_QWEN_API_KEY",
+      "input_usd_per_million_tokens": 0,
+      "output_usd_per_million_tokens": 0,
+      "execution_mode": "mock"
+    },
+    {
+      "name": "scripted-qwen-local",
+      "locality": "local",
+      "provider": "ollama",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "model_id": "scripted-local-mock-v1",
+      "model_revision": "scripted-local-mock-v1",
+      "input_usd_per_million_tokens": 0,
+      "output_usd_per_million_tokens": 0,
+      "execution_mode": "mock"
+    }
+  ]
+}

@@ -130,6 +130,11 @@ def main(argv: list[str] | None = None) -> None:
     real_model_preflight.add_argument("--plan", type=Path, required=True)
     real_model_preflight.add_argument("--output", type=Path, required=True)
     real_model_preflight.add_argument("--force", action="store_true")
+    real_model_preflight.add_argument(
+        "--allow-mock",
+        action="store_true",
+        help="Explicitly allow scripted mock preflight; never real-model evidence",
+    )
     real_model = subcommands.add_parser(
         "eval-real-model",
         help="Run a preflighted local/remote model comparison through production paths",
@@ -137,6 +142,11 @@ def main(argv: list[str] | None = None) -> None:
     real_model.add_argument("--plan", type=Path, required=True)
     real_model.add_argument("--output", type=Path, required=True)
     real_model.add_argument("--force", action="store_true")
+    real_model.add_argument(
+        "--allow-mock",
+        action="store_true",
+        help="Explicitly allow scripted mock integration; never real-model evidence",
+    )
     benchmark = subcommands.add_parser(
         "benchmark", help="Measure local SQLite FTS5 lexical search latency"
     )
@@ -219,7 +229,7 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(1)
     elif args.command == "eval-real-model-preflight":
         try:
-            receipt = preflight_real_model_plan(args.plan)
+            receipt = preflight_real_model_plan(args.plan, allow_mock=args.allow_mock)
             write_preflight_receipt(args.output, receipt, force=args.force)
         except (FileExistsError, OSError, ValueError) as exc:
             raise SystemExit(f"real-model preflight failed: {type(exc).__name__}") from exc
@@ -228,7 +238,7 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(1)
     elif args.command == "eval-real-model":
         try:
-            receipt = run_real_model_comparison(args.plan)
+            receipt = run_real_model_comparison(args.plan, allow_mock=args.allow_mock)
             write_comparison_receipt(args.output, receipt, force=args.force)
         except (FileExistsError, OSError, ValueError) as exc:
             raise SystemExit(f"real-model comparison failed: {type(exc).__name__}") from exc

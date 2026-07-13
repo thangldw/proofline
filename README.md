@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.5 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.6 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -227,8 +227,23 @@ grounded-answer paths:
 
 The comparison receipt includes per-kind extraction quality, exact-evidence resolution, grounded
 citation and abstention metrics, provider latency, token totals and estimated cost. Mock transport
-is available only through injected tests, is labeled `mock_integration`, and cannot use the normal
-real-provider transport accidentally.
+can be exercised without a provider or local model through the committed scripted fixture:
+
+```bash
+export PROOFLINE_MOCK_QWEN_API_KEY=mock-api-key
+.venv/bin/proofline eval-real-model-preflight \
+  --plan evals/real-model/comparison-mock-v1.json \
+  --output evals/real-model/receipts/mock-preflight-v1.json \
+  --allow-mock
+.venv/bin/proofline eval-real-model \
+  --plan evals/real-model/comparison-mock-v1.json \
+  --output evals/real-model/receipts/mock-comparison-v1.json \
+  --allow-mock
+```
+
+Both commands require the explicit `--allow-mock` boundary. They use an in-process scripted
+provider, make no network request, and label the output `mock_integration`; their perfect fixture
+scores only verify pipeline wiring and cannot satisfy a real-model or pilot quality gate.
 
 Remaining beta/production qualification gates include real-model and external-pilot evidence, a
 repository security-plugin scan, reranking, scalable vector indexing, Windows verification, and
@@ -239,11 +254,11 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.5` is the latest experimental pre-alpha release. It adds a local evidence-first Studio for
-audio narration, presentations, video storyboards, mind maps, reports, flashcards, quizzes,
-infographics and data tables on top of the existing notes, study and proposal flows.
-The installed wheel contains the same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.5.md) and verify `SHA256SUMS` before installation.
+`v0.14.6` is the latest experimental pre-alpha release. It adds an explicit offline mock path for
+real-model comparison preflight and pipeline integration while preserving the evidence boundary:
+mock receipts never count as real-model quality. The installed wheel contains the same-origin UI
+and API for a one-command local run. See the [release notes](docs/releases/v0.14.6.md) and verify
+`SHA256SUMS` before installation.
 
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
@@ -264,7 +279,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.5
+make release-local TAG=v0.14.6
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
