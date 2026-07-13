@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.11.0 wheel includes the web UI, so Node.js is not required after installation:
+The v0.12.0 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -208,14 +208,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.9.1` is the latest experimental pre-alpha release. It refreshes the entire web app with an
-accessible Sky + Mint theme while preserving the workspace and evidence-first workflows from
-`v0.9.0`.
-Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
-archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
-reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
-proven two-process development workflow above. See the
-[release notes](docs/releases/v0.9.1.md) and verify `SHA256SUMS` before installation.
+`v0.12.0` is the latest experimental pre-alpha release. It adds evidence-first Markdown notes,
+immutable revisions, deterministic tags/wiki-links and exact-span backlinks. The installed wheel
+contains the same-origin UI and API for a one-command local run. See the
+[release notes](docs/releases/v0.12.0.md) and verify `SHA256SUMS` before installation.
 
 When GitHub Actions minutes are unavailable, a release can be built and published from a clean,
 up-to-date local `main` checkout without starting CI:

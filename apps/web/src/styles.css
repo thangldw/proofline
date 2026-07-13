@@ -43,7 +43,8 @@ body {
   background: var(--color-page);
 }
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 .app-shell {
@@ -223,6 +224,107 @@ summary:focus-visible,
   max-width: 1060px;
   margin: 0 auto;
   padding: 42px 38px;
+}
+.notes-view {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(420px, 1fr);
+  gap: 22px;
+}
+.notes-list,
+.note-form {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgb(18 104 222 / 7%);
+}
+.notes-list {
+  padding: 18px;
+}
+.notes-list-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.notes-list-heading h2 {
+  margin: 5px 0 0;
+  font-size: 18px;
+}
+.notes-list-heading button,
+.note-form-footer button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 7px;
+  text-align: left;
+  color: var(--color-ink);
+  background: var(--color-surface-subtle);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.note-row.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.note-row span,
+.empty-copy,
+.note-form-footer span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+.note-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+.note-form input,
+.note-form textarea {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 11px;
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+.note-form textarea {
+  min-height: 330px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  line-height: 1.55;
+}
+.note-form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.note-form-footer button:disabled {
+  opacity: 0.6;
+}
+@media (max-width: 840px) {
+  .notes-view {
+    grid-template-columns: 1fr;
+  }
 }
 .error-banner {
   background: var(--color-danger-soft);

@@ -5,6 +5,7 @@ import type {
   Memory,
   ModelRun,
   ModelRunFilters,
+  Note,
   Overview,
   ProviderConfiguration,
   ProviderStatus,
@@ -41,6 +42,17 @@ export const api = {
   workspaces: () => request<Workspace[]>("/api/v1/workspaces"),
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
+  notes: () => request<Note[]>("/api/v1/notes"),
+  createNote: (title: string, content: string) =>
+    request<Note>("/api/v1/notes", {
+      method: "POST",
+      body: JSON.stringify({ title, content }),
+    }),
+  updateNote: (id: string, title: string, content: string) =>
+    request<Note>(`/api/v1/notes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ title, content }),
+    }),
   deletionImpact: (id: string) =>
     request<SourceDeletionImpact>(`/api/v1/sources/${id}/deletion-impact`),
   deleteSource: (id: string) =>

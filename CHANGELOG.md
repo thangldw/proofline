@@ -7,7 +7,23 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.11.0`.
+No changes have been recorded after `v0.12.0`.
+
+## [0.12.0] - 2026-07-13
+
+### Added
+
+- Evidence-first Markdown quick capture with stable `note://` identities and immutable content
+  revisions that reuse the existing indexing, backup and deletion contracts.
+- Deterministic hashtags and `[[wiki links]]` with exact offsets and line numbers, plus current-note
+  backlink resolution carrying the immutable linking source version.
+- A focused Notes workspace for capture and revision without introducing a rich-text editor.
+
+### Quality
+
+- API coverage proves revision history, exact link spans, backlinks, search, workspace isolation and
+  deletion; web coverage proves capture and revision workflows.
+- ADR 0004 bounds the planned Learning Brain, Third Brain AI and Team Brain milestones.
 
 ## [0.11.0] - 2026-07-13
 
