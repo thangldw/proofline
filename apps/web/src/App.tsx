@@ -33,6 +33,7 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  SourceVersion,
   StudyCard,
   Workspace,
 } from "./types";
@@ -532,18 +533,40 @@ export function NotesView({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [backlinks, setBacklinks] = useState<NoteBacklink[]>([]);
+  const [versions, setVersions] = useState<SourceVersion[]>([]);
+  const [preview, setPreview] = useState<{ version: SourceVersion; content: string } | null>(null);
+  const [filter, setFilter] = useState("");
+  const visibleNotes = notes.filter((note) => {
+    const needle = filter.trim().toLocaleLowerCase();
+    return !needle || note.title.toLocaleLowerCase().includes(needle) ||
+      note.tags.some((tag) => tag.name.toLocaleLowerCase().includes(needle.replace(/^#/, "")));
+  });
 
   useEffect(() => {
     setTitle(selected?.title ?? "");
     setContent(selected?.content ?? "");
     setMessage("");
     setBacklinks([]);
+    setVersions([]);
+    setPreview(null);
     if (selected) {
-      void api.noteBacklinks(selected.id).then(setBacklinks).catch((reason) =>
-        setMessage(errorMessage(reason, "Could not load backlinks")),
-      );
+      void Promise.all([api.noteBacklinks(selected.id), api.noteVersions(selected.id)])
+        .then(([nextBacklinks, nextVersions]) => {
+          setBacklinks(nextBacklinks);
+          setVersions(nextVersions);
+        })
+        .catch((reason) => setMessage(errorMessage(reason, "Could not load note provenance")));
     }
   }, [selected]);
+
+  async function previewVersion(version: SourceVersion) {
+    try {
+      const result = await api.sourceVersion(version.source_id, version.id);
+      setPreview({ version, content: result.content });
+    } catch (reason) {
+      setMessage(errorMessage(reason, "Could not load immutable revision"));
+    }
+  }
 
   async function saveNote(event: React.FormEvent) {
     event.preventDefault();
@@ -580,10 +603,19 @@ export function NotesView({
             New note
           </button>
         </div>
+        <label className="note-filter">
+          <span className="sr-only">Filter notes by title or tag</span>
+          <input
+            aria-label="Filter notes by title or tag"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filter title or #tag"
+          />
+        </label>
         {notes.length === 0 ? (
           <p className="empty-copy">Capture a note to make it searchable.</p>
         ) : (
-          notes.map((note) => (
+          visibleNotes.map((note) => (
             <button
               type="button"
               className={note.id === selectedId ? "note-row active" : "note-row"}
@@ -640,6 +672,26 @@ export function NotesView({
                   : "None"}
               </span>
             </div>
+            <div className="note-versions">
+              <strong>Revisions</strong>
+              <span>
+                {versions.map((version) => (
+                  <button type="button" key={version.id} onClick={() => void previewVersion(version)}>
+                    v{version.version_number} · {version.content_length} chars
+                  </button>
+                ))}
+              </span>
+            </div>
+          </div>
+        )}
+        {preview && (
+          <div className="note-version-preview" aria-label="Immutable revision preview">
+            <header>
+              <strong>Revision {preview.version.version_number}</strong>
+              <span>{preview.version.content_hash.slice(0, 12)}</span>
+              <button type="button" onClick={() => setPreview(null)}>Close preview</button>
+            </header>
+            <pre>{preview.content}</pre>
           </div>
         )}
         <div className="note-form-footer">

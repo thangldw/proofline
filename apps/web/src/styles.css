@@ -438,6 +438,13 @@ summary:focus-visible,
   border-radius: 9px;
   cursor: pointer;
 }
+.note-filter input {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 9px 10px;
+  margin-bottom: 8px;
+}
 .note-row.active {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
@@ -499,6 +506,50 @@ summary:focus-visible,
 .note-provenance span {
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
+}
+.note-versions span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.note-versions button,
+.note-version-preview button {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: var(--color-surface);
+  color: var(--color-primary-strong);
+  cursor: pointer;
+}
+.note-version-preview {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.note-version-preview header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--color-primary-soft);
+  font-size: 12px;
+}
+.note-version-preview header span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+.note-version-preview header button {
+  margin-left: auto;
+}
+.note-version-preview pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font: 12px/1.55 var(--font-mono);
 }
 .note-form-footer button:disabled {
   opacity: 0.6;

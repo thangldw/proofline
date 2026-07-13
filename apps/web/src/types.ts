@@ -71,6 +71,17 @@ export type NoteBacklink = NoteLink & {
   source_title: string;
 };
 
+export type SourceVersion = {
+  id: string;
+  source_id: string;
+  content_hash: string;
+  version_number: number;
+  content_length: number;
+  status: string;
+  parser_version: string;
+  created_at: string;
+};
+
 export type StudyCard = {
   id: string;
   workspace_id: string;

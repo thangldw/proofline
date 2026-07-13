@@ -15,6 +15,7 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  SourceVersion,
   StudyCard,
   Workspace,
 } from "./types";
@@ -79,6 +80,8 @@ export const api = {
     }),
   noteBacklinks: (id: string) =>
     request<NoteBacklink[]>(`/api/v1/notes/${id}/backlinks`),
+  noteVersions: (id: string) =>
+    request<SourceVersion[]>(`/api/v1/sources/${id}/versions`),
   deletionImpact: (id: string) =>
     request<SourceDeletionImpact>(`/api/v1/sources/${id}/deletion-impact`),
   deleteSource: (id: string) =>

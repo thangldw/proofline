@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.1 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.2 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -208,10 +208,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.1` is the latest experimental pre-alpha release. It includes human-governed,
-citation-backed action proposals plus usable note backlink metadata and a due-only study queue. The installed wheel
+`v0.14.2` is the latest experimental pre-alpha release. It includes human-governed,
+citation-backed action proposals plus note backlinks, filtering and read-only revision history. The installed wheel
 contains the same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.1.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.14.2.md) and verify `SHA256SUMS` before installation.
 
 To derive study cards, place explicit adjacent pairs in any indexed source and select it under
 **Study**:
