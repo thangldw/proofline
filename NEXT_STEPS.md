@@ -1,8 +1,8 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** installed-wheel macOS lifecycle, backup restore/rollback và OS-keyring
-qualification receipt đã hoàn thành cho `v0.14.10`; Windows, native packaging, production qualification, real-model
+**Trạng thái hiện tại:** public support/ownership policy, installed-wheel macOS lifecycle, backup
+restore/rollback và OS-keyring qualification receipt đã hoàn thành cho `v0.14.11`; Windows, native packaging, production qualification, real-model
 evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -91,6 +91,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Refuse path trùng, SQLite sidecar và candidate sai schema trước khi publish.
 - [x] Atomic replace với quyền owner-only và post-restore verification.
 - [x] Installed-release receipt restore về snapshot cũ rồi reverse bằng rollback copy.
+
+### v0.14.11 — Public support and ownership policy
+
+- [x] Thêm root support policy với supported scope, safe issue report và no-SLA boundary.
+- [x] Ghi data-loss escalation, backup responsibility và upgrade/database rollback flow.
+- [x] Định nghĩa release cadence pre-alpha và latest-release-only support.
+- [x] Ghi current maintainer cùng production ownership gaps chưa được nhận.
+- [ ] GitHub repository visibility vẫn private; không tự đổi public nếu chưa có xác nhận trực tiếp.
 
 ## Việc nên làm đầu tiên ngày mai
 
