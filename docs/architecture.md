@@ -385,11 +385,18 @@ GET    /api/v1/search
 POST   /api/v1/answers
 ```
 
-Portable JSON export/verification, strict empty-database import, complete SQLite
+Portable JSON export/verification, strict empty-database import, previewed non-empty merge/remap,
+complete SQLite
 backup/verification, and live semantic integrity verification are implemented as local CLI
 operations. Import preserves exported domain
 identity in one transaction, rebuilds chunks/FTS without extraction, and records the payload hash;
-merge, overwrite, and ID remapping are not implemented.
+merge remaps every imported identity deterministically after an exact preview digest. Destructive
+overwrite is not implemented.
+
+The installed server also has an embedded lifecycle contract: an operator or native wrapper can
+select an owned data directory, bind port `0`, atomically observe readiness after migrations and
+recovery, serve the built web archive from the same origin, and request graceful shutdown. This is
+locally verified packaging infrastructure, not a native desktop or production-support claim.
 
 Planned MVP operations (exact contracts remain undecided):
 

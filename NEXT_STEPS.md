@@ -1,7 +1,8 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** Git read-only vertical slice đã hoàn tất cho `v0.3.0`; các mục P1 và pilot vẫn mở.  
+**Trạng thái hiện tại:** các lát cắt P1 nội bộ đã phát hành đến `v0.10.0`; Windows, production
+qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
 ## Việc nên làm đầu tiên ngày mai
@@ -84,6 +85,8 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [x] Quy định workspace-scoped source identity, search, model runs, audit và deletion.
 - [ ] Xác minh Windows trong CI hoặc máy thật.
 - [ ] Hoàn thiện production packaging; chưa tuyên bố production support.
+- [x] Hoàn thiện embedded start/ready/stop, data-directory, migration/recovery và same-origin web
+  lifecycle làm nền cho native wrapper.
 - [x] Đánh giá Tauri desktop packaging; ADR 0003 hoãn triển khai cho đến khi Windows, lifecycle
   API/web và production support boundary được chứng minh.
 
@@ -176,7 +179,7 @@ make check
 make eval
 ```
 
-Sau đó bắt đầu bằng ADR và vertical slice **Git repository ingestion dạng read-only** ở mục P0.
+Sau đó chọn một gate chưa đóng có đủ môi trường/chứng cứ; không lặp lại lát cắt Git đã phát hành.
 
 ## Definition of Done cho mỗi công việc
 

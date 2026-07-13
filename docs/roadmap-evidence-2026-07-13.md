@@ -12,13 +12,20 @@ credentials, participants or legal decisions. Planned behavior is not counted as
 - v0.7.0: workspace isolation and multi-worker folder-scan leases.
 - v0.8.0: previewed portable merge/remap into non-empty databases.
 - v0.9.0: workspace UI and benchmark-backed watcher decision.
+- v0.9.1: bright Sky + Mint visual system and responsive navigation fixes.
+- v0.10.0: embedded start/readiness/stop, owned data directory and same-origin web serving.
 
 ## Technically open
 
 - Windows verification: blocked by exhausted hosted Actions quota and no real Windows machine in
   the current workspace. Static review or emulation is not equivalent evidence.
-- Production packaging: Docker definitions exist, but Docker is unavailable on the current machine;
-  no container runtime smoke receipt or production support claim can be made.
+- Production packaging: the embedded lifecycle prerequisite is implemented and locally tested, but
+  Docker is unavailable on the current machine and no installer is signed; no production support
+  claim can be made.
+
+The [receipt quality report](./reports/roadmap-evidence-quality-v0.10.0.html) found that all six
+checked-in receipts qualify their scope, while only three include timestamps and three include the
+tested revision. Future receipt writers should normalize that metadata before trend comparisons.
 
 ## External evidence gates
 

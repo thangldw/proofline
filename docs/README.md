@@ -11,6 +11,11 @@ way and trace every answer back to exact source evidence.
 ## Start here
 
 | Document | Purpose | Status |
+| --- | --- | --- |
+| [v0.10.0 notes](./releases/v0.10.0.md) | Embedded runtime lifecycle and same-origin web serving | Pre-alpha |
+| [Embedded lifecycle](./embedded-lifecycle.md) | Start, readiness, data directory, stop and recovery contract | Implemented locally |
+| [Roadmap evidence quality report](./reports/roadmap-evidence-quality-v0.10.0.html) | Metadata fitness of checked-in benchmark/platform receipts | Current report |
+| [v0.10.0 launch-flow audit](./audits/v0.10.0-launch/audit.md) | Screenshot-backed Search, Sources and Settings audit | Current audit |
 | [v0.6.0 notes](./releases/v0.6.0.md) | Reranking, grounding assessment and vector index | Pre-alpha |
 | [v0.7.0 notes](./releases/v0.7.0.md) | Workspace isolation and multi-worker scan leases | Pre-alpha |
 | [v0.8.0 notes](./releases/v0.8.0.md) | Portable non-empty merge with deterministic remapping | Pre-alpha |
@@ -21,7 +26,6 @@ way and trace every answer back to exact source evidence.
 | [Provider configuration](./provider-configuration.md) | Profiles, keys, health and retry semantics | Implemented |
 | [v0.4.0 notes](./releases/v0.4.0.md) | Temporal decision relations and timelines | Pre-alpha |
 | [v0.3.0 notes](./releases/v0.3.0.md) | Immutable local Git repository ingestion | Pre-alpha |
-| --- | --- | --- |
 | [Product brief](./product-brief.md) | Problem, audience, value proposition, scope, and success measures | Baseline |
 | [MVP architecture](./architecture.md) | Current vertical slice, planned boundaries, data model, and quality attributes | Evolving |
 | [ADR-0001](./adr/0001-scope-and-stack.md) | First scope and technology decision | Accepted |
@@ -49,7 +53,7 @@ way and trace every answer back to exact source evidence.
 
 ## Current implementation inventory
 
-As of 2026-07-12:
+As of 2026-07-13:
 
 - Implemented in `apps/api`: Python/FastAPI + SQLAlchemy local API, SQLite schema,
   deterministic Markdown chunking, upload and registered-root folder ingestion, FTS5 lexical
@@ -107,8 +111,10 @@ As of 2026-07-12:
   build. The [versioned receipt](../evals/platform/github-actions-0dde53f.json) records successful
   hosted API CI and Secret Scan runs, including both platform jobs. This is not production support;
   Windows remains unverified.
-- Not yet completed: merge import, a scalable vector index, reranking, real-model/pilot
-  evaluation, a repository security-plugin scan, Windows verification, production support,
-  desktop packaging, cloud services, or telemetry.
+- Also implemented: portable merge/remap, a local vector candidate index, optional reranking,
+  workspace isolation, a benchmark-backed polling watcher decision, and an embedded start/ready/
+  stop lifecycle with same-origin web serving.
+- Not yet completed: real-model/pilot evaluation, Windows verification, production support,
+  signed desktop packaging, cloud services, or telemetry.
 
 Update this inventory whenever the repository reaches a meaningful milestone.

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from importlib.resources import files
 from pathlib import Path
-
-import uvicorn
 
 from . import __version__
 from .backup import BackupError, create_sqlite_backup, verify_sqlite_backup
@@ -36,6 +35,7 @@ from .portable_import import (
     preview_portable_merge,
 )
 from .schemas import SourceCreate
+from .server import run_server
 
 
 def unit_interval(value: str) -> float:
@@ -71,6 +71,24 @@ def main(argv: list[str] | None = None) -> None:
     serve = subcommands.add_parser("serve", help="Run the local API")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", default=8000, type=int)
+    serve.add_argument(
+        "--data-dir",
+        type=Path,
+        help="Store the database and local configuration in this directory",
+    )
+    serve.add_argument(
+        "--ready-file",
+        type=Path,
+        help="Atomically publish readiness metadata and remove it on shutdown",
+    )
+    serve.add_argument(
+        "--web-dir",
+        type=Path,
+        help="Serve a built Proofline web archive from the same process",
+    )
+    serve.add_argument(
+        "--log-level", choices=("critical", "error", "warning", "info"), default="info"
+    )
     subcommands.add_parser("seed", help="Index the bundled example decision")
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
@@ -126,7 +144,20 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     if args.command == "serve":
-        uvicorn.run("proofline.main:app", host=args.host, port=args.port, reload=False)
+        if args.web_dir is not None:
+            web_dir = args.web_dir.expanduser().resolve()
+            if not (web_dir / "index.html").is_file():
+                parser.error("--web-dir must contain index.html")
+            os.environ["PROOFLINE_WEB_DIR"] = str(web_dir)
+        try:
+            run_server(
+                args.host,
+                args.port,
+                ready_file=args.ready_file,
+                log_level=args.log_level,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise SystemExit(f"serve failed: {type(exc).__name__}") from exc
     elif args.command == "seed":
         seed_demo()
     elif args.command == "eval":
