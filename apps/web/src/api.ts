@@ -64,4 +64,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ title, content, kind: "markdown", uri }),
     }),
+  importGitRepository: (path: string) =>
+    request<{ commit_sha: string; created_count: number; unchanged_count: number; failed_count: number }>("/api/v1/git-repositories", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
 };

@@ -3,7 +3,8 @@
 **Document status:** Evolving  
 **Implementation status:** Pre-alpha local vertical slice implemented through governed generalized
 memory and evidence-backed answers; external pilot gates and later product stages remain open
-**Decision record:** [ADR-0001](./adr/0001-scope-and-stack.md)
+**Decision records:** [ADR-0001](./adr/0001-scope-and-stack.md),
+[ADR-0002](./adr/0002-git-source-identity-and-provenance.md)
 
 ## Architecture goal
 
@@ -69,6 +70,8 @@ Current and target boundaries are:
 
 - workspace abstraction — planned; the current implementation is one local workspace;
 - source catalog and ingestion coordinator — implemented for upload and registered roots;
+- read-only local Git ingestion — implemented for immutable commit metadata and tracked
+  Markdown/text objects;
 - retrieval and answer service — implemented without reranking;
 - governed memory review service — implemented for four memory kinds;
 - provider gateway plus safe model-run API and web diagnostics — implemented, with provider settings UI planned;
@@ -104,6 +107,13 @@ failed extraction remains usable and visibly degraded.
 Each source version is keyed by a stable source identity and content hash. Unchanged content
 must not be parsed, embedded, or extracted again. A changed file creates a new source version;
 old evidence remains resolvable until retention or deletion removes it.
+
+For Git repositories, the API resolves a requested revision to a full commit SHA before reading
+objects. A `git_file` identity combines repository root, commit SHA, and repository-relative path;
+a `git_commit` identity uses the same root and SHA with a reserved commit locator. Re-scanning the
+same commit is idempotent, a later commit creates new immutable sources, and citations additionally
+expose commit SHA and path alongside exact offsets and lines. Git reads use tracked objects rather
+than mutable working-tree content.
 
 ### 5. Storage
 
@@ -329,6 +339,9 @@ Implemented foundation operations:
 GET    /health
 GET    /api/v1/overview
 POST   /api/v1/sources
+POST   /api/v1/git-repositories
+GET    /api/v1/git-repositories
+DELETE /api/v1/git-repositories/:id
 POST   /api/v1/folder-scans
 GET    /api/v1/sources
 GET    /api/v1/sources/:id

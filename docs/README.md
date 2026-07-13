@@ -11,6 +11,7 @@ way and trace every answer back to exact source evidence.
 ## Start here
 
 | Document | Purpose | Status |
+| [v0.3.0 notes](./releases/v0.3.0.md) | Immutable local Git repository ingestion | Pre-alpha |
 | --- | --- | --- |
 | [Product brief](./product-brief.md) | Problem, audience, value proposition, scope, and success measures | Baseline |
 | [MVP architecture](./architecture.md) | Current vertical slice, planned boundaries, data model, and quality attributes | Evolving |

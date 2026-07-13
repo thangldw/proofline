@@ -396,6 +396,35 @@ def _enforce_memory_status_contract(connection: Connection) -> None:
     )
 
 
+def _add_git_repositories(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS git_repositories (
+            id VARCHAR(36) PRIMARY KEY,
+            title VARCHAR(300) NOT NULL,
+            path TEXT NOT NULL UNIQUE,
+            current_commit_sha VARCHAR(40),
+            status VARCHAR(30) NOT NULL,
+            created_at DATETIME NOT NULL,
+            indexed_at DATETIME NOT NULL
+        )"""
+    )
+    columns = {column["name"] for column in inspect(connection).get_columns("sources")}
+    additions = {
+        "git_repository_id": "VARCHAR(36) REFERENCES git_repositories(id) ON DELETE CASCADE",
+        "git_commit_sha": "VARCHAR(40)",
+        "git_path": "TEXT",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            connection.exec_driver_sql(f"ALTER TABLE sources ADD COLUMN {name} {definition}")
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_sources_git_repository_id ON sources (git_repository_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_sources_git_commit_sha ON sources (git_commit_sha)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -410,6 +439,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (11, "normalize governed memory statuses", _normalize_governed_memory_statuses),
     (12, "portable import receipts", _add_import_receipts),
     (13, "enforce governed memory status contract", _enforce_memory_status_contract),
+    (14, "read-only git repository sources", _add_git_repositories),
 )
 
 
