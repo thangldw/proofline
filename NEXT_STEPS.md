@@ -1,7 +1,7 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** real-model comparison runner đã mock-validated cho `v0.14.4`; Windows,
+**Trạng thái hiện tại:** evidence-first Studio local đã hoàn thành cho `v0.14.5`; Windows,
 production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
@@ -42,6 +42,17 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Liệt kê revision theo version number, content length và immutable identity.
 - [x] Mở nội dung revision read-only qua workspace-scoped source/version API.
 - [ ] Portable JSON cho study/proposal được hoãn vì cần mở rộng validator và toàn bộ ID-remap graph.
+
+### v0.14.5 — Evidence-first Studio
+
+- [x] Studio hub có đủ 9 loại: audio overview, presentation, video overview, mind map, report,
+  flashcards, quiz, infographic và data table.
+- [x] Persist artifact theo immutable source version; tạo lại cùng version/kind là idempotent.
+- [x] Mọi item giữ exact offsets, lines, quote hash và mở được evidence trong UI.
+- [x] Audio phát bằng browser speech; slide/video có preview tương tác; quiz/flashcard có trạng thái học.
+- [x] Xóa source báo trước và cascade Studio artifact/citation.
+- [ ] Downloadable audio/video, `.pptx`, ảnh infographic và model-enhanced generation để lại cho mốc
+  media production sau khi có provider/dữ liệu thật.
 
 ## Việc nên làm đầu tiên ngày mai
 

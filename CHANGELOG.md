@@ -7,7 +7,29 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.4`.
+No changes have been recorded after `v0.14.5`.
+
+## [0.14.5] - 2026-07-13
+
+### Added
+
+- Add an evidence-first Studio with audio narration, presentation, video storyboard, mind map,
+  report, flashcard, quiz, infographic and data-table artifacts.
+- Persist deterministic artifacts per immutable source version through migration 21, with exact
+  citation offsets, line ranges and SHA-256 quote hashes.
+- Add responsive pastel Studio cards, saved-artifact browsing, interactive quiz/flashcard/slide
+  previews, browser-local narration and exact-evidence inspection.
+
+### Changed
+
+- Source deletion preview and cascade now include Studio artifacts and their citations.
+- Media-heavy outputs remain honest local previews: the release does not claim downloadable audio,
+  rendered video or production presentation-file export.
+
+### Validation
+
+- Add backend coverage for all nine artifact kinds, idempotency, source revisions, workspace scope
+  and deletion; add frontend interaction coverage and browser design QA at 746 × 860.
 
 ## [0.14.4] - 2026-07-13
 

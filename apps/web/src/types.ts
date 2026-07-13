@@ -102,6 +102,61 @@ export type StudyCard = {
   updated_at: string;
 };
 
+export type StudioKind =
+  | "audio_overview"
+  | "presentation"
+  | "video_overview"
+  | "mind_map"
+  | "report"
+  | "flashcards"
+  | "quiz"
+  | "infographic"
+  | "data_table";
+
+export type StudioCitation = {
+  id: string;
+  source_id: string;
+  source_version_id: string;
+  source_title: string;
+  ordinal: number;
+  quote: string;
+  quote_hash: string;
+  start_offset: number;
+  end_offset: number;
+  start_line: number;
+  end_line: number;
+};
+
+export type StudioItem = {
+  title: string;
+  body: string;
+  citation: number;
+  answer?: string;
+  options?: string[];
+  cells?: string[];
+};
+
+export type StudioArtifact = {
+  id: string;
+  workspace_id: string;
+  source_id: string;
+  source_version_id: string;
+  source_title: string;
+  kind: StudioKind;
+  title: string;
+  content: {
+    format: string;
+    summary: string;
+    columns?: string[];
+    items: StudioItem[];
+  };
+  status: "ready";
+  generation_method: string;
+  created_at: string;
+  updated_at: string;
+  citations: StudioCitation[];
+};
+
 export type ActionProposal = {
   id: string;
   workspace_id: string;
@@ -142,6 +197,8 @@ export type SourceDeletionImpact = {
   study_reviews?: number;
   action_proposals?: number;
   proposal_citations?: number;
+  studio_artifacts?: number;
+  studio_citations?: number;
   ingestion_jobs_to_detach: number;
   audit_events_to_delete: number;
   fts_rows: number;

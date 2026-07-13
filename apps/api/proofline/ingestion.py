@@ -47,6 +47,8 @@ class SourceDeletionImpact:
     study_reviews: int
     action_proposals: int
     proposal_citations: int
+    studio_artifacts: int
+    studio_citations: int
     ingestion_jobs_to_detach: int
     audit_events_to_delete: int
     fts_rows: int
@@ -693,6 +695,10 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
                 (SELECT count(*) FROM proposal_citations
                     WHERE proposal_id IN (SELECT proposal_id FROM proposal_citations
                         WHERE source_id = :source)) AS proposal_citations,
+                (SELECT count(*) FROM studio_artifacts
+                    WHERE source_id = :source) AS studio_artifacts,
+                (SELECT count(*) FROM studio_citations
+                    WHERE source_id = :source) AS studio_citations,
                 (SELECT count(*) FROM ingestion_jobs WHERE source_id = :source)
                     AS ingestion_jobs_to_detach,
                 (SELECT count(*) FROM audit_events

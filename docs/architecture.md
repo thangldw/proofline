@@ -426,6 +426,20 @@ span. Human accept/reject changes only proposal governance state and appends an 
 no write path to sources or governed memories. Deleting any cited source deletes the complete
 proposal so a partially evidenced action cannot survive.
 
+### Evidence-first Studio
+
+Migration 21 adds `studio_artifacts` and `studio_citations`. A Studio artifact is keyed by one
+immutable source version and artifact kind, making deterministic generation idempotent without
+rewriting historical outputs after a source revision. Structured content JSON stores presentation
+and interaction state; each item points to an ordinal citation row containing source identity,
+immutable version, exact offsets/lines, quote and SHA-256 quote hash.
+
+Nine deterministic renderers are available: audio narration, presentation, video storyboard, mind
+map, report, flashcards, quiz, infographic and data table. The web client may speak narration using
+the browser's local speech engine, but the API does not claim a rendered audio/video file. Deleting
+a source cascades through both Studio tables, and the metadata-only deletion preview reports both
+counts. Portable JSON does not yet include these regenerable derived artifacts.
+
 Planned MVP operations (exact contracts remain undecided):
 
 ```text

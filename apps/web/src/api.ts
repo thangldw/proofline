@@ -16,6 +16,8 @@ import type {
   Source,
   SourceDeletionImpact,
   SourceVersion,
+  StudioArtifact,
+  StudioKind,
   StudyCard,
   Workspace,
 } from "./types";
@@ -48,6 +50,14 @@ export const api = {
   sources: () => request<Source[]>("/api/v1/sources"),
   notes: () => request<Note[]>("/api/v1/notes"),
   studyCards: () => request<StudyCard[]>("/api/v1/study-cards?due_only=true"),
+  studioArtifacts: () => request<StudioArtifact[]>("/api/v1/studio-artifacts"),
+  createStudioArtifact: (sourceId: string, kind: StudioKind) =>
+    request<StudioArtifact>("/api/v1/studio-artifacts", {
+      method: "POST",
+      body: JSON.stringify({ source_id: sourceId, kind }),
+    }),
+  deleteStudioArtifact: (artifactId: string) =>
+    request<void>(`/api/v1/studio-artifacts/${artifactId}`, { method: "DELETE" }),
   actionProposals: () => request<ActionProposal[]>("/api/v1/action-proposals"),
   createActionProposal: (question: string) =>
     request<ActionProposal>("/api/v1/action-proposals", {
