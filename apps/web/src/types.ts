@@ -1,4 +1,10 @@
-export type Overview = { sources: number; chunks: number; decisions: number; memories: number; evidence: number };
+export type Overview = {
+  sources: number;
+  chunks: number;
+  decisions: number;
+  memories: number;
+  evidence: number;
+};
 
 export type SearchScope = {
   sourceIds: string[];
@@ -34,6 +40,7 @@ export type SourceDeletionImpact = {
   decisions: number;
   memories: number;
   evidence: number;
+  decision_relations?: number;
   ingestion_jobs_to_detach: number;
   audit_events_to_delete: number;
   fts_rows: number;
@@ -70,7 +77,11 @@ export type Evidence = {
   end_line: number;
 };
 
-export type MemoryKind = "decision" | "assumption" | "constraint" | "alternative";
+export type MemoryKind =
+  | "decision"
+  | "assumption"
+  | "constraint"
+  | "alternative";
 
 export type Memory = {
   id: string;
@@ -94,6 +105,23 @@ export type Memory = {
 
 export type Decision = Memory;
 
+export type DecisionRelation = {
+  id: string;
+  source_decision_id: string;
+  target_decision_id: string;
+  kind: "supersedes" | "implements" | "contradicts" | "based_on" | "considered";
+  valid_from: string | null;
+  valid_to: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type DecisionTimeline = {
+  decision: Decision;
+  incoming: DecisionRelation[];
+  outgoing: DecisionRelation[];
+};
+
 export type SearchHit = {
   chunk_id: string;
   source_id: string;
@@ -113,6 +141,7 @@ export type SearchHit = {
   source_kind?: string | null;
   git_commit_sha?: string | null;
   git_path?: string | null;
+  temporal_priority?: "current_decision" | "neutral";
 };
 
 export type AnswerCitation = {
