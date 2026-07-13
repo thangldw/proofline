@@ -7,6 +7,8 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection, Engine, inspect, text
 
+DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
+
 Migration = tuple[int, str, Callable[[Connection], None]]
 
 
@@ -512,6 +514,61 @@ def _add_vector_candidate_index(connection: Connection) -> None:
             )
 
 
+def _add_workspace_scope(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS workspaces (
+            id VARCHAR(36) PRIMARY KEY,
+            slug VARCHAR(80) NOT NULL UNIQUE,
+            title VARCHAR(200) NOT NULL,
+            created_at DATETIME NOT NULL
+        )"""
+    )
+    connection.execute(
+        text(
+            """INSERT OR IGNORE INTO workspaces (id, slug, title, created_at)
+               VALUES (:id, 'local', 'Local workspace', CURRENT_TIMESTAMP)"""
+        ),
+        {"id": DEFAULT_WORKSPACE_ID},
+    )
+    for table in (
+        "sources",
+        "git_repositories",
+        "ingestion_jobs",
+        "ingestion_job_inputs",
+        "audit_events",
+        "model_runs",
+    ):
+        columns = {column["name"] for column in inspect(connection).get_columns(table)}
+        if "workspace_id" not in columns:
+            connection.exec_driver_sql(
+                f"ALTER TABLE {table} ADD COLUMN workspace_id VARCHAR(36) NOT NULL "
+                f"DEFAULT '{DEFAULT_WORKSPACE_ID}'"
+            )
+        connection.exec_driver_sql(
+            f"UPDATE {table} SET workspace_id = '{DEFAULT_WORKSPACE_ID}' WHERE workspace_id IS NULL"
+        )
+        connection.exec_driver_sql(
+            f"CREATE INDEX IF NOT EXISTS ix_{table}_workspace_id ON {table} (workspace_id)"
+        )
+
+
+def _add_workspace_leases(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS workspace_leases (
+            workspace_id VARCHAR(36) PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+            owner_id VARCHAR(36) NOT NULL,
+            purpose VARCHAR(80) NOT NULL,
+            expires_at DATETIME NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_workspace_leases_owner_id ON workspace_leases (owner_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_workspace_leases_expires_at ON workspace_leases (expires_at)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -529,6 +586,8 @@ MIGRATIONS: tuple[Migration, ...] = (
     (14, "read-only git repository sources", _add_git_repositories),
     (15, "temporal decision relations", _add_temporal_decision_relations),
     (16, "vector candidate band index", _add_vector_candidate_index),
+    (17, "workspace scoped records", _add_workspace_scope),
+    (18, "multi-worker workspace leases", _add_workspace_leases),
 )
 
 

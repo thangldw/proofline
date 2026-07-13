@@ -109,6 +109,7 @@ def extract_memory_candidates(
             else "memory-candidate-extraction-v1"
         ),
         input_hashes=[version.content_hash],
+        workspace_id=source.workspace_id,
     )
     initial_request = request
     parent_run_id: str | None = retry_parent_run_id
