@@ -154,6 +154,7 @@ class SourceDeletionImpactRead(BaseModel):
     versions: int = Field(ge=0)
     chunks: int = Field(ge=0)
     embeddings: int = Field(ge=0)
+    vector_index_rows: int = Field(ge=0)
     decisions: int = Field(ge=0)
     memories: int = Field(ge=0)
     evidence: int = Field(ge=0)
@@ -287,6 +288,8 @@ class SearchHit(BaseModel):
     git_commit_sha: str | None = None
     git_path: str | None = None
     temporal_priority: Literal["current_decision", "neutral"] = "neutral"
+    rerank_rank: int | None = None
+    rerank_score: float | None = None
 
 
 class SearchResponse(BaseModel):
@@ -307,6 +310,7 @@ class AnswerRequest(BaseModel):
         le=1.0,
         allow_inf_nan=False,
     )
+    rerank: bool = False
 
     @model_validator(mode="after")
     def normalize_filters(self) -> AnswerRequest:
@@ -322,6 +326,7 @@ class AnswerStatement(BaseModel):
     text: str
     kind: Literal["direct", "synthesis", "inference"]
     evidence_ids: list[str]
+    support_status: Literal["supported", "uncertain", "contradicted"] = "supported"
 
 
 class AnswerCitation(BaseModel):

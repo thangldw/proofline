@@ -38,6 +38,7 @@ class SourceDeletionImpact:
     versions: int
     chunks: int
     embeddings: int
+    vector_index_rows: int
     decisions: int
     memories: int
     evidence: int
@@ -655,6 +656,8 @@ def source_deletion_impact(session: Session, source: Source) -> SourceDeletionIm
                 (SELECT count(*) FROM source_versions WHERE source_id = :source) AS versions,
                 (SELECT count(*) FROM chunks WHERE source_id = :source) AS chunks,
                 (SELECT count(*) FROM chunk_embeddings WHERE source_id = :source) AS embeddings,
+                (SELECT count(*) FROM chunk_vector_buckets WHERE source_id = :source)
+                    AS vector_index_rows,
                 (SELECT count(*) FROM decisions
                    WHERE source_id = :source AND kind = 'decision') AS decisions,
                 (SELECT count(*) FROM decisions WHERE source_id = :source) AS memories,

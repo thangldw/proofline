@@ -1,6 +1,6 @@
 [project]
 name = "proofline"
-version = "0.5.0"
+version = "0.6.0"
 description = "Evidence-first engineering decision memory"
 readme = "README.md"
 requires-python = ">=3.11"

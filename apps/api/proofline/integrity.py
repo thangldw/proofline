@@ -213,11 +213,13 @@ def _verify_memories_and_evidence(connection: Connection, sources: dict, version
         _fail("memory_evidence_missing")
 
 
-def _verify_embeddings(connection: Connection, chunks: dict) -> int:
+def _verify_embeddings(connection: Connection, chunks: dict) -> tuple[int, int]:
     count = 0
+    expected_buckets: dict[tuple[str, int], str] = {}
     rows = connection.execute(
         text(
-            "SELECT chunk_id, source_id, source_version_id, dimensions, vector_json, content_hash "
+            "SELECT id, chunk_id, source_id, source_version_id, dimensions, "
+            "vector_json, content_hash "
             "FROM chunk_embeddings ORDER BY id"
         )
     ).mappings()
@@ -248,7 +250,21 @@ def _verify_embeddings(connection: Connection, chunks: dict) -> int:
             )
         ):
             _fail("embedding_vector_invalid")
-    return count
+        bits = "".join("1" if float(value) >= 0 else "0" for value in vector[:64])
+        for offset in range(0, len(bits), 16):
+            expected_buckets[(embedding["id"], offset // 16)] = bits[offset : offset + 16]
+    bucket_rows = list(
+        connection.execute(
+            text(
+                "SELECT embedding_id, band_index, band_value FROM chunk_vector_buckets "
+                "ORDER BY embedding_id, band_index"
+            )
+        ).mappings()
+    )
+    observed = {(row["embedding_id"], row["band_index"]): row["band_value"] for row in bucket_rows}
+    if observed != expected_buckets or len(observed) != len(bucket_rows):
+        _fail("vector_candidate_index_mismatch")
+    return count, len(bucket_rows)
 
 
 def _verify_fts(connection: Connection, chunks: dict) -> None:
@@ -278,7 +294,7 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
             sources, versions = _verify_sources_and_versions(connection)
             chunks = _verify_chunks(connection, versions)
             _verify_memories_and_evidence(connection, sources, versions)
-            embedding_count = _verify_embeddings(connection, chunks)
+            embedding_count, vector_index_count = _verify_embeddings(connection, chunks)
             _verify_fts(connection, chunks)
             counts = {
                 "sources": len(sources),
@@ -287,6 +303,7 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
                 "memories": connection.execute(text("SELECT count(*) FROM decisions")).scalar_one(),
                 "evidence": connection.execute(text("SELECT count(*) FROM evidence")).scalar_one(),
                 "embeddings": embedding_count,
+                "vector_index_rows": vector_index_count,
             }
     except IntegrityVerificationError:
         raise

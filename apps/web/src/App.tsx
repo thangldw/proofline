@@ -805,6 +805,7 @@ export function SearchView({
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [ingestedFrom, setIngestedFrom] = useState("");
   const [ingestedBefore, setIngestedBefore] = useState("");
+  const [rerank, setRerank] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [answer, setAnswer] = useState<GroundedAnswer | null>(null);
   const [searched, setSearched] = useState(false);
@@ -819,6 +820,7 @@ export function SearchView({
       ingestedFrom,
       ingestedBefore,
     );
+    if (rerank) scope.rerank = true;
     if (
       scope.ingestedFrom &&
       scope.ingestedBefore &&
@@ -898,7 +900,8 @@ export function SearchView({
   const hasActiveScope =
     selectedSources.length > 0 ||
     Boolean(ingestedFrom) ||
-    Boolean(ingestedBefore);
+    Boolean(ingestedBefore) ||
+    rerank;
   function toggleSource(sourceId: string) {
     setSelectedSourceIds((current) =>
       current.includes(sourceId)
@@ -968,6 +971,14 @@ export function SearchView({
               events or decisions occurred.
             </small>
           </fieldset>
+          <label>
+            <input
+              type="checkbox"
+              checked={rerank}
+              onChange={(event) => setRerank(event.target.checked)}
+            />
+            Optional local reranking
+          </label>
           <button
             type="button"
             disabled={!hasActiveScope}
@@ -975,6 +986,7 @@ export function SearchView({
               setSelectedSourceIds([]);
               setIngestedFrom("");
               setIngestedBefore("");
+              setRerank(false);
             }}
           >
             Clear scope
@@ -1081,6 +1093,9 @@ export function SearchView({
                       <div>
                         <span className={`statement-kind ${statement.kind}`}>
                           {statement.kind}
+                        </span>
+                        <span className="text-muted">
+                          {statement.support_status ?? "supported"}
                         </span>
                         <p>{statement.text}</p>
                       </div>
@@ -1901,6 +1916,7 @@ function DeletionDialog({
         ["Versions", state.impact.versions],
         ["Chunks", state.impact.chunks],
         ["Embeddings", state.impact.embeddings],
+        ["Vector index rows", state.impact.vector_index_rows ?? 0],
         ["Memories", state.impact.memories],
         ["Decisions", state.impact.decisions],
         ["Evidence", state.impact.evidence],

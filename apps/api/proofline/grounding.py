@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -20,6 +21,7 @@ from .model_gateway import (
     run_generation,
 )
 from .models import ModelRun, SourceVersion
+from .reranking import Reranker
 from .schemas import AnswerCitation, AnswerExclusion, AnswerResponse, AnswerStatement, SearchHit
 
 MAX_EVIDENCE_PACK_BYTES = 64 * 1024
@@ -130,6 +132,60 @@ def _fail_grounding(session: Session, run: ModelRun, reason: str) -> None:
     session.commit()
 
 
+GROUNDING_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "because",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "this",
+    "to",
+    "was",
+    "we",
+    "with",
+}
+NEGATION_TERMS = {"no", "not", "never", "without", "không", "chưa"}
+
+
+def semantic_support_status(
+    statement: DraftStatement, hits: list[SearchHit]
+) -> Literal["supported", "uncertain", "contradicted"]:
+    statement_terms = {
+        term.casefold()
+        for term in re.findall(r"[\w-]+", statement.text, re.UNICODE)
+        if term.casefold() not in GROUNDING_STOPWORDS
+    }
+    evidence_terms = {
+        term.casefold()
+        for hit in hits
+        for term in re.findall(r"[\w-]+", hit.content, re.UNICODE)
+        if term.casefold() not in GROUNDING_STOPWORDS
+    }
+    if statement_terms and not statement_terms.intersection(evidence_terms):
+        return "uncertain"
+    statement_negative = bool(statement_terms & NEGATION_TERMS)
+    evidence_negative = bool(evidence_terms & NEGATION_TERMS)
+    shared_subject = (
+        len((statement_terms - NEGATION_TERMS) & (evidence_terms - NEGATION_TERMS)) >= 2
+    )
+    if shared_subject and statement_negative != evidence_negative:
+        return "contradicted" if statement.kind == "direct" else "uncertain"
+    return "supported"
+
+
 def answer_question(
     session: Session,
     question: str,
@@ -141,6 +197,7 @@ def answer_question(
     source_ids: list[str] | None = None,
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
+    reranker: Reranker | None = None,
 ) -> AnswerResponse:
     hits = hybrid_search(
         session,
@@ -152,6 +209,7 @@ def answer_question(
         source_ids=source_ids,
         ingested_from=ingested_from,
         ingested_before=ingested_before,
+        reranker=reranker,
     )
     if not hits:
         return AnswerResponse(
@@ -231,8 +289,16 @@ def answer_question(
             if unknown:
                 validation_error = "grounding_unknown_evidence"
                 break
+            support_status = semantic_support_status(
+                statement, [hit_by_id[item] for item in statement.evidence_ids]
+            )
+            if support_status == "contradicted":
+                validation_error = "grounding_contradiction_detected"
+                break
             cited_ids.extend(statement.evidence_ids)
-            statements.append(AnswerStatement(**statement.model_dump()))
+            statements.append(
+                AnswerStatement(**statement.model_dump(), support_status=support_status)
+            )
 
         if validation_error:
             _fail_grounding(session, run, validation_error)

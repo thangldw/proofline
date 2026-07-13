@@ -1,0 +1,15 @@
+{
+  "schema": "proofline-reranking-eval-v1",
+  "provenance": "synthetic-engineering-decisions",
+  "queries": [
+    {"id":"r1","query":"Redis cache eviction","relevant_id":"r1-good","candidates":[
+      {"id":"r1-noise","content":"General cache operations notes"},
+      {"id":"r1-good","content":"Decision: Redis cache eviction uses allkeys-lru"}]},
+    {"id":"r2","query":"PostgreSQL connection pool limit","relevant_id":"r2-good","candidates":[
+      {"id":"r2-noise","content":"PostgreSQL deployment overview"},
+      {"id":"r2-good","content":"Constraint: PostgreSQL connection pool limit is 20"}]},
+    {"id":"r3","query":"NATS retry backoff","relevant_id":"r3-good","candidates":[
+      {"id":"r3-noise","content":"NATS messaging is enabled"},
+      {"id":"r3-good","content":"Decision: NATS retry backoff is exponential with jitter"}]}
+  ]
+}
