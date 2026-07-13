@@ -270,16 +270,20 @@ by GitHub). It does not run the optional security test suite.
 
 GitHub's dynamic Dependabot dependency-graph job does not honor commit skip instructions. While the
 hosted Actions quota is unavailable, repository Actions must therefore remain disabled. Restore
-them, then re-enable the push workflows, when hosted capacity returns:
+the dependency graph and Actions, then re-enable the push workflows, when hosted capacity returns:
 
 ```bash
+gh api --method PATCH repos/thangldw/proofline \
+  -F 'security_and_analysis[dependency_graph][status]=enabled'
 gh api --method PUT repos/thangldw/proofline/actions/permissions -F enabled=true
 gh workflow enable "API CI"
 gh workflow enable "Secret Scan"
 ```
 
 Direct local releases continue to work while Actions are disabled because `release-local` pushes an
-annotated tag and publishes artifacts through `gh release`, not `workflow_dispatch`.
+annotated tag and publishes artifacts through `gh release`, not `workflow_dispatch`. The dependency
+graph is also temporarily disabled because its dynamic Dependabot jobs ignore both commit skip
+instructions and the repository Actions switch.
 
 ### Data portability and recovery
 
