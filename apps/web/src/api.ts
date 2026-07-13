@@ -12,12 +12,20 @@ import type {
   SearchScope,
   Source,
   SourceDeletionImpact,
+  Workspace,
 } from "./types";
+
+const DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+let activeWorkspaceId = DEFAULT_WORKSPACE_ID;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Proofline-Workspace-ID": activeWorkspaceId,
+      ...init?.headers,
+    },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -27,6 +35,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  setWorkspace: (workspaceId: string) => {
+    activeWorkspaceId = workspaceId;
+  },
+  workspaces: () => request<Workspace[]>("/api/v1/workspaces"),
   overview: () => request<Overview>("/api/v1/overview"),
   sources: () => request<Source[]>("/api/v1/sources"),
   deletionImpact: (id: string) =>

@@ -63,4 +63,21 @@ describe("search scope API contract", () => {
       ingested_before: scope.ingestedBefore,
     });
   });
+
+  it("sends the selected workspace on subsequent requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ sources: 0, chunks: 0, decisions: 0, memories: 0, evidence: 0 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    api.setWorkspace("workspace-platform");
+    await api.overview();
+
+    expect(fetchMock.mock.calls[0][1].headers["X-Proofline-Workspace-ID"]).toBe(
+      "workspace-platform",
+    );
+  });
 });

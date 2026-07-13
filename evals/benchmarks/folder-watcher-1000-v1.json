@@ -1,0 +1,22 @@
+{
+  "database_bytes": 3760128,
+  "dataset": "synthetic-generated-no-private-source-content",
+  "decision_rule": "retain polling when a 1000-file no-op cycle remains below 1000 ms; otherwise evaluate native notifications",
+  "file_count": 1000,
+  "initial_created_count": 1000,
+  "initial_latency_ms": 10950.446208007634,
+  "no_op_latency_ms": 403.17949996097013,
+  "no_op_latency_samples_ms": [
+    404.1527910158038,
+    403.17949996097013,
+    402.0013330155052
+  ],
+  "no_op_unchanged_count": 1000,
+  "peak_python_memory_bytes": 4411676,
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.12.4",
+  "qualification": "synthetic local benchmark; does not establish Windows behavior, network filesystem behavior, or production scale",
+  "schema": "proofline-folder-watcher-benchmark-v1",
+  "single_update_count": 1,
+  "single_update_latency_ms": 426.27479101065546
+}
