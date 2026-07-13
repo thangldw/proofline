@@ -194,13 +194,14 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.9.0` is the latest experimental pre-alpha release. It exposes workspace switching in the web
-app and records the benchmark-backed decision to retain the polling watcher.
+`v0.9.1` is the latest experimental pre-alpha release. It refreshes the entire web app with an
+accessible Sky + Mint theme while preserving the workspace and evidence-first workflows from
+`v0.9.0`.
 Assets include the local API/CLI wheel and source distribution plus an optimized, unhosted web
 archive for integrators. The web archive is not a standalone server: deploy it behind a same-origin
 reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline API, or use the
 proven two-process development workflow above. See the
-[release notes](docs/releases/v0.9.0.md) and verify `SHA256SUMS` before installation.
+[release notes](docs/releases/v0.9.1.md) and verify `SHA256SUMS` before installation.
 
 When GitHub Actions minutes are unavailable, a release can be built and published from a clean,
 up-to-date local `main` checkout without starting CI:
