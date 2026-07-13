@@ -7,7 +7,25 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.7`.
+No changes have been recorded after `v0.14.8`.
+
+## [0.14.8] - 2026-07-14
+
+### Added
+
+- Add an atomic platform-release qualification receipt that binds an installed wheel SHA-256 and
+  Git revision to the observed OS, architecture, Python and Proofline versions.
+- Exercise installed server lifecycle, bundled web, exact evidence, portable export/import,
+  SQLite backup/restore and semantic integrity in the same receipt.
+
+### Changed
+
+- Upload the platform receipt as a checksummed local GitHub Release asset.
+
+### Validation
+
+- Cover successful receipt generation, artifact identity, qualification boundaries and safe
+  refusal to overwrite an existing receipt.
 
 ## [0.14.7] - 2026-07-14
 

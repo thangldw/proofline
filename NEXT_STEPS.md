@@ -1,7 +1,7 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** public-hygiene và production gate matrix đã hoàn thành cho `v0.14.7`;
+**Trạng thái hiện tại:** installed-wheel macOS qualification receipt đã hoàn thành cho `v0.14.8`;
 Windows, native packaging, production qualification, real-model evaluation và external pilot vẫn
 mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
@@ -67,6 +67,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Cập nhật security support boundary theo release hiện tại.
 - [x] Sửa tài liệu portable merge để khớp behavior đã phát hành từ `v0.8.0`.
 - [x] Định nghĩa production target local desktop và receipt bắt buộc cho từng gate.
+
+### v0.14.8 — Installed-release platform receipt
+
+- [x] Khóa SHA-256 của wheel và Git revision trong receipt versioned.
+- [x] Ghi OS, machine architecture, Python và Proofline version.
+- [x] Chạy installed server start/ready/web/graceful-stop trên artifact đã cài.
+- [x] Chạy immutable evidence, export/import, backup/restore và integrity trên cùng environment.
+- [x] Upload receipt cùng release assets và đưa receipt vào `SHA256SUMS`.
 
 ## Việc nên làm đầu tiên ngày mai
 

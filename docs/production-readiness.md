@@ -23,8 +23,8 @@ profile.
 | Area | Required evidence | Status | Current evidence or blocker |
 | --- | --- | --- | --- |
 | Public repository | License, community docs, current support policy, no contributor-machine paths, accurate implemented/planned claims | Partial | Hygiene corrections are prepared; repository metadata and visibility remain external changes |
-| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.7` GitHub assets and local release gates |
-| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Partial | Local gates pass; signed `.app`, notarization and durable platform receipt are missing |
+| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.8` GitHub assets and checksummed platform receipt |
+| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.8` installed-release platform receipt; native signing remains a separate gate |
 | Windows lifecycle | Same installed-artifact and recovery path on a real Windows target | Blocked | No Windows runner or machine receipt |
 | Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Blocked | Tauri remains deferred by ADR 0003 |
 | Data integrity | Versioned migrations, immutable source identity, exact spans, deletion cascade and semantic verification | Complete for tested local schema | Migration, provenance, deletion and integrity suites |

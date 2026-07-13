@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.7 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.8 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -254,10 +254,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.7` is the latest experimental pre-alpha release. It makes the public support, portability
-and production-readiness claims consistent with the behavior already implemented. The installed
-wheel contains the same-origin UI and API for a one-command local run. See the
-[release notes](docs/releases/v0.14.7.md) and verify `SHA256SUMS` before installation.
+`v0.14.8` is the latest experimental pre-alpha release. It attaches a platform qualification
+receipt to the exact wheel exercised by the local release gate. The installed wheel contains the
+same-origin UI and API for a one-command local run. See the
+[release notes](docs/releases/v0.14.8.md) and verify `SHA256SUMS` before installation.
 
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
@@ -278,11 +278,13 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.7
+make release-local TAG=v0.14.8
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
 immutable annotated tag, pushes only that tag, and uploads versioned artifacts through `gh`.
+It also uploads a checksummed platform receipt binding the installed wheel SHA-256 to lifecycle,
+portability, backup and integrity observations on the machine that performed the release.
 Tag pushes intentionally do not trigger the release workflow; `workflow_dispatch` remains available
 when hosted CI capacity returns. The command refuses dirty, divergent, duplicate-tag, and duplicate-
 release states, and refuses a HEAD commit without `[skip ci]` (or another skip instruction supported
