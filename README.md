@@ -256,6 +256,19 @@ when hosted CI capacity returns. The command refuses dirty, divergent, duplicate
 release states, and refuses a HEAD commit without `[skip ci]` (or another skip instruction supported
 by GitHub). It does not run the optional security test suite.
 
+GitHub's dynamic Dependabot dependency-graph job does not honor commit skip instructions. While the
+hosted Actions quota is unavailable, repository Actions must therefore remain disabled. Restore
+them, then re-enable the push workflows, when hosted capacity returns:
+
+```bash
+gh api --method PUT repos/thangldw/proofline/actions/permissions -F enabled=true
+gh workflow enable "API CI"
+gh workflow enable "Secret Scan"
+```
+
+Direct local releases continue to work while Actions are disabled because `release-local` pushes an
+annotated tag and publishes artifacts through `gh release`, not `workflow_dispatch`.
+
 ### Data portability and recovery
 
 Proofline can write an inspectable portable JSON snapshot or a complete local
