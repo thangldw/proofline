@@ -1,6 +1,7 @@
 # Embedded runtime lifecycle
 
-Proofline v0.10.0 defines a process contract that a future native shell or local service manager
+Proofline v0.10.0 defines the process contract, and v0.11.0 bundles the web UI into the installed
+wheel so a future native shell or local service manager
 can supervise. This is a packaging foundation, not a signed desktop application or a production
 support claim.
 
@@ -13,14 +14,14 @@ proofline serve \
   --host 127.0.0.1 \
   --port 0 \
   --data-dir "$HOME/Library/Application Support/Proofline" \
-  --web-dir ./proofline-web \
   --ready-file ./proofline-ready.json
 ```
 
 - `--port 0` asks the OS for an available port and avoids a fixed-port collision.
 - `--data-dir` owns the default `proofline.db` and `providers.json`. The equivalent environment
   variable is `PROOFLINE_HOME`; an explicit `PROOFLINE_DATABASE_URL` still overrides the database.
-- `--web-dir` must contain `index.html`. The API, `/health`, and the web app then share one origin.
+- The bundled web UI, API, and `/health` share one origin. `--no-web` starts API-only mode;
+  `--web-dir` explicitly replaces the bundled UI and must contain `index.html`.
 - `--ready-file` is written atomically with owner-only permissions after migrations, ingestion
   recovery, and watcher startup succeed. The same JSON is written to stdout.
 - Failure before readiness exits without leaving a ready file. Error output contains a stable
@@ -55,6 +56,7 @@ database file directly and must keep rollback data until the restored process is
 
 ## Support boundary
 
-This contract has local automated coverage for dynamic-port startup, readiness, same-origin web
-serving, data-directory creation, `/health`, graceful `SIGTERM`, and cleanup. Windows, installer
+This contract has local automated coverage for dynamic-port startup, readiness, bundled same-origin
+web serving from a cleanly installed wheel, data-directory creation, `/health`, graceful `SIGTERM`,
+and cleanup. Windows, installer
 signing, update rollback, native auto-launch, and production qualification remain unverified gates.

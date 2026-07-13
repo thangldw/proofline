@@ -81,11 +81,13 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         help="Atomically publish readiness metadata and remove it on shutdown",
     )
-    serve.add_argument(
+    web_mode = serve.add_mutually_exclusive_group()
+    web_mode.add_argument(
         "--web-dir",
         type=Path,
-        help="Serve a built Proofline web archive from the same process",
+        help="Serve this built web archive instead of the bundled UI",
     )
+    web_mode.add_argument("--no-web", action="store_true", help="Run the API without the web UI")
     serve.add_argument(
         "--log-level", choices=("critical", "error", "warning", "info"), default="info"
     )
@@ -144,6 +146,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     if args.command == "serve":
+        if args.no_web:
+            os.environ["PROOFLINE_DISABLE_WEB"] = "true"
         if args.web_dir is not None:
             web_dir = args.web_dir.expanduser().resolve()
             if not (web_dir / "index.html").is_file():

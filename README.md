@@ -166,19 +166,19 @@ make eval
 npm run test:e2e
 ```
 
-## Embedded local run
+## One-command local run
 
-The installed v0.10.0 command can run the API and a built web archive in one supervised process:
+The v0.11.0 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
-npm run build:web
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
-  --web-dir apps/web/dist --ready-file .proofline-runtime/ready.json
+  --ready-file .proofline-runtime/ready.json
 ```
 
 Read the emitted readiness JSON for the selected port, then open that loopback URL. `SIGTERM` and
 `SIGINT` shut down gracefully and remove the ready file. See the
-[embedded lifecycle contract](docs/embedded-lifecycle.md) for wrapper and recovery requirements.
+[embedded lifecycle contract](docs/embedded-lifecycle.md) and
+[pre-alpha support boundary](docs/alpha-support-boundary.md) for wrapper and recovery requirements.
 
 The pre-alpha workflow runs source-development smoke checks
 on Ubuntu and macOS 14 with Python 3.11 and Node.js 20. Its checked-in script covers

@@ -59,6 +59,7 @@ tar -czf "$release_dir/proofline-web-$tag.tar.gz" -C apps/web/dist .
 python3 -m venv "$smoke_dir/venv"
 "$smoke_dir/venv/bin/pip" install --quiet "$release_dir"/*.whl
 "$smoke_dir/venv/bin/proofline" --version
+python3 scripts/installed_server_smoke.py --proofline "$smoke_dir/venv/bin/proofline"
 database_url="sqlite:///$smoke_dir/proofline.db"
 PROOFLINE_DATABASE_URL="$database_url" "$smoke_dir/venv/bin/proofline" seed >/dev/null
 PROOFLINE_DATABASE_URL="$database_url" "$smoke_dir/venv/bin/proofline" verify-integrity

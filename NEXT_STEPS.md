@@ -1,7 +1,7 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** các lát cắt P1 nội bộ đã phát hành đến `v0.10.0`; Windows, production
+**Trạng thái hiện tại:** các lát cắt P1 nội bộ đã phát hành đến `v0.11.0`; Windows, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -87,6 +87,7 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [ ] Hoàn thiện production packaging; chưa tuyên bố production support.
 - [x] Hoàn thiện embedded start/ready/stop, data-directory, migration/recovery và same-origin web
   lifecycle làm nền cho native wrapper.
+- [x] Bundle reviewed web UI vào wheel và smoke-test executable đã cài để chạy local bằng một lệnh.
 - [x] Đánh giá Tauri desktop packaging; ADR 0003 hoãn triển khai cho đến khi Windows, lifecycle
   API/web và production support boundary được chứng minh.
 
@@ -166,7 +167,7 @@ Các phần vẫn chủ động không làm sớm:
 - [ ] Chốt license dài hạn: giữ MIT hay chuyển sang cấu trúc open-core/dual license cho contribution tương lai.
 - [ ] Nếu thay license, cần tư vấn pháp lý và contributor-rights strategy; không đổi license âm thầm.
 - [ ] Xác minh trademark/domain/package names cho Proofline.
-- [ ] Chuẩn bị alpha release criteria và support boundary rõ ràng.
+- [x] Chuẩn bị alpha release criteria và support boundary rõ ràng.
 
 ## Checklist bắt đầu phiên làm việc ngày mai
 
