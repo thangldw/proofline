@@ -7,7 +7,22 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.10`.
+No changes have been recorded after `v0.14.11`.
+
+## [0.14.11] - 2026-07-14
+
+### Added
+
+- Add a root support policy covering the supported experiment, safe issue reports, data-loss
+  escalation, operator backup responsibility, upgrade/database rollback and release cadence.
+- Add a maintainer document naming the current pre-alpha owner and recording unassigned production
+  signing, updater, incident-response, retention, evaluation and pilot responsibilities.
+
+### Changed
+
+- Narrow the remaining public-repository gate to the external GitHub visibility decision.
+- Distinguish complete pre-alpha operational documentation from unaccepted production support
+  commitments.
 
 ## [0.14.10] - 2026-07-14
 

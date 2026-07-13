@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.10 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.11 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -254,11 +254,14 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.10` is the latest experimental pre-alpha release. It adds an atomic verified-backup restore
-command that preserves a rollback copy and exercises both restore directions in the installed-
-artifact receipt. It retains the opt-in macOS Keychain and Windows Credential Locker provider-key
-storage from v0.14.9. See the [release notes](docs/releases/v0.14.10.md) and verify `SHA256SUMS`
-before installation.
+`v0.14.11` is the latest experimental pre-alpha release. It publishes the root support and
+maintainer policies needed for an honest public repository, including data-loss escalation,
+upgrade/database rollback and explicit production ownership gaps. It retains the reversible backup
+restore receipt from v0.14.10. See the [release notes](docs/releases/v0.14.11.md) and verify
+`SHA256SUMS` before installation.
+
+Public issue handling, data-loss escalation, upgrade/rollback expectations and ownership gaps are
+documented in [SUPPORT.md](SUPPORT.md) and [MAINTAINERS.md](MAINTAINERS.md).
 
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
@@ -279,7 +282,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.10
+make release-local TAG=v0.14.11
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
