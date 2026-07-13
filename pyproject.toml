@@ -1,6 +1,6 @@
 [project]
 name = "proofline"
-version = "0.9.1"
+version = "0.10.0"
 description = "Evidence-first engineering decision memory"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,7 +30,7 @@ dev = [
 ]
 
 [project.scripts]
-proofline = "proofline.cli:main"
+proofline = "proofline.runtime:main"
 
 [build-system]
 requires = ["hatchling"]

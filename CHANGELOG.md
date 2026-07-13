@@ -7,7 +7,28 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.9.1`.
+No changes have been recorded after `v0.10.0`.
+
+## [0.10.0] - 2026-07-13
+
+### Added
+
+- The local server can bind an OS-selected port, publish atomic machine-readable readiness, use an
+  owned data directory, and serve the built web archive from the API process.
+- The installed `proofline` entry point applies the data directory before database and provider
+  configuration are initialized.
+
+### Changed
+
+- `SIGTERM` and `SIGINT` now drive a graceful watcher/API shutdown and remove the readiness file.
+- `/health` reports the running Proofline version.
+
+### Quality
+
+- Subprocess coverage proves start, migrate, ready, same-origin web/API access, graceful stop, and
+  cleanup without external services.
+- A screenshot-backed launch-flow audit and source-backed receipt metadata report document the
+  remaining accessibility and evidence-quality follow-ups.
 
 ## [0.9.1] - 2026-07-13
 

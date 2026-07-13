@@ -18,7 +18,8 @@ Reconsider Tauri only after all of these evidence gates are met:
 
 1. `scripts/platform_smoke.py` passes on a real Windows runner or machine.
 2. The API has a documented start/stop, data-directory, migration and recovery lifecycle suitable
-   for an embedded sidecar.
+   for an embedded sidecar. **Satisfied locally in v0.10.0 by `docs/embedded-lifecycle.md`; Windows
+   behavior remains part of gate 1.**
 3. Installer signing, update rollback and supported OS versions have named owners.
 4. Production packaging is qualified independently of the desktop wrapper.
 

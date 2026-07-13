@@ -43,8 +43,13 @@ def provider_config_path() -> Path:
     return (
         Path(configured).expanduser().resolve()
         if configured
-        else (Path.cwd() / ".proofline" / "providers.json")
+        else (proofline_home() / "providers.json")
     )
+
+
+def proofline_home() -> Path:
+    configured = os.getenv("PROOFLINE_HOME")
+    return Path(configured).expanduser().resolve() if configured else (Path.cwd() / ".proofline")
 
 
 def load_provider_config(path: Path | None = None) -> dict:
@@ -93,7 +98,7 @@ def _folder_watch_interval() -> int:
 
 
 def get_settings() -> Settings:
-    default_db = Path.cwd() / ".proofline" / "proofline.db"
+    default_db = proofline_home() / "proofline.db"
     database_url = os.getenv("PROOFLINE_DATABASE_URL", f"sqlite:///{default_db}")
     origins = os.getenv("PROOFLINE_CORS_ORIGINS", "http://localhost:5173")
     stored = load_provider_config()

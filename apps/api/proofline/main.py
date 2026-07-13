@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
@@ -55,7 +58,14 @@ def create_app(database_engine: Engine = engine) -> FastAPI:
 
     @application.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "version": __version__}
+
+    web_dir_value = os.getenv("PROOFLINE_WEB_DIR")
+    if web_dir_value:
+        web_dir = Path(web_dir_value).expanduser().resolve()
+        if not (web_dir / "index.html").is_file():
+            raise RuntimeError("PROOFLINE_WEB_DIR must contain index.html")
+        application.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
     return application
 
