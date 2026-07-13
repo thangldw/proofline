@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+
+DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
 
 
 def new_id() -> str:
@@ -17,10 +19,37 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+
+class WorkspaceLease(Base):
+    __tablename__ = "workspace_leases"
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    owner_id: Mapped[str] = mapped_column(String(36), index=True)
+    purpose: Mapped[str] = mapped_column(String(80))
+    expires_at: Mapped[datetime] = mapped_column(
+        default=lambda: utc_now() + timedelta(minutes=30), index=True
+    )
+
+
 class Source(Base):
     __tablename__ = "sources"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(300))
     kind: Mapped[str] = mapped_column(String(30), default="markdown")
     uri: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -47,6 +76,11 @@ class GitRepository(Base):
     __tablename__ = "git_repositories"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(300))
     path: Mapped[str] = mapped_column(Text, unique=True)
     current_commit_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
@@ -151,6 +185,11 @@ class IngestionJob(Base):
     __tablename__ = "ingestion_jobs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     source_id: Mapped[str | None] = mapped_column(
         ForeignKey("sources.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -177,6 +216,11 @@ class IngestionJobInput(Base):
     job_id: Mapped[str] = mapped_column(
         ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), primary_key=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(300))
     kind: Mapped[str] = mapped_column(String(30))
     uri: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -189,6 +233,11 @@ class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     actor: Mapped[str] = mapped_column(String(100), default="local_user")
     action: Mapped[str] = mapped_column(String(80))
     object_type: Mapped[str] = mapped_column(String(50), index=True)
@@ -202,6 +251,11 @@ class ModelRun(Base):
     __tablename__ = "model_runs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        default=DEFAULT_WORKSPACE_ID,
+        index=True,
+    )
     provider_id: Mapped[str] = mapped_column(String(100))
     model_id: Mapped[str] = mapped_column(String(200))
     operation: Mapped[str] = mapped_column(String(50))

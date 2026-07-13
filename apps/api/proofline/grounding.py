@@ -20,7 +20,7 @@ from .model_gateway import (
     build_repair_request,
     run_generation,
 )
-from .models import ModelRun, SourceVersion
+from .models import DEFAULT_WORKSPACE_ID, ModelRun, Source, SourceVersion
 from .reranking import Reranker
 from .schemas import AnswerCitation, AnswerExclusion, AnswerResponse, AnswerStatement, SearchHit
 
@@ -198,6 +198,7 @@ def answer_question(
     ingested_from: datetime | None = None,
     ingested_before: datetime | None = None,
     reranker: Reranker | None = None,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
 ) -> AnswerResponse:
     hits = hybrid_search(
         session,
@@ -210,6 +211,7 @@ def answer_question(
         ingested_from=ingested_from,
         ingested_before=ingested_before,
         reranker=reranker,
+        workspace_id=workspace_id,
     )
     if not hits:
         return AnswerResponse(
@@ -248,7 +250,8 @@ def answer_question(
         update={
             "input_hashes": sorted(
                 version.content_hash for version in versions.values() if version is not None
-            )
+            ),
+            "workspace_id": session.get(Source, hits[0].source_id).workspace_id,
         }
     )
     hit_by_id = {hit.chunk_id: hit for hit in hits}
