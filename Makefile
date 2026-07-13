@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval simulate-pilot check format release-check
+.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval simulate-pilot check format release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -59,3 +59,7 @@ format:
 release-check:
 	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.6.0"; exit 2)
 	.venv/bin/python scripts/release_check.py --tag "$(TAG)"
+
+release-local:
+	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.8.0"; exit 2)
+	./scripts/release_local.sh "$(TAG)"

@@ -7,7 +7,11 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.7.0`.
+### Changed
+
+- Release tag pushes no longer start GitHub Actions automatically. Maintainers can run the guarded
+  `make release-local TAG=vX.Y.Z` path to test, build, smoke-check, tag, and publish from a local
+  machine when hosted Actions quota is unavailable.
 
 ## [0.7.0] - 2026-07-13
 

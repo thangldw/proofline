@@ -202,6 +202,19 @@ reverse proxy that forwards `/api` and `/health` to the loopback-bound Proofline
 proven two-process development workflow above. See the
 [release notes](docs/releases/v0.7.0.md) and verify `SHA256SUMS` before installation.
 
+When GitHub Actions minutes are unavailable, a release can be built and published from a clean,
+up-to-date local `main` checkout without starting CI:
+
+```bash
+make release-local TAG=v0.8.0
+```
+
+The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
+immutable annotated tag, pushes only that tag, and uploads versioned artifacts through `gh`.
+Tag pushes intentionally do not trigger the release workflow; `workflow_dispatch` remains available
+when hosted CI capacity returns. The command refuses dirty, divergent, duplicate-tag, and duplicate-
+release states. It does not run the optional security test suite.
+
 ### Data portability and recovery
 
 Proofline can write an inspectable portable JSON snapshot or a complete local
