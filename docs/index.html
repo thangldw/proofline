@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Proofline — Evidence-first engineering decision memory</title>
+  <meta name="description" content="Proofline turns engineering sources into traceable decisions, answers, and learning artifacts backed by immutable versions and exact source lines.">
+  <link rel="canonical" href="https://thangldw.github.io/proofline/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Proofline — Every engineering answer should show its receipts">
+  <meta property="og:description" content="A local-first engineering decision memory with immutable source versions and exact citations.">
+  <meta property="og:url" content="https://thangldw.github.io/proofline/">
+  <meta property="og:image" content="https://thangldw.github.io/proofline/images/proofline-evidence-first.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="proofline-page.css?v=20260714a">
+  <script>document.documentElement.dataset.theme=localStorage.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="https://thangldw.github.io/" aria-label="Thang Luu portfolio">thang<span>.</span></a>
+      <nav aria-label="Primary navigation">
+        <a href="#why">Why Proofline</a>
+        <a href="#studio">Studio</a>
+        <a href="#try">Try it</a>
+        <a href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch color theme"><span aria-hidden="true">◐</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero-copy reveal">
+        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPEN SOURCE · EXPERIMENTAL PRE-ALPHA · v0.14.13</p>
+        <h1>Every engineering answer should show its <em>receipts.</em></h1>
+        <p class="hero-lead">Proofline turns local documents, notes, and Git history into decision memory. Every derived claim leads back to an immutable source version and its exact lines.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#try">Launch locally <span aria-hidden="true">→</span></a>
+          <a class="btn secondary" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">Explore the source <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="local-note">Local-first by default · External AI optional · No cloud account required</p>
+      </div>
+
+      <div class="trace-demo reveal" aria-label="Example of a Proofline answer traced to exact evidence">
+        <div class="demo-toolbar"><span>GROUNDING TRACE</span><span class="demo-state">CITATION VALID</span></div>
+        <div class="source-card">
+          <div class="source-meta"><span>ADR-007.md</span><span>version 97ee7fb8</span></div>
+          <p><span class="line">01</span><mark>Decision: Use SQLite for the local queue.</mark></p>
+          <p><span class="line">02</span><mark>Rationale: Keep development self-contained</mark></p>
+          <p><span class="line">03</span><mark>and avoid an external broker.</mark></p>
+        </div>
+        <div class="trace-line"><span>immutable source span</span><i aria-hidden="true"></i><span>answer</span></div>
+        <div class="answer-card">
+          <p class="answer-label">EVIDENCE-BACKED ANSWER</p>
+          <strong>The queue uses SQLite to keep local development self-contained.</strong>
+          <div class="citation">ADR-007.md · Lines 1–3 · offsets 0:142</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-band" aria-label="Proofline release evidence">
+      <div class="proof-grid wrap">
+        <div><strong>289</strong><span>backend tests</span></div>
+        <div><strong>55</strong><span>frontend tests</span></div>
+        <div><strong>9</strong><span>Studio artifact types</span></div>
+        <div><strong>0</strong><span>required external services</span></div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="why">
+      <div class="section-heading reveal">
+        <p class="eyebrow">WHY PROOFLINE</p>
+        <h2>Teams remember <em>what</em> shipped.<br>They lose <em>why</em>.</h2>
+        <p>Architecture decisions fragment across repositories, notes, and model chats. Search finds text. Proofline preserves the evidence chain needed to trust an answer later.</p>
+      </div>
+      <div class="feature-grid reveal">
+        <article><span class="feature-number">01_</span><h3>Immutable by design</h3><p>Every edit creates a new source version. Historical citations keep resolving to the original content.</p></article>
+        <article><span class="feature-number">02_</span><h3>Exact, inspectable proof</h3><p>Answers, memories, study cards, and proposals retain source IDs, offsets, line ranges, and quote hashes.</p></article>
+        <article><span class="feature-number">03_</span><h3>Local-first control</h3><p>SQLite, bundled web UI, deterministic retrieval, local backups, and optional model providers keep the offline core useful.</p></article>
+      </div>
+    </section>
+
+    <section class="section workflow-section">
+      <div class="wrap">
+        <div class="section-heading compact reveal"><p class="eyebrow">HOW IT WORKS</p><h2>From source to defensible context.</h2></div>
+        <ol class="workflow reveal">
+          <li><span>01</span><div><h3>Capture</h3><p>Import Markdown, text, registered folders, local Git repositories, or quick notes.</p></div></li>
+          <li><span>02</span><div><h3>Version</h3><p>Index content against a stable identity without overwriting historical evidence.</p></div></li>
+          <li><span>03</span><div><h3>Recover</h3><p>Search decisions, rationale, contradictions, timelines, and learning material.</p></div></li>
+          <li><span>04</span><div><h3>Verify</h3><p>Open the exact source version, line range, and quote behind every generated section.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section wrap product-section">
+      <div class="product-copy reveal">
+        <p class="eyebrow">BUILT FOR INSPECTION</p>
+        <h2>Useful when AI is available.<br>Still useful when it is not.</h2>
+        <p>Proofline fails visibly into deterministic retrieval instead of inventing an uncited response. Provider settings stay behind interfaces, remote egress is explicit, and the source evidence remains inspectable.</p>
+        <ul class="check-list">
+          <li>Grounded answers with abstention</li>
+          <li>Decision timelines and contradictions</li>
+          <li>Second-brain notes and backlinks</li>
+          <li>Study cards with append-only review history</li>
+          <li>Human-reviewed AI action proposals</li>
+        </ul>
+      </div>
+      <figure class="product-shot reveal">
+        <img src="images/proofline-screen-search-current.png" alt="Proofline search showing an evidence-backed result with exact source lines and retrieval diagnostics" width="1280" height="896" loading="lazy">
+        <figcaption>Search degrades to raw evidence when no generation provider is configured.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section studio-section" id="studio">
+      <div class="wrap studio-layout">
+        <div class="section-heading reveal">
+          <p class="eyebrow">EVIDENCE STUDIO</p>
+          <h2>Turn sources into learning artifacts.</h2>
+          <p>Generate locally and deterministically today. Every section still points to an immutable source version and exact source lines.</p>
+        </div>
+        <div class="artifact-grid reveal" aria-label="Studio artifact types">
+          <span>Audio overview</span><span>Presentation</span><span>Video storyboard</span>
+          <span>Mind map</span><span>Report</span><span>Flashcards</span>
+          <span>Quiz</span><span>Infographic</span><span>Data table</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap try-section" id="try">
+      <div class="try-copy reveal">
+        <p class="eyebrow">TRY THE LATEST PRE-RELEASE</p>
+        <h2>One wheel. One command.<br>Your data stays local.</h2>
+        <p>The platform-aware launcher selects the application data directory, binds to loopback on a dynamic port, uses macOS Keychain by default, and opens the bundled interface.</p>
+        <div class="qualification"><strong>Current boundary</strong><p>Qualified on local macOS ARM64 as an installed Python wheel. Windows lifecycle, signed native installers, real-model quality, external pilot evidence, security qualification, and production support remain open.</p></div>
+      </div>
+      <div class="terminal reveal" aria-label="Install and launch commands">
+        <div class="terminal-bar"><span>TERMINAL</span><button id="copyCommand" type="button">Copy</button></div>
+        <pre><code id="installCommand">python3 -m venv ~/.proofline-venv
+~/.proofline-venv/bin/pip install \
+  https://github.com/thangldw/proofline/releases/download/v0.14.13/proofline-0.14.13-py3-none-any.whl
+~/.proofline-venv/bin/proofline launch</code></pre>
+        <p id="copyStatus" aria-live="polite">Then open the local URL printed by Proofline.</p>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="wrap cta-inner reveal">
+        <div><p class="eyebrow">ENGINEERING DECISION MEMORY</p><h2>Keep the decision.<br>Keep the proof.</h2></div>
+        <div class="hero-actions"><a class="btn primary" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">View on GitHub <span aria-hidden="true">↗</span></a><a class="btn secondary" href="https://github.com/thangldw/proofline/releases/tag/v0.14.13" target="_blank" rel="noopener noreferrer">Download v0.14.13</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap footer-inner"><a class="brand" href="https://thangldw.github.io/">thang<span>.</span></a><p>Proofline is open-source experimental software · MIT License</p><a href="https://github.com/thangldw/proofline">Source ↗</a></div></footer>
+  <script src="proofline-page.js?v=20260714a"></script>
+</body>
+</html>
