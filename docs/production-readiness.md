@@ -3,6 +3,29 @@
 Status: **not production-ready**. v0.14.17 is an experimental pre-alpha release for approved,
 recoverable local test data.
 
+```mermaid
+flowchart LR
+    C["Core integrity"] --> G{"Production gate"}
+    M["macOS package"] --> G
+    W["Real Windows receipt"] --> G
+    P["External pilot"] --> G
+    Q["Model quality"] --> G
+    S["Security qualification"] --> G
+    G -->|all complete| R["Production-ready claim"]
+    G -->|any open| E["Experimental pre-alpha"]
+
+    classDef complete fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef partial fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef blocked fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef outcome fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    class C complete;
+    class M partial;
+    class W,P,Q,S blocked;
+    class G gate;
+    class R,E outcome;
+```
+
 | Gate | Status | Evidence or blocker |
 | --- | --- | --- |
 | Public repository and community policy | Complete for pre-alpha | MIT license, contribution, conduct, support, security, and ownership files |

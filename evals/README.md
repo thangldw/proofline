@@ -4,6 +4,26 @@ Everything checked into `evals/` is synthetic or a target-specific development r
 deterministic contracts and must not be presented as real-model, external-pilot, adoption, or
 production-performance evidence.
 
+```mermaid
+flowchart LR
+    F["Versioned fixture"] --> R["Production code path"]
+    R --> M["Measured contract"]
+    M --> G{"Threshold"}
+    G -->|pass| C["Regression protected"]
+    G -->|fail| X["Change blocked"]
+
+    classDef fixture fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef blocked fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
+    class F fixture;
+    class R process;
+    class M,C evidence;
+    class G gate;
+    class X blocked;
+```
+
 ## Quality gate
 
 ```bash

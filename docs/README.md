@@ -7,6 +7,7 @@ in Git history and GitHub Releases, not in the active documentation set.
 | --- | --- |
 | [Product brief](product-brief.md) | User, problem, principles, and current scope |
 | [Architecture](architecture.md) | Runtime components, data flow, and invariants |
+| [Visual language](visual-language.md) | Offline typography and collaborative-canvas diagrams |
 | [Provider configuration](provider-configuration.md) | Local/remote model settings and secret storage |
 | [Embedded lifecycle](embedded-lifecycle.md) | Launcher and desktop process contract |
 | [Backup and recovery](backup-recovery.md) | Backup, verification, restore, and rollback |

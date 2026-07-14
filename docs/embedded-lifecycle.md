@@ -2,6 +2,29 @@
 
 The bundled launcher and Tauri sidecar share one local runtime contract.
 
+```mermaid
+flowchart LR
+    U["Launch"] --> D["Resolve app data"]
+    D --> M["Apply migrations"]
+    M --> S["Start loopback API"]
+    S --> R{"Ready?"}
+    R -->|yes| W["Open bundled UI"]
+    R -->|no| F["Visible startup failure"]
+    W --> Q["Graceful shutdown"]
+    Q --> C["Remove ready file"]
+
+    classDef start fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef action fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef success fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef blocked fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
+    class U start;
+    class D,M,S,Q,C action;
+    class R gate;
+    class W success;
+    class F blocked;
+```
+
 ## Start
 
 1. Resolve a platform application-data directory or an explicit `--data-dir`.

@@ -11,6 +11,8 @@ line.
 - Consolidated active documentation around v0.14.17 and removed superseded roadmaps, audits,
   historical release-note copies, screenshots, receipts, unused platform icons, and generated
   development artifacts. Product behavior and evaluation fixtures are unchanged.
+- Standardized offline system typography and added labelled collaborative-canvas diagrams for
+  architecture, lifecycle, evaluation, recovery, roadmap, and release workflows.
 
 ## [0.14.17] - 2026-07-14
 

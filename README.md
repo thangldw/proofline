@@ -8,6 +8,30 @@ Current release: **v0.14.17 experimental pre-alpha**. Use approved, recoverable 
 Windows qualification, signed installers, external pilot evidence, and production support remain
 open.
 
+## Product flow
+
+```mermaid
+flowchart LR
+    S["Approved source"] --> V["Immutable version"]
+    V --> C["Exact chunks"]
+    C --> R["Retrieve evidence"]
+    R --> A["Answer or artifact"]
+    A --> H{"Human review"}
+    H -->|accept| M["Decision memory"]
+    H -->|reject| X["Audit trail"]
+
+    classDef source fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef human fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef outcome fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    class S source;
+    class V,C,R evidence;
+    class A process;
+    class H human;
+    class M,X outcome;
+```
+
 ## What works
 
 - Deterministic ingestion with immutable source versions, exact offsets, and line numbers.
@@ -89,6 +113,7 @@ signing, notarization, update rollback, and uninstall qualification are not comp
 
 - [Documentation index](docs/README.md)
 - [Architecture](docs/architecture.md)
+- [Visual language and typography](docs/visual-language.md)
 - [Current roadmap](NEXT_STEPS.md)
 - [Production readiness](docs/production-readiness.md)
 - [Alpha support boundary](docs/alpha-support-boundary.md)

@@ -15,3 +15,6 @@ PyInstaller sidecars are not cross-platform. Build and qualify on the target OS.
 packages are experimental and unsigned; Windows requires the workflow in
 [`docs/windows-release.md`](../../docs/windows-release.md). Signing, notarization, uninstall,
 upgrade, and updater rollback remain open gates.
+
+The loading screen uses the native system sans-serif stack and ships no font files or remote font
+requests.

@@ -20,6 +20,9 @@ current roadmap explicitly opens that milestone.
 - Do not log source content, credentials, or prompts by default.
 - Test behavior changes and regressions.
 - Keep local development functional without external services.
+- Use only offline system font stacks; do not add remote fonts or font packages.
+- Use the documented collaborative-canvas palette and labelled Mermaid connectors for useful
+  architecture, graph, and workflow diagrams.
 
 ## Completion rule
 
