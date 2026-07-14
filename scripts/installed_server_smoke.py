@@ -37,17 +37,15 @@ def main() -> None:
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="proofline-installed-server-") as directory:
         root = Path(directory)
-        ready_file = root / "ready.json"
+        state = root / "state"
+        ready_file = state / "proofline-ready.json"
         process = subprocess.Popen(
             [
                 str(args.proofline),
-                "serve",
-                "--port",
-                "0",
+                "launch",
                 "--data-dir",
-                str(root / "state"),
-                "--ready-file",
-                str(ready_file),
+                str(state),
+                "--no-browser",
                 "--log-level",
                 "warning",
             ],
@@ -77,6 +75,7 @@ def main() -> None:
                     "version": health["version"],
                     "bundled_web": True,
                     "graceful_shutdown": True,
+                    "platform_launcher": True,
                 },
                 sort_keys=True,
             )

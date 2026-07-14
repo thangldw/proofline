@@ -1,8 +1,9 @@
 # Proofline — công việc còn lại
 
 **Cập nhật:** 2026-07-14
-**Trạng thái hiện tại:** repository public, support/ownership policy, installed-wheel macOS lifecycle,
-backup restore/rollback và OS-keyring qualification receipt đã hoàn thành cho `v0.14.12`; Windows, native packaging, production qualification, real-model
+**Trạng thái hiện tại:** repository public, platform-aware wheel launcher, support/ownership policy,
+installed-wheel macOS lifecycle, backup restore/rollback và OS-keyring qualification receipt đã
+hoàn thành cho `v0.14.13`; Windows, native packaging, production qualification, real-model
 evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -106,6 +107,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Xác nhận default branch, Issues, description và topics công khai.
 - [x] Cập nhật release/readiness documentation để không còn tuyên bố repository private.
 - [x] Giữ nhãn experimental pre-alpha; không suy diễn public thành production-ready.
+
+### v0.14.13 — Platform-aware installed-wheel launcher
+
+- [x] Thêm `proofline launch` dùng loopback và dynamic port, mở bundled UI bằng default browser.
+- [x] Chọn application-data directory chuẩn theo macOS, Windows và XDG Linux.
+- [x] Bật OS keyring mặc định cho launcher trên macOS/Windows; không ghi secret vào receipt.
+- [x] Ready-file nằm trong app state và được xóa khi shutdown sạch.
+- [x] Giữ ranh giới rõ: đây là wheel launcher, không phải native/signed desktop application.
 
 ## Việc nên làm đầu tiên ngày mai
 

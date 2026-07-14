@@ -7,7 +7,22 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.12`.
+No changes have been recorded after `v0.14.13`.
+
+## [0.14.13] - 2026-07-14
+
+### Added
+
+- Add `proofline launch` for a loopback-only dynamic-port installed-wheel experience that opens the
+  bundled UI in the default browser.
+- Resolve owned application state to macOS Application Support, Windows Local AppData or the Linux
+  XDG data directory, with an explicit override for testing and recovery.
+
+### Changed
+
+- Default the launcher to OS-backed provider secrets on macOS and Windows while preserving explicit
+  secret-store overrides.
+- Publish and clean launcher readiness metadata inside the selected application data directory.
 
 ## [0.14.12] - 2026-07-14
 
