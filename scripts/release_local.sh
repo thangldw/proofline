@@ -56,6 +56,20 @@ trap cleanup EXIT
 npm run build:web
 tar -czf "$release_dir/proofline-web-$tag.tar.gz" -C apps/web/dist .
 
+if [[ $(uname -s) == "Darwin" && $(uname -m) == "arm64" ]]; then
+  rust_bin=$(dirname "$(rustup which cargo)")
+  PATH="$rust_bin:$PATH" make desktop-build
+  desktop_app="apps/desktop/src-tauri/target/release/bundle/macos/Proofline.app"
+  desktop_dmg="apps/desktop/src-tauri/target/release/bundle/dmg/Proofline_${installed_version:-${tag#v}}_aarch64.dmg"
+  desktop_asset="$release_dir/proofline-desktop-$tag-macos-arm64.dmg"
+  cp "$desktop_dmg" "$desktop_asset"
+  .venv/bin/python scripts/desktop_release_receipt.py \
+    --app "$desktop_app" \
+    --dmg "$desktop_asset" \
+    --expected-version "${tag#v}" \
+    --output "$release_dir/proofline-desktop-$tag-macos-arm64.json" >/dev/null
+fi
+
 python3 -m venv "$smoke_dir/venv"
 "$smoke_dir/venv/bin/pip" install --quiet "$release_dir"/*.whl
 installed_version=$("$smoke_dir/venv/bin/proofline" --version)

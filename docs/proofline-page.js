@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var installCommands = "pip install proofline-0.14.14-py3-none-any.whl\nproofline launch";
+  var installCommands = "pip install proofline-0.14.15-py3-none-any.whl\nproofline launch";
   var copyButtons = [
     document.querySelector("#copy-demo"),
     document.querySelector("#copy-demo-primary"),

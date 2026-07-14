@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core desktop-window permissions; the Rust shell owns the private sidecar.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

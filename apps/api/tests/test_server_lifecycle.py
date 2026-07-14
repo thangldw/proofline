@@ -123,6 +123,47 @@ def test_embedded_server_publishes_dynamic_port_serves_bundled_web_and_cleans_re
     assert json.loads(stdout.strip().splitlines()[-1]) == ready
 
 
+def test_embedded_server_gracefully_stops_from_private_shutdown_file(tmp_path):
+    data_dir = tmp_path / "state"
+    ready_file = tmp_path / "runtime" / "ready.json"
+    shutdown_file = tmp_path / "runtime" / "shutdown"
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "proofline.runtime",
+            "serve",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "0",
+            "--data-dir",
+            str(data_dir),
+            "--ready-file",
+            str(ready_file),
+            "--shutdown-file",
+            str(shutdown_file),
+            "--log-level",
+            "warning",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        ready = _wait_for_ready(process, ready_file)
+        shutdown_file.write_text("shutdown\n", encoding="utf-8")
+        process.wait(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+
+    assert ready["host"] == "127.0.0.1"
+    assert process.returncode == 0
+    assert not ready_file.exists()
+    assert not shutdown_file.exists()
+
+
 def test_experimental_launcher_uses_loopback_dynamic_port_and_owned_state(tmp_path):
     data_dir = tmp_path / "Proofline App State"
     ready_file = data_dir / "proofline-ready.json"

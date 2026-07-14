@@ -10,5 +10,6 @@ __pycache__/
 *.db-wal
 node_modules/
 dist/
+build/
 coverage/
 *.tsbuildinfo

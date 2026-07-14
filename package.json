@@ -7,5 +7,5 @@
     "test:e2e": "npm --workspace @proofline/web run test:e2e",
     "test:web": "npm --workspace @proofline/web run test"
   },
-  "workspaces": ["apps/web"]
+  "workspaces": ["apps/web", "apps/desktop"]
 }

@@ -393,10 +393,12 @@ identity in one transaction, rebuilds chunks/FTS without extraction, and records
 merge remaps every imported identity deterministically after an exact preview digest. Destructive
 overwrite is not implemented.
 
-The installed server also has an embedded lifecycle contract: an operator or native wrapper can
+The installed server also has an embedded lifecycle contract: an operator or the experimental
+Tauri v2 wrapper can
 select an owned data directory, bind port `0`, atomically observe readiness after migrations and
 recovery, serve the built web archive from the same origin, and request graceful shutdown. This is
-locally verified packaging infrastructure, not a native desktop or production-support claim.
+locally verified packaging infrastructure. The wrapper bundles a PyInstaller sidecar and uses a
+private shutdown marker, but its unsigned/unqualified installers are not production support.
 
 ### Evidence-first notes
 

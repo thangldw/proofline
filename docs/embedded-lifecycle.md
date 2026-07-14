@@ -14,7 +14,8 @@ proofline serve \
   --host 127.0.0.1 \
   --port 0 \
   --data-dir "$HOME/Library/Application Support/Proofline" \
-  --ready-file ./proofline-ready.json
+  --ready-file ./proofline-ready.json \
+  --shutdown-file ./proofline-shutdown
 ```
 
 - `--port 0` asks the OS for an available port and avoids a fixed-port collision.
@@ -28,6 +29,8 @@ proofline serve \
   recovery, and watcher startup succeed. The same JSON is written to stdout.
 - Failure before readiness exits without leaving a ready file. Error output contains a stable
   category, not source text or credentials.
+- A native shell may create the private `--shutdown-file` to request the same graceful stop on
+  platforms where delivering a process signal is unreliable. The marker is removed on exit.
 
 The ready document contains only supervision metadata:
 
@@ -82,5 +85,6 @@ environment override still wins. `--data-dir` provides a deliberate state-locati
 tests, migration and recovery. Browser-open failure is reported without stopping the loopback
 server, so the printed readiness URL remains usable.
 
-This launcher is distributed inside the Python wheel. It is not a native application, installer,
-signing receipt, auto-updater or Windows qualification.
+This launcher is distributed inside the Python wheel. The experimental v0.14.15 Tauri shell uses
+the same contract with a frozen sidecar; neither path is an Apple-notarized application,
+auto-updater or Windows qualification.

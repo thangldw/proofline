@@ -42,9 +42,18 @@ async def _serve(
     port: int,
     *,
     ready_file: Path | None,
+    shutdown_file: Path | None,
     log_level: str,
     open_browser: bool,
 ) -> None:
+    # Pass the ASGI object directly so frozen desktop binaries do not depend on
+    # Uvicorn's string-based dynamic module import.
+    from .main import app
+
+    resolved_shutdown_file = shutdown_file.expanduser().resolve() if shutdown_file else None
+    if resolved_shutdown_file is not None:
+        resolved_shutdown_file.parent.mkdir(parents=True, exist_ok=True)
+        resolved_shutdown_file.unlink(missing_ok=True)
     listener = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind((host, port))
@@ -52,7 +61,7 @@ async def _serve(
     actual_port = listener.getsockname()[1]
     server = uvicorn.Server(
         uvicorn.Config(
-            "proofline.main:app",
+            app,
             host=host,
             port=actual_port,
             log_level=log_level,
@@ -60,6 +69,7 @@ async def _serve(
         )
     )
     task = asyncio.create_task(server.serve(sockets=[listener]))
+    shutdown_task: asyncio.Task[None] | None = None
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         while not server.started and not task.done():
@@ -74,6 +84,18 @@ async def _serve(
         for signal_name in (signal.SIGINT, signal.SIGTERM):
             previous_handlers[signal_name] = signal.getsignal(signal_name)
             signal.signal(signal_name, request_shutdown)
+
+        async def watch_shutdown_file() -> None:
+            if resolved_shutdown_file is None:
+                return
+            while not server.should_exit:
+                if resolved_shutdown_file.is_file():
+                    server.should_exit = True
+                    return
+                await asyncio.sleep(0.1)
+
+        if resolved_shutdown_file is not None:
+            shutdown_task = asyncio.create_task(watch_shutdown_file())
         payload: dict[str, object] = {
             "event": "ready",
             "host": host,
@@ -93,11 +115,16 @@ async def _serve(
                 )
         await task
     finally:
+        if shutdown_task is not None:
+            shutdown_task.cancel()
+            await asyncio.gather(shutdown_task, return_exceptions=True)
         for signal_name, previous_handler in previous_handlers.items():
             signal.signal(signal_name, previous_handler)
         listener.close()
         if ready_file is not None:
             ready_file.expanduser().resolve().unlink(missing_ok=True)
+        if resolved_shutdown_file is not None:
+            resolved_shutdown_file.unlink(missing_ok=True)
 
 
 def run_server(
@@ -105,6 +132,7 @@ def run_server(
     port: int,
     *,
     ready_file: Path | None = None,
+    shutdown_file: Path | None = None,
     log_level: str = "info",
     open_browser: bool = False,
 ) -> None:
@@ -115,6 +143,7 @@ def run_server(
             host,
             port,
             ready_file=ready_file,
+            shutdown_file=shutdown_file,
             log_level=log_level,
             open_browser=open_browser,
         )

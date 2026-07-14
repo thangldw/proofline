@@ -26,7 +26,7 @@ profile.
 | Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.14` GitHub assets and checksummed platform receipt |
 | macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.14` installed-release receipt plus platform-aware wheel launcher; native signing remains a separate gate |
 | Windows lifecycle | Same installed-artifact and recovery path on a real Windows target | Blocked | No Windows runner or machine receipt |
-| Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Blocked | Tauri remains deferred by ADR 0003 |
+| Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Partial | Experimental Tauri `.app/.dmg` builds locally; macOS notarization, real Windows installers, uninstall and updater rollback receipts remain open |
 | Data integrity | Versioned migrations, immutable source identity, exact spans, deletion cascade and semantic verification | Complete for tested local schema | Migration, provenance, deletion and integrity suites |
 | Backup/recovery | Encrypted retention policy plus successful backup, restore and rollback drills from release artifacts | Partial | `v0.14.14` receipt proves atomic restore and rollback from the installed artifact; encrypted retention policy remains operator-owned and unqualified |
 | Offline core | Useful ingestion, retrieval, memory review and Studio behavior without external services | Complete for deterministic scope | Credential-free regression and UI suites |
@@ -48,7 +48,7 @@ profile.
 ## Next execution order
 
 1. Keep public metadata, support boundaries and implemented/planned claims accurate in each release.
-2. Implement the desktop wrapper on top of the qualified lifecycle and OS-keyring contract.
-3. Obtain a real Windows environment and close the same receipt contract.
+2. Qualify and sign/notarize the implemented desktop wrapper and define updater rollback.
+3. Obtain a real Windows environment, build MSI/NSIS there and close the same receipt contract.
 4. Run the frozen real-model comparison and external pilot.
 5. Complete security qualification before changing the production claim.

@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format sync-web-bundle release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -64,6 +64,15 @@ sync-web-bundle:
 format:
 	.venv/bin/ruff check --fix .
 	.venv/bin/ruff format .
+
+desktop-sidecar:
+	.venv/bin/python scripts/build_desktop_sidecar.py
+
+desktop-check: desktop-sidecar
+	npm run check --workspace @proofline/desktop
+
+desktop-build: desktop-sidecar
+	npm run build --workspace @proofline/desktop
 
 release-check:
 	@test -n "$(TAG)" || (echo "TAG is required, for example TAG=v0.6.0"; exit 2)

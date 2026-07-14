@@ -92,6 +92,11 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         help="Atomically publish readiness metadata and remove it on shutdown",
     )
+    serve.add_argument(
+        "--shutdown-file",
+        type=Path,
+        help="Gracefully stop when this private lifecycle file is created",
+    )
     web_mode = serve.add_mutually_exclusive_group()
     web_mode.add_argument(
         "--web-dir",
@@ -216,6 +221,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.host,
                 args.port,
                 ready_file=args.ready_file,
+                shutdown_file=args.shutdown_file,
                 log_level=args.log_level,
             )
         except (OSError, RuntimeError, ValueError) as exc:
