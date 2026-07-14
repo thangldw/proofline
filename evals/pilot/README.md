@@ -55,3 +55,21 @@ Before analysis, verify at minimum: unique IDs; foreign keys; exactly one eligib
 per `question_id`; at least 25 eligible real questions and 10 temporal; paired timing coverage;
 one judgment for every emitted citation; no synthetic rows in the calculation; and frozen artifact
 SHA-256 hashes recorded in the manifest and gate review.
+
+## Aggregate analyzer
+
+Copy the five data templates into an access-controlled directory using these exact names:
+`questions.jsonl`, `attempts.csv`, `citations.csv`, `weekly-usage.csv`, and
+`commercial-signals.csv`. Create `manifest.json` with `artifact_status` set to
+`frozen_private_dataset`, a shared `dataset_version`, and an `artifact_sha256` entry for every data
+file. Then run:
+
+```bash
+.venv/bin/python scripts/analyze_pilot.py /private/path/to/frozen-pilot \
+  --output /private/path/to/pilot-gate-review.json
+```
+
+The analyzer fails closed on hash, version, ID, foreign-key, synthetic-row, and citation-resolution
+problems. Its output is an unsigned aggregate calculation, not pilot evidence or owner approval.
+Do not commit the private input directory or the generated review without explicit aggregate-use
+consent.

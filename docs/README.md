@@ -13,7 +13,8 @@ way and trace every answer back to exact source evidence.
 | Document | Purpose | Status |
 | --- | --- | --- |
 | [Product website](./index.html) | Public Proofline overview, evidence model and local launch path | Current |
-| [v0.14.16 notes](./releases/v0.14.16.md) | Downloadable Studio evidence packages | Current pre-release |
+| [v0.14.17 notes](./releases/v0.14.17.md) | Windows release and private-pilot tooling | Current pre-release |
+| [v0.14.16 notes](./releases/v0.14.16.md) | Downloadable Studio evidence packages | Pre-alpha |
 | [v0.14.15 notes](./releases/v0.14.15.md) | Experimental Tauri desktop shell | Pre-alpha |
 | [v0.14.14 notes](./releases/v0.14.14.md) | Extended portable evidence archive | Pre-alpha |
 | [v0.14.13 notes](./releases/v0.14.13.md) | Platform-aware installed-wheel launcher | Pre-alpha |
@@ -42,6 +43,7 @@ way and trace every answer back to exact source evidence.
 | [ADR-0001](./adr/0001-scope-and-stack.md) | First scope and technology decision | Accepted |
 | [90-day roadmap](./roadmap-90-days.md) | Validation and delivery plan with measurable gates | Proposed |
 | [External pilot protocol](./pilot-protocol.md) | Consent-safe evidence collection, metric formulas, and go/no-go rules | Ready for collection |
+| [Windows local release](./windows-release.md) | Real-Windows MSI/NSIS build and qualification without Actions | Ready to run on Windows |
 | [Security threat model](./security-threat-model.md) | Assets, trust boundaries, attacker stories, and severity calibration | Baseline |
 | [Backup and recovery](./backup-recovery.md) | Portable export, complete SQLite backup, verification, restore drill, and retention limits | Implemented |
 | [v0.1.0-alpha.5 notes](./releases/v0.1.0-alpha.5.md) | Live provenance integrity verification and cited inference | Pre-alpha |

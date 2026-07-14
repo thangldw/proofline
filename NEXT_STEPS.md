@@ -3,8 +3,8 @@
 **Cập nhật:** 2026-07-14
 **Trạng thái hiện tại:** repository public, platform-aware wheel launcher, support/ownership policy,
 installed-wheel macOS lifecycle, backup restore/rollback, OS-keyring qualification receipt,
-portable evidence archive v2, experimental Tauri shell và Studio evidence packages đã hoàn thành
-cho `v0.14.16`; Windows,
+portable evidence archive v2, experimental Tauri shell, Studio evidence packages, real-Windows
+release workflow và private-pilot aggregate analyzer đã hoàn thành cho `v0.14.17`; Windows receipt,
 signed packaging, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
@@ -201,6 +201,8 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [x] Thêm workspace abstraction và default local workspace tương thích dữ liệu cũ.
 - [x] Quy định workspace-scoped source identity, search, model runs, audit và deletion.
 - [ ] Xác minh Windows trong CI hoặc máy thật.
+- [x] Thêm PowerShell local-release workflow cho Windows thật, MSI/NSIS, installed-wheel +
+  Credential Locker receipt; tooling từ chối tạo Windows receipt trên OS khác.
 - [ ] Hoàn thiện production packaging; chưa tuyên bố production support.
 - [x] Hoàn thiện embedded start/ready/stop, data-directory, migration/recovery và same-origin web
   lifecycle làm nền cho native wrapper.
@@ -243,6 +245,8 @@ Nền tảng preflight đã triển khai ngày 2026-07-13:
 - [ ] Có ít nhất 10 câu hỏi liên quan decision thay đổi theo thời gian.
 - [ ] Ghi baseline thủ công: thời gian trả lời, số nguồn phải mở và confidence.
 - [ ] Chạy pilot hàng tuần và đóng băng report theo protocol trong `docs/pilot-protocol.md`.
+- [x] Thêm analyzer cho frozen private pilot: kiểm SHA-256/ID/FK, aggregate citation/usefulness/time,
+  weekly usage và WTP; output không chứa raw question/source/identity.
 - [ ] Không trộn dữ liệu pilot riêng tư vào repository công khai.
 
 Go/no-go metrics chưa được chứng minh:

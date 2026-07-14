@@ -7,7 +7,25 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.16`.
+No changes have been recorded after `v0.14.17`.
+
+## [0.14.17] - 2026-07-14
+
+### Added
+
+- Add a no-Actions real-Windows PowerShell release workflow for full tests, wheel qualification,
+  frozen sidecar, MSI/NSIS installers, Windows Credential Locker receipt, checksums and GitHub
+  release upload.
+- Add a Windows-only desktop receipt that refuses to run on another operating system and keeps
+  signing/uninstall/upgrade claims explicitly open.
+- Add a private-pilot aggregate analyzer with frozen-file hashes, identifier/foreign-key checks,
+  citation coverage, usefulness, median time improvement, weekly adoption and concrete WTP gates.
+
+### Validation
+
+- Cover a complete 25-question aggregate pilot calculation and reject a tampered frozen artifact.
+- Leave Windows and external-pilot gates open until the tooling runs with a real Windows machine
+  and permissioned external participants respectively.
 
 ## [0.14.16] - 2026-07-14
 
