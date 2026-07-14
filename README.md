@@ -8,6 +8,13 @@ Current release: **v0.14.17 experimental pre-alpha**. Use approved, recoverable 
 Windows qualification, signed installers, external pilot evidence, and production support remain
 open.
 
+## Product demo
+
+![Proofline Evidence Studio showing evidence-backed learning artifact tools](docs/assets/proofline-demo.png)
+
+Evidence Studio running locally with the bundled example source. The screenshot shows the current
+web bundle and does not depend on an external model or font service.
+
 ## Product flow
 
 ```mermaid
