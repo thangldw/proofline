@@ -7,7 +7,26 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.13`.
+No changes have been recorded after `v0.14.14`.
+
+## [0.14.14] - 2026-07-14
+
+### Added
+
+- Add portable export schema v2 for workspace-scoped chunks, study cards and append-only reviews,
+  grounded action proposals and citations, and Evidence Studio artifacts and citations.
+- Add deterministic all-ID remapping for every new portable collection and preserve exact source
+  spans through empty-database restore and non-empty merge.
+
+### Changed
+
+- Preserve chunk identities directly instead of rebuilding them with new IDs during import.
+- Upgrade verified schema-v1 exports in memory so older core snapshots remain restorable.
+
+### Validation
+
+- Cover full study scheduling, reviewed proposal and Studio artifact round trips, v1 upgrade,
+  tamper rejection, atomic rollback and no-overwrite merge behavior.
 
 ## [0.14.13] - 2026-07-14
 

@@ -14,7 +14,9 @@ from proofline.ingestion import (
     retry_ingestion_job,
 )
 from proofline.integrity import verify_live_database
+from proofline.model_gateway import FakeGenerationProvider
 from proofline.models import (
+    ActionProposal,
     AuditEvent,
     Chunk,
     ChunkEmbedding,
@@ -23,8 +25,13 @@ from proofline.models import (
     ImportReceipt,
     IngestionJob,
     ModelRun,
+    ProposalCitation,
     Source,
     SourceVersion,
+    StudioArtifact,
+    StudioCitation,
+    StudyCard,
+    StudyReview,
 )
 from proofline.portability import (
     PortabilityError,
@@ -160,6 +167,71 @@ def test_import_round_trip_preserves_provenance_and_rebuilds_only_indexes(sessio
     engine.dispose()
 
 
+def test_round_trip_preserves_study_proposals_and_studio(client, session, tmp_path, monkeypatch):
+    content = (
+        "# Queue lesson\n\nQ: Why retain failed work?\n"
+        "A: It allows explicit bounded retries.\n\n"
+        "Retries must cite the immutable queue evidence."
+    )
+    source = client.post(
+        "/api/v1/sources", json={"title": "Queue lesson", "content": content}
+    ).json()
+    card = client.post(f"/api/v1/sources/{source['id']}/study-cards").json()[0]
+    review_response = client.post(
+        f"/api/v1/study-cards/{card['id']}/reviews", json={"rating": "good"}
+    )
+    assert review_response.status_code == 200
+    artifact = client.post(
+        "/api/v1/studio-artifacts",
+        json={"source_id": source["id"], "kind": "report"},
+    ).json()
+    chunk = session.scalar(
+        select(Chunk).where(
+            Chunk.source_id == source["id"],
+            Chunk.source_version_id == source["current_version_id"],
+        )
+    )
+    provider = FakeGenerationProvider(
+        json.dumps(
+            {
+                "statements": [
+                    {
+                        "text": "Use explicit bounded retries.",
+                        "kind": "inference",
+                        "evidence_ids": [chunk.id],
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setattr("proofline.api.build_generation_provider", lambda _settings: provider)
+    proposal = client.post(
+        "/api/v1/action-proposals", json={"question": "How should retries work?"}
+    ).json()
+    client.patch(
+        f"/api/v1/action-proposals/{proposal['id']}", json={"status": "accepted"}
+    ).raise_for_status()
+
+    document = build_portable_export(session)
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target, target.begin():
+        import_portable_export(target, document)
+    with factory() as target:
+        rebuilt = build_portable_export(target)
+        assert rebuilt["payload"] == document["payload"]
+        assert target.get(StudyCard, card["id"]) is not None
+        assert target.scalar(select(StudyReview).where(StudyReview.card_id == card["id"]))
+        assert target.get(ActionProposal, proposal["id"]).status == "accepted"
+        assert target.scalar(
+            select(ProposalCitation).where(ProposalCitation.proposal_id == proposal["id"])
+        )
+        assert target.get(StudioArtifact, artifact["id"]) is not None
+        assert target.scalar(
+            select(StudioCitation).where(StudioCitation.artifact_id == artifact["id"])
+        )
+    engine.dispose()
+
+
 def test_import_rejects_nonempty_target_without_mutation(session, tmp_path):
     document, *_ = _rich_document(session)
     engine, factory = _target_factory(tmp_path)
@@ -261,7 +333,7 @@ def test_import_rolls_back_and_hides_internal_failure(session, tmp_path, monkeyp
     def fail_without_leaking(*_args, **_kwargs):
         raise RuntimeError("PRIVATE-IMPORT-CONTENT")
 
-    monkeypatch.setattr(import_module, "index_source_version_chunks", fail_without_leaking)
+    monkeypatch.setattr(import_module, "_insert_chunks", fail_without_leaking)
     with pytest.raises(PortabilityError, match="^import_failed$") as raised:
         with factory() as target, target.begin():
             import_portable_export(target, document)

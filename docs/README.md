@@ -13,7 +13,8 @@ way and trace every answer back to exact source evidence.
 | Document | Purpose | Status |
 | --- | --- | --- |
 | [Product website](./index.html) | Public Proofline overview, evidence model and local launch path | Current |
-| [v0.14.13 notes](./releases/v0.14.13.md) | Platform-aware installed-wheel launcher | Current pre-release |
+| [v0.14.14 notes](./releases/v0.14.14.md) | Extended portable evidence archive | Current pre-release |
+| [v0.14.13 notes](./releases/v0.14.13.md) | Platform-aware installed-wheel launcher | Pre-alpha |
 | [v0.14.12 notes](./releases/v0.14.12.md) | Public experimental repository and qualification boundary | Current pre-release |
 | [v0.11.0 notes](./releases/v0.11.0.md) | One-command installed app with bundled web UI | Pre-alpha |
 | [Alpha support boundary](./alpha-support-boundary.md) | Current exclusions and evidence required for alpha | Current |

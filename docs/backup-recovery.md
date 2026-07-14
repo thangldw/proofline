@@ -11,7 +11,7 @@ Proofline produces two different artifacts:
 
 | Artifact | Purpose | Contains | Does not contain |
 | --- | --- | --- | --- |
-| Portable JSON export | Inspectable, provider-neutral knowledge snapshot, empty-database restore, or explicit no-overwrite merge | immutable source versions, governed memories, exact evidence, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; overwrite import is not supported |
+| Portable JSON export | Inspectable, provider-neutral knowledge snapshot, empty-database restore, or explicit no-overwrite merge | immutable source versions, exact chunks/evidence, governed memories, study/review history, grounded proposals, Studio artifacts, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; overwrite import is not supported |
 | SQLite backup | Exact recovery of the current local deployment | the complete SQLite database, including source contents, historical versions, indexes, embeddings, audit data, model metadata, and staged ingestion inputs | external files or secrets stored outside SQLite |
 
 The portable export can restore an empty initialized database or be explicitly merged into a
@@ -39,8 +39,9 @@ PROOFLINE_DATABASE_URL=sqlite:///./restored.db \
   .venv/bin/proofline import proofline-export.json
 ```
 
-The importer verifies the size-bounded schema-v1 document before writing. It preserves exported
-IDs and timestamps, rebuilds deterministic chunks and SQLite FTS rows without running extraction,
+The importer verifies the size-bounded schema-v2 document before writing and upgrades verified
+schema-v1 core snapshots in memory. It preserves exported IDs and timestamps, rebuilds SQLite FTS
+rows from the exported exact chunks without running extraction,
 leaves embeddings empty for explicit re-indexing, and commits a unique receipt for the payload
 hash. Any validation, constraint, indexing, or final payload-equivalence failure rolls back the
 whole import.
