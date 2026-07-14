@@ -11,12 +11,14 @@ from proofline.cli import main
 from proofline.ingestion import ingest_source
 from proofline.models import AuditEvent, Decision, IngestionJob, IngestionJobInput, ModelRun
 from proofline.portability import (
+    LEGACY_PORTABLE_EXPORT_SCHEMA,
     PORTABLE_EXPORT_SCHEMA,
     PortabilityError,
     atomic_write_export,
     build_portable_export,
     canonical_json_bytes,
     load_and_verify_export,
+    normalize_portable_export,
     payload_sha256,
     verify_portable_export,
 )
@@ -167,19 +169,51 @@ def test_payload_hash_is_stable_and_export_is_complete_and_private(session):
         "ingestion_job_inputs",
         "idempotency_key",
         "request_hash",
-        "chunks",
         "embeddings",
         "chunk_search",
     ]:
         assert forbidden not in encoded
+    assert first["payload"]["chunks"]
     assert '"prompt":' not in encoded
 
 
 def test_empty_database_export_is_valid_and_deterministic(session):
     document = build_portable_export(session)
 
-    assert document["manifest"]["counts"] == {key: 0 for key in sorted(document["payload"])}
+    expected_counts = {key: 0 for key in sorted(document["payload"])}
+    expected_counts["workspaces"] = 1
+    assert document["manifest"]["counts"] == expected_counts
     assert verify_portable_export(document) == document["manifest"]["counts"]
+
+
+def test_schema_v1_exports_upgrade_without_losing_core_provenance(session):
+    rich_export_fixture(session)
+    current = build_portable_export(session)
+    legacy = copy.deepcopy(current)
+    legacy_keys = {
+        "sources",
+        "source_versions",
+        "memories",
+        "evidence",
+        "model_runs",
+        "audit_events",
+        "ingestion_jobs",
+    }
+    legacy["payload"] = {key: legacy["payload"][key] for key in legacy_keys}
+    for source in legacy["payload"]["sources"]:
+        source.pop("workspace_id")
+    for event in legacy["payload"]["audit_events"]:
+        event.pop("workspace_id")
+    legacy["manifest"]["schema"] = LEGACY_PORTABLE_EXPORT_SCHEMA
+    legacy["manifest"]["counts"] = {key: len(legacy["payload"][key]) for key in sorted(legacy_keys)}
+    legacy["manifest"]["payload_sha256"] = payload_sha256(legacy["payload"])
+
+    counts = verify_portable_export(legacy)
+    normalized = normalize_portable_export(legacy)
+    assert normalized["manifest"]["schema"] == PORTABLE_EXPORT_SCHEMA
+    assert counts == normalized["manifest"]["counts"]
+    assert normalized["payload"]["chunks"]
+    assert normalized["payload"]["study_cards"] == []
 
 
 def test_verifier_detects_hash_and_rehashed_provenance_tampering(session):

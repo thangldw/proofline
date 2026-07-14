@@ -11,8 +11,8 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from .ingestion import index_source_version_chunks
 from .models import (
+    ActionProposal,
     AuditEvent,
     Chunk,
     ChunkEmbedding,
@@ -22,13 +22,20 @@ from .models import (
     IngestionJob,
     IngestionJobInput,
     ModelRun,
+    ProposalCitation,
     Source,
     SourceVersion,
+    StudioArtifact,
+    StudioCitation,
+    StudyCard,
+    StudyReview,
+    Workspace,
 )
 from .portability import (
     PortabilityError,
     build_portable_export,
     load_verified_export_document,
+    normalize_portable_export,
     payload_sha256,
     verify_portable_export,
 )
@@ -43,18 +50,32 @@ DOMAIN_MODELS = (
     ModelRun,
     AuditEvent,
     IngestionJob,
+    StudyCard,
+    StudyReview,
+    ActionProposal,
+    ProposalCitation,
+    StudioArtifact,
+    StudioCitation,
     IngestionJobInput,
     ImportReceipt,
 )
 
 ID_COLLECTIONS = {
+    "workspaces": "workspace",
     "sources": "source",
     "source_versions": "source_version",
+    "chunks": "chunk",
     "memories": "memory",
     "evidence": "evidence",
     "model_runs": "model_run",
     "audit_events": "audit_event",
     "ingestion_jobs": "ingestion_job",
+    "study_cards": "study_card",
+    "study_reviews": "study_review",
+    "action_proposals": "action_proposal",
+    "proposal_citations": "proposal_citation",
+    "studio_artifacts": "studio_artifact",
+    "studio_citations": "studio_citation",
 }
 
 
@@ -116,6 +137,31 @@ def _insert_model_runs(session: Session, items: list[dict[str, Any]]) -> None:
         session.flush()
 
 
+def _insert_chunks(session: Session, items: list[dict[str, Any]]) -> None:
+    for item in items:
+        session.add(
+            Chunk(
+                id=item["id"],
+                source_id=item["source_id"],
+                source_version_id=item["source_version_id"],
+                ordinal=item["ordinal"],
+                content=item["content"],
+                start_offset=item["start_offset"],
+                end_offset=item["end_offset"],
+                start_line=item["start_line"],
+                end_line=item["end_line"],
+            )
+        )
+        session.execute(
+            text(
+                "INSERT INTO chunk_search(chunk_id, source_id, content) "
+                "VALUES (:chunk, :source, :content)"
+            ),
+            {"chunk": item["id"], "source": item["source_id"], "content": item["content"]},
+        )
+    session.flush()
+
+
 def _merge_id(payload_hash: str, kind: str, value: str) -> str:
     namespace = uuid.uuid5(uuid.NAMESPACE_URL, f"proofline:{payload_hash}")
     return str(uuid.uuid5(namespace, f"{kind}:{value}"))
@@ -123,6 +169,7 @@ def _merge_id(payload_hash: str, kind: str, value: str) -> str:
 
 def preview_portable_merge(session: Session, document: dict[str, Any]) -> dict[str, Any]:
     """Return a stable, content-free remap plan without mutating the target."""
+    document = normalize_portable_export(document)
     counts = verify_portable_export(document)
     payload_hash = document["manifest"]["payload_sha256"]
     remap = {
@@ -132,6 +179,14 @@ def preview_portable_merge(session: Session, document: dict[str, Any]) -> dict[s
         }
         for collection, kind in ID_COLLECTIONS.items()
     }
+    for item in document["payload"]["workspaces"]:
+        existing_workspace = session.get(Workspace, item["id"])
+        if (
+            existing_workspace is not None
+            and existing_workspace.slug == item["slug"]
+            and existing_workspace.title == item["title"]
+        ):
+            remap["workspace"][item["id"]] = item["id"]
     existing = {
         model.__tablename__: session.scalar(select(func.count()).select_from(model)) or 0
         for model in DOMAIN_MODELS
@@ -158,11 +213,19 @@ def _remap_document(document: dict[str, Any], plan: dict[str, Any]) -> dict[str,
     payload = remapped["payload"]
     maps = plan["remap"]
 
+    for item in payload["workspaces"]:
+        old_id = item["id"]
+        item["id"] = maps["workspace"][old_id]
+        if item["id"] != old_id:
+            item["slug"] = f"{item['slug'][:67]}-{item['id'][:12]}"
     for collection, kind in ID_COLLECTIONS.items():
+        if collection == "workspaces":
+            continue
         for item in payload[collection]:
             item["id"] = maps[kind][item["id"]]
     for item in payload["sources"]:
         item["identity_hash"] = hashlib.sha256(f"source:{item['id']}".encode()).hexdigest()
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
         item["current_version_id"] = maps["source_version"][item["current_version_id"]]
     for item in payload["source_versions"]:
         item["source_id"] = maps["source"][item["source_id"]]
@@ -175,10 +238,14 @@ def _remap_document(document: dict[str, Any], plan: dict[str, Any]) -> dict[str,
         item["memory_id"] = maps["memory"][item["memory_id"]]
         item["source_id"] = maps["source"][item["source_id"]]
         item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    for item in payload["chunks"]:
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
     for item in payload["model_runs"]:
         if item["parent_run_id"] is not None:
             item["parent_run_id"] = maps["model_run"][item["parent_run_id"]]
     for item in payload["audit_events"]:
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
         object_kind = "memory" if item["object_type"] == "decision" else item["object_type"]
         object_map = maps.get(object_kind)
         if object_map and item["object_id"] in object_map:
@@ -188,6 +255,28 @@ def _remap_document(document: dict[str, Any], plan: dict[str, Any]) -> dict[str,
             item["source_id"] = maps["source"][item["source_id"]]
         if item["source_version_id"] is not None:
             item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    for item in payload["study_cards"]:
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    for item in payload["study_reviews"]:
+        item["card_id"] = maps["study_card"][item["card_id"]]
+    for item in payload["action_proposals"]:
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
+        item["model_run_id"] = maps["model_run"][item["model_run_id"]]
+    for item in payload["proposal_citations"]:
+        item["proposal_id"] = maps["action_proposal"][item["proposal_id"]]
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+        item["chunk_id"] = maps["chunk"][item["chunk_id"]]
+    for item in payload["studio_artifacts"]:
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+    for item in payload["studio_citations"]:
+        item["artifact_id"] = maps["studio_artifact"][item["artifact_id"]]
+        item["source_id"] = maps["source"][item["source_id"]]
+        item["source_version_id"] = maps["source_version"][item["source_version_id"]]
     return remapped
 
 
@@ -204,6 +293,23 @@ def _import_verified(
     versions_by_id = {item["id"]: item for item in payload["source_versions"]}
 
     try:
+        for item in payload["workspaces"]:
+            existing = session.get(Workspace, item["id"])
+            if existing is None:
+                session.add(
+                    Workspace(
+                        id=item["id"],
+                        slug=item["slug"],
+                        title=item["title"],
+                        created_at=_datetime(item["created_at"]),
+                    )
+                )
+            elif existing.slug != item["slug"] or existing.title != item["title"]:
+                raise PortabilityError("workspace_conflict")
+            else:
+                existing.created_at = _datetime(item["created_at"])
+        session.flush()
+
         _insert_model_runs(session, payload["model_runs"])
 
         sources: dict[str, Source] = {}
@@ -211,6 +317,7 @@ def _import_verified(
             current = versions_by_id[item["current_version_id"]]
             source = Source(
                 id=item["id"],
+                workspace_id=item["workspace_id"],
                 title=item["title"],
                 kind=item["kind"],
                 uri=item["uri"],
@@ -224,6 +331,8 @@ def _import_verified(
             session.add(source)
             sources[source.id] = source
         session.flush()
+
+        _insert_chunks(session, payload["chunks"])
 
         versions: dict[str, SourceVersion] = {}
         for item in payload["source_versions"]:
@@ -280,20 +389,6 @@ def _import_verified(
                 )
             )
 
-        for item in payload["audit_events"]:
-            session.add(
-                AuditEvent(
-                    id=item["id"],
-                    actor=item["actor"],
-                    action=item["action"],
-                    object_type=item["object_type"],
-                    object_id=item["object_id"],
-                    before_json=item["before"],
-                    after_json=item["after"],
-                    created_at=_datetime(item["created_at"]),
-                )
-            )
-
         for item in payload["ingestion_jobs"]:
             session.add(
                 IngestionJob(
@@ -318,13 +413,121 @@ def _import_verified(
             )
         session.flush()
 
-        for item in payload["source_versions"]:
-            index_source_version_chunks(
-                session,
-                sources[item["source_id"]],
-                versions[item["id"]],
-                item["content"],
+        for item in payload["study_cards"]:
+            session.add(
+                StudyCard(
+                    id=item["id"],
+                    workspace_id=item["workspace_id"],
+                    source_id=item["source_id"],
+                    source_version_id=item["source_version_id"],
+                    question=item["question"],
+                    answer=item["answer"],
+                    quote_hash=item["quote_hash"],
+                    start_offset=item["start_offset"],
+                    end_offset=item["end_offset"],
+                    start_line=item["start_line"],
+                    end_line=item["end_line"],
+                    state=item["state"],
+                    interval_days=item["interval_days"],
+                    due_at=_datetime(item["due_at"]),
+                    created_at=_datetime(item["created_at"]),
+                    updated_at=_datetime(item["updated_at"]),
+                )
             )
+        session.flush()
+        for item in payload["study_reviews"]:
+            session.add(
+                StudyReview(
+                    id=item["id"],
+                    card_id=item["card_id"],
+                    rating=item["rating"],
+                    previous_interval_days=item["previous_interval_days"],
+                    next_interval_days=item["next_interval_days"],
+                    reviewed_at=_datetime(item["reviewed_at"]),
+                )
+            )
+
+        for item in payload["action_proposals"]:
+            session.add(
+                ActionProposal(
+                    id=item["id"],
+                    workspace_id=item["workspace_id"],
+                    goal=item["goal"],
+                    body=item["body"],
+                    status=item["status"],
+                    model_run_id=item["model_run_id"],
+                    created_at=_datetime(item["created_at"]),
+                    updated_at=_datetime(item["updated_at"]),
+                )
+            )
+        session.flush()
+        for item in payload["proposal_citations"]:
+            session.add(
+                ProposalCitation(
+                    id=item["id"],
+                    proposal_id=item["proposal_id"],
+                    source_id=item["source_id"],
+                    source_version_id=item["source_version_id"],
+                    chunk_id=item["chunk_id"],
+                    source_title=item["source_title"],
+                    quote=item["quote"],
+                    quote_hash=item["quote_hash"],
+                    start_offset=item["start_offset"],
+                    end_offset=item["end_offset"],
+                    start_line=item["start_line"],
+                    end_line=item["end_line"],
+                )
+            )
+
+        for item in payload["studio_artifacts"]:
+            session.add(
+                StudioArtifact(
+                    id=item["id"],
+                    workspace_id=item["workspace_id"],
+                    source_id=item["source_id"],
+                    source_version_id=item["source_version_id"],
+                    kind=item["kind"],
+                    title=item["title"],
+                    content_json=item["content"],
+                    status=item["status"],
+                    generation_method=item["generation_method"],
+                    created_at=_datetime(item["created_at"]),
+                    updated_at=_datetime(item["updated_at"]),
+                )
+            )
+        session.flush()
+        for item in payload["studio_citations"]:
+            session.add(
+                StudioCitation(
+                    id=item["id"],
+                    artifact_id=item["artifact_id"],
+                    source_id=item["source_id"],
+                    source_version_id=item["source_version_id"],
+                    ordinal=item["ordinal"],
+                    quote=item["quote"],
+                    quote_hash=item["quote_hash"],
+                    start_offset=item["start_offset"],
+                    end_offset=item["end_offset"],
+                    start_line=item["start_line"],
+                    end_line=item["end_line"],
+                )
+            )
+
+        for item in payload["audit_events"]:
+            session.add(
+                AuditEvent(
+                    id=item["id"],
+                    workspace_id=item["workspace_id"],
+                    actor=item["actor"],
+                    action=item["action"],
+                    object_type=item["object_type"],
+                    object_id=item["object_id"],
+                    before_json=item["before"],
+                    after_json=item["after"],
+                    created_at=_datetime(item["created_at"]),
+                )
+            )
+        session.flush()
 
         receipt = receipt_manifest or manifest
         session.add(
@@ -356,6 +559,7 @@ def _import_verified(
 
 def import_portable_export(session: Session, document: dict[str, Any]) -> dict[str, Any]:
     """Restore one verified export into an empty database without committing the transaction."""
+    document = normalize_portable_export(document)
     counts = verify_portable_export(document)
     if not _target_is_empty(session):
         raise PortabilityError("target_not_empty")
@@ -370,6 +574,7 @@ def merge_portable_export(
     expected_preview_sha256: str,
 ) -> dict[str, Any]:
     """Apply an explicitly acknowledged no-overwrite merge in one savepoint."""
+    document = normalize_portable_export(document)
     plan = preview_portable_merge(session, document)
     if plan["preview_sha256"] != expected_preview_sha256:
         raise PortabilityError("merge_preview_changed")

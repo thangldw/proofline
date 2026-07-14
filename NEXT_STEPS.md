@@ -2,9 +2,9 @@
 
 **Cập nhật:** 2026-07-14
 **Trạng thái hiện tại:** repository public, platform-aware wheel launcher, support/ownership policy,
-installed-wheel macOS lifecycle, backup restore/rollback và OS-keyring qualification receipt đã
-hoàn thành cho `v0.14.13`; Windows, native packaging, production qualification, real-model
-evaluation và external pilot vẫn mở.
+installed-wheel macOS lifecycle, backup restore/rollback, OS-keyring qualification receipt và
+portable evidence archive v2 đã hoàn thành cho `v0.14.14`; Windows, native packaging, production
+qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
 ## Mở rộng evidence-first đã được chấp thuận
@@ -42,7 +42,8 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Lọc note local theo title hoặc deterministic hashtag.
 - [x] Liệt kê revision theo version number, content length và immutable identity.
 - [x] Mở nội dung revision read-only qua workspace-scoped source/version API.
-- [ ] Portable JSON cho study/proposal được hoãn vì cần mở rộng validator và toàn bộ ID-remap graph.
+- [x] Portable JSON schema v2 giữ study cards/reviews, grounded proposals/citations, Studio
+  artifacts/citations, workspace scope và chunk identities; import schema v1 vẫn được nâng cấp an toàn.
 
 ### v0.14.5 — Evidence-first Studio
 
