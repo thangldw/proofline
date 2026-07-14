@@ -1,4 +1,7 @@
 import hashlib
+import io
+import json
+import zipfile
 
 from proofline.models import StudioArtifact, StudioCitation
 from proofline.studio import STUDIO_KINDS
@@ -99,3 +102,59 @@ def test_studio_failures_are_explicit_and_workspace_scoped(client):
         json={"source_id": "11111111-1111-1111-1111-111111111111", "kind": "report"},
     )
     assert missing.status_code == 404
+
+
+def test_studio_download_packages_native_artifact_and_exact_manifest(client):
+    source = client.post(
+        "/api/v1/sources",
+        json={"title": "Queue architecture", "content": CONTENT},
+    ).json()
+    expected_native = {
+        "presentation": ".pptx",
+        "infographic": ".png",
+        "data_table": ".csv",
+        "video_overview": ".html",
+        "audio_overview": "-narration.txt",
+    }
+    for kind, suffix in expected_native.items():
+        artifact = client.post(
+            "/api/v1/studio-artifacts", json={"source_id": source["id"], "kind": kind}
+        ).json()
+        response = client.get(f"/api/v1/studio-artifacts/{artifact['id']}/download")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+        with zipfile.ZipFile(io.BytesIO(response.content)) as bundle:
+            names = bundle.namelist()
+            assert "evidence-manifest.json" in names
+            native_name = next(name for name in names if name.endswith(suffix))
+            manifest = json.loads(bundle.read("evidence-manifest.json"))
+            assert manifest["immutable_source"]["version_id"] == source["current_version_id"]
+            assert manifest["immutable_source"]["content_sha256"]
+            for citation in manifest["citations"]:
+                exact = CONTENT[citation["start_offset"] : citation["end_offset"]]
+                assert exact == citation["quote"]
+                assert hashlib.sha256(exact.encode()).hexdigest() == citation["quote_sha256"]
+            if kind == "presentation":
+                assert bundle.read(native_name).startswith(b"PK")
+            if kind == "infographic":
+                assert bundle.read(native_name).startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_studio_download_fails_closed_when_persisted_citation_is_tampered(client, session):
+    source = client.post(
+        "/api/v1/sources",
+        json={"title": "Queue architecture", "content": CONTENT},
+    ).json()
+    artifact = client.post(
+        "/api/v1/studio-artifacts", json={"source_id": source["id"], "kind": "report"}
+    ).json()
+    citation = session.scalar(
+        select(StudioCitation).where(StudioCitation.artifact_id == artifact["id"])
+    )
+    assert citation is not None
+    citation.quote = "tampered"
+    session.commit()
+
+    response = client.get(f"/api/v1/studio-artifacts/{artifact['id']}/download")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "citation_quote_mismatch"

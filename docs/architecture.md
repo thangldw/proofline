@@ -440,7 +440,13 @@ Nine deterministic renderers are available: audio narration, presentation, video
 map, report, flashcards, quiz, infographic and data table. The web client may speak narration using
 the browser's local speech engine, but the API does not claim a rendered audio/video file. Deleting
 a source cascades through both Studio tables, and the metadata-only deletion preview reports both
-counts. Portable JSON does not yet include these regenerable derived artifacts.
+counts. Portable JSON schema v2 preserves these artifacts and their exact citations.
+
+Studio download is derived on demand and does not create a second mutable record. Before writing a
+ZIP, the exporter resolves every persisted citation against the immutable `SourceVersion` content
+and rechecks its exact slice and SHA-256. The package includes a provenance manifest plus the
+deterministic native representation available for its kind (`.pptx`, PNG, CSV, Markdown,
+narration text or storyboard HTML); any mismatch fails closed.
 
 Planned MVP operations (exact contracts remain undecided):
 

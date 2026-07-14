@@ -7,7 +7,27 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.15`.
+No changes have been recorded after `v0.14.16`.
+
+## [0.14.16] - 2026-07-14
+
+### Added
+
+- Add fail-closed Evidence Studio download packages with a machine-readable immutable-source and
+  exact-citation manifest.
+- Export real `.pptx` presentations, PNG infographics and CSV data tables, plus downloadable
+  report/learning Markdown, narration scripts and self-contained video storyboard HTML.
+- Add a Studio Download action that preserves the server-provided safe filename.
+
+### Changed
+
+- Add Pillow and python-pptx to the runtime and frozen-desktop dependency graph.
+
+### Validation
+
+- Verify native file signatures, exact quote slices/hashes and workspace-scoped downloads.
+- Reject export with HTTP 409 if a persisted citation no longer resolves exactly to its immutable
+  source version.
 
 ## [0.14.15] - 2026-07-14
 

@@ -58,6 +58,23 @@ export const api = {
     }),
   deleteStudioArtifact: (artifactId: string) =>
     request<void>(`/api/v1/studio-artifacts/${artifactId}`, { method: "DELETE" }),
+  downloadStudioArtifact: async (artifactId: string) => {
+    const response = await fetch(`/api/v1/studio-artifacts/${artifactId}/download`, {
+      headers: { "X-Proofline-Workspace-ID": activeWorkspaceId },
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail ?? `Download failed (${response.status})`);
+    }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? "proofline-studio.zip";
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
   actionProposals: () => request<ActionProposal[]>("/api/v1/action-proposals"),
   createActionProposal: (question: string) =>
     request<ActionProposal>("/api/v1/action-proposals", {

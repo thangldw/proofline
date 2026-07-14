@@ -13,7 +13,8 @@ way and trace every answer back to exact source evidence.
 | Document | Purpose | Status |
 | --- | --- | --- |
 | [Product website](./index.html) | Public Proofline overview, evidence model and local launch path | Current |
-| [v0.14.15 notes](./releases/v0.14.15.md) | Experimental Tauri desktop shell | Current pre-release |
+| [v0.14.16 notes](./releases/v0.14.16.md) | Downloadable Studio evidence packages | Current pre-release |
+| [v0.14.15 notes](./releases/v0.14.15.md) | Experimental Tauri desktop shell | Pre-alpha |
 | [v0.14.14 notes](./releases/v0.14.14.md) | Extended portable evidence archive | Pre-alpha |
 | [v0.14.13 notes](./releases/v0.14.13.md) | Platform-aware installed-wheel launcher | Pre-alpha |
 | [v0.14.12 notes](./releases/v0.14.12.md) | Public experimental repository and qualification boundary | Current pre-release |

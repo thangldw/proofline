@@ -3,7 +3,8 @@
 **Cập nhật:** 2026-07-14
 **Trạng thái hiện tại:** repository public, platform-aware wheel launcher, support/ownership policy,
 installed-wheel macOS lifecycle, backup restore/rollback, OS-keyring qualification receipt,
-portable evidence archive v2 và experimental Tauri shell đã hoàn thành cho `v0.14.15`; Windows,
+portable evidence archive v2, experimental Tauri shell và Studio evidence packages đã hoàn thành
+cho `v0.14.16`; Windows,
 signed packaging, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
@@ -54,8 +55,10 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Mọi item giữ exact offsets, lines, quote hash và mở được evidence trong UI.
 - [x] Audio phát bằng browser speech; slide/video có preview tương tác; quiz/flashcard có trạng thái học.
 - [x] Xóa source báo trước và cascade Studio artifact/citation.
-- [ ] Downloadable audio/video, `.pptx`, ảnh infographic và model-enhanced generation để lại cho mốc
-  media production sau khi có provider/dữ liệu thật.
+- [x] Evidence package download có manifest immutable citation, `.pptx`, PNG infographic, CSV,
+  Markdown, narration script và storyboard HTML; export fail-closed khi citation không còn exact.
+- [ ] Render MP3/MP4 và model-enhanced generation để lại cho mốc media production sau khi có
+  provider/dữ liệu thật.
 
 ### v0.14.6 — Explicit offline model-comparison mock
 

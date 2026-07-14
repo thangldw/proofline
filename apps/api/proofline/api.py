@@ -116,6 +116,7 @@ from .schemas import (
     normalize_retrieval_filters,
 )
 from .studio import build_studio_draft
+from .studio_exports import StudioExportError, build_studio_export
 
 router = APIRouter(prefix="/api/v1")
 
@@ -715,6 +716,36 @@ def get_studio_artifact(
     if row is None:
         raise HTTPException(status_code=404, detail="Studio artifact not found")
     return studio_artifact_to_read(*row)
+
+
+@router.get("/studio-artifacts/{artifact_id}/download")
+def download_studio_artifact(
+    artifact_id: str,
+    workspace_id: str = Depends(resolve_workspace_id),
+    session: Session = Depends(get_session),
+) -> Response:
+    row = session.execute(
+        select(StudioArtifact, Source.title, SourceVersion)
+        .join(Source, Source.id == StudioArtifact.source_id)
+        .join(SourceVersion, SourceVersion.id == StudioArtifact.source_version_id)
+        .where(
+            StudioArtifact.id == artifact_id,
+            StudioArtifact.workspace_id == workspace_id,
+        )
+        .options(selectinload(StudioArtifact.citations))
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Studio artifact not found")
+    artifact, source_title, version = row
+    try:
+        exported = build_studio_export(artifact, version, source_title)
+    except StudioExportError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(
+        content=exported.content,
+        media_type=exported.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'},
+    )
 
 
 @router.delete("/studio-artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)

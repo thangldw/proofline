@@ -6,6 +6,7 @@ import type { Source, StudioArtifact } from "./types";
 const apiMock = vi.hoisted(() => ({
   createStudioArtifact: vi.fn(),
   deleteStudioArtifact: vi.fn(),
+  downloadStudioArtifact: vi.fn(),
 }));
 vi.mock("./api", () => ({ api: apiMock }));
 
@@ -50,5 +51,13 @@ describe("StudioView", () => {
     expect(screen.getAllByText("Queues preserve work.")).toHaveLength(2);
     expect(screen.getByText(/EXACT EVIDENCE · L2–2/)).toBeInTheDocument();
     expect(screen.getByText(/Immutable version version-/)).toBeInTheDocument();
+  });
+
+  it("downloads an evidence package from a saved artifact", async () => {
+    apiMock.downloadStudioArtifact.mockResolvedValue(undefined);
+    render(<StudioView artifacts={[artifact]} sources={[source]} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Download/ }));
+    await waitFor(() => expect(apiMock.downloadStudioArtifact).toHaveBeenCalledWith(artifact.id));
+    expect(await screen.findByText(/evidence package downloaded/)).toBeInTheDocument();
   });
 });
