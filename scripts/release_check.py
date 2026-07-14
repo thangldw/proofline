@@ -61,6 +61,13 @@ def validate_release(repository: Path, tag: str) -> list[str]:
     errors: list[str] = []
     project = tomllib.loads((repository / "pyproject.toml").read_text(encoding="utf-8"))
     web = json.loads((repository / "apps/web/package.json").read_text(encoding="utf-8"))
+    desktop = json.loads((repository / "apps/desktop/package.json").read_text(encoding="utf-8"))
+    tauri = json.loads(
+        (repository / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8")
+    )
+    desktop_cargo = tomllib.loads(
+        (repository / "apps/desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8")
+    )
     lock = json.loads((repository / "package-lock.json").read_text(encoding="utf-8"))
     runtime_version = read_dunder_version(repository / "apps/api/proofline/__init__.py")
 
@@ -68,7 +75,11 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         "pyproject.toml": project["project"]["version"],
         "proofline.__version__": runtime_version,
         "apps/web/package.json": web["version"],
+        "apps/desktop/package.json": desktop["version"],
+        "apps/desktop/src-tauri/tauri.conf.json": tauri["version"],
+        "apps/desktop/src-tauri/Cargo.toml": desktop_cargo["package"]["version"],
         "package-lock.json workspace": lock["packages"]["apps/web"]["version"],
+        "package-lock.json desktop workspace": lock["packages"]["apps/desktop"]["version"],
     }
     for surface, value in observed.items():
         expected = (

@@ -1,0 +1,14 @@
+{
+  "name": "@proofline/desktop",
+  "private": true,
+  "version": "0.14.15",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "check": "tauri build --debug --no-bundle",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
+  }
+}

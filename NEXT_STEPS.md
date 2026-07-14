@@ -2,8 +2,9 @@
 
 **Cập nhật:** 2026-07-14
 **Trạng thái hiện tại:** repository public, platform-aware wheel launcher, support/ownership policy,
-installed-wheel macOS lifecycle, backup restore/rollback, OS-keyring qualification receipt và
-portable evidence archive v2 đã hoàn thành cho `v0.14.14`; Windows, native packaging, production
+installed-wheel macOS lifecycle, backup restore/rollback, OS-keyring qualification receipt,
+portable evidence archive v2 và experimental Tauri shell đã hoàn thành cho `v0.14.15`; Windows,
+signed packaging, production
 qualification, real-model evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -203,6 +204,8 @@ Import local repo → index immutable commit/file sources → search → grounde
 - [x] Bundle reviewed web UI vào wheel và smoke-test executable đã cài để chạy local bằng một lệnh.
 - [x] Đánh giá Tauri desktop packaging; ADR 0003 hoãn triển khai cho đến khi Windows, lifecycle
   API/web và production support boundary được chứng minh.
+- [x] Triển khai experimental Tauri v2 shell + frozen sidecar, dynamic loopback readiness và
+  private graceful shutdown; macOS `.app/.dmg` đã build cục bộ nhưng chưa notarize.
 
 ## P1 — Đánh giá bằng model và dữ liệu thật
 

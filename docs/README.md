@@ -13,7 +13,8 @@ way and trace every answer back to exact source evidence.
 | Document | Purpose | Status |
 | --- | --- | --- |
 | [Product website](./index.html) | Public Proofline overview, evidence model and local launch path | Current |
-| [v0.14.14 notes](./releases/v0.14.14.md) | Extended portable evidence archive | Current pre-release |
+| [v0.14.15 notes](./releases/v0.14.15.md) | Experimental Tauri desktop shell | Current pre-release |
+| [v0.14.14 notes](./releases/v0.14.14.md) | Extended portable evidence archive | Pre-alpha |
 | [v0.14.13 notes](./releases/v0.14.13.md) | Platform-aware installed-wheel launcher | Pre-alpha |
 | [v0.14.12 notes](./releases/v0.14.12.md) | Public experimental repository and qualification boundary | Current pre-release |
 | [v0.11.0 notes](./releases/v0.11.0.md) | One-command installed app with bundled web UI | Pre-alpha |
@@ -30,7 +31,7 @@ way and trace every answer back to exact source evidence.
 | [v0.8.0 notes](./releases/v0.8.0.md) | Portable non-empty merge with deterministic remapping | Pre-alpha |
 | [v0.9.0 notes](./releases/v0.9.0.md) | Workspace UI and evidence-based watcher decision | Pre-alpha |
 | [Roadmap evidence audit](./roadmap-evidence-2026-07-13.md) | Implemented milestones and external blockers | Current audit |
-| [ADR 0003](./adr/0003-defer-tauri-packaging.md) | Defer Tauri until platform and lifecycle gates pass | Accepted |
+| [ADR 0003](./adr/0003-defer-tauri-packaging.md) | Tauri deferral and experimental-shell revisit | Superseded |
 | [v0.5.0 notes](./releases/v0.5.0.md) | Provider settings and model reliability | Pre-alpha |
 | [Provider configuration](./provider-configuration.md) | Profiles, keys, health and retry semantics | Implemented |
 | [v0.4.0 notes](./releases/v0.4.0.md) | Temporal decision relations and timelines | Pre-alpha |

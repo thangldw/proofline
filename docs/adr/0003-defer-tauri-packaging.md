@@ -1,6 +1,6 @@
 # ADR 0003: Defer Tauri desktop packaging
 
-- Status: accepted
+- Status: superseded by the experimental v0.14.15 desktop implementation
 - Date: 2026-07-13
 
 ## Context
@@ -33,3 +33,11 @@ The platform-aware `proofline launch` command added in v0.14.13 does not change 
 provides an application-data directory, loopback dynamic port, OS-keyring default and browser launch
 from the installed Python wheel, but it does not create a native shell, installer, signature or
 update channel.
+
+## Revisit in v0.14.15
+
+The user explicitly requested the remaining implementation work, and the embedded lifecycle plus
+support-boundary prerequisites now exist. Proofline therefore adds an experimental Tauri shell and
+current-platform build tooling. This does not waive the unsatisfied evidence gates: the macOS
+artifact is ad-hoc signed rather than notarized, Windows has no real-machine receipt, and installer
+update rollback and production packaging remain unqualified.

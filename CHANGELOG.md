@@ -7,7 +7,30 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.14`.
+No changes have been recorded after `v0.14.15`.
+
+## [0.14.15] - 2026-07-14
+
+### Added
+
+- Add an experimental Tauri v2 desktop shell with generated macOS/Windows icon assets and a
+  target-triple-named PyInstaller sidecar build.
+- Add a private file-based shutdown contract so desktop close drains the local API and cleans
+  lifecycle markers without exposing a network shutdown endpoint.
+- Add local `desktop-check` and `desktop-build` commands and validate every desktop version surface
+  during release checks.
+
+### Changed
+
+- Pass the ASGI application object directly to Uvicorn so the frozen sidecar does not depend on a
+  dynamic import that PyInstaller cannot discover.
+- Revisit ADR 0003 now that the lifecycle prerequisite is implemented; native installers remain
+  unsigned and Windows qualification remains open.
+
+### Validation
+
+- Compile the Tauri debug shell, build an ad-hoc-signed macOS `.app` and `.dmg`, and smoke-test the
+  frozen sidecar through readiness, `/health`, graceful shutdown and marker cleanup.
 
 ## [0.14.14] - 2026-07-14
 

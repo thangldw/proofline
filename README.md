@@ -1,6 +1,6 @@
 # Proofline
 
-[Product website](https://thangldw.github.io/proofline/) · [Latest pre-release](https://github.com/thangldw/proofline/releases/tag/v0.14.14)
+[Product website](https://thangldw.github.io/proofline/) · [Latest pre-release](https://github.com/thangldw/proofline/releases/tag/v0.14.15)
 
 **Evidence-backed engineering memory.**
 
@@ -170,7 +170,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.14 wheel includes the web UI, so Node.js is not required after installation. For the
+The v0.14.15 wheel includes the web UI, so Node.js is not required after installation. For the
 fastest installed-app experiment, run:
 
 ```bash
@@ -181,6 +181,11 @@ The launcher binds only to loopback on a dynamic port, opens the bundled UI in t
 and stores state under the operating system's application-data directory. Use
 `proofline launch --no-browser` when another local shell will open the printed URL. This is a wheel
 launcher, not a signed native desktop application.
+
+An experimental native macOS shell is also built from `apps/desktop`. Build it on the target
+machine with `make desktop-build`; the resulting `.app` and `.dmg` are under the Tauri bundle
+directory. The current macOS bundle is ad-hoc signed and not notarized, and Windows installers must
+be built and qualified on real Windows before they are offered as supported downloads.
 
 For an explicit development data directory:
 
@@ -268,10 +273,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.14` is the latest experimental pre-alpha release. It adds portable schema-v2 round trips for
-study history, grounded proposals and Evidence Studio artifacts while retaining the platform-aware
-launcher and macOS qualification from v0.14.13. See the
-[release notes](docs/releases/v0.14.14.md) and verify
+`v0.14.15` is the latest experimental pre-alpha release. It adds the Tauri desktop shell,
+target-specific frozen sidecar and graceful private shutdown contract while retaining portable
+schema-v2 evidence round trips. See the
+[release notes](docs/releases/v0.14.15.md) and verify
 `SHA256SUMS` before installation.
 
 Public issue handling, data-loss escalation, upgrade/rollback expectations and ownership gaps are
@@ -296,7 +301,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.14
+make release-local TAG=v0.14.15
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an
