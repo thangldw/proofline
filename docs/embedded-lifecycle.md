@@ -60,6 +60,27 @@ database file directly and must keep rollback data until the restored process is
 
 This contract has local automated coverage for dynamic-port startup, readiness, bundled same-origin
 web serving from a cleanly installed wheel, data-directory creation, `/health`, graceful `SIGTERM`,
-and cleanup. The v0.14.12 macOS release receipt also exercises verified-backup restore/rollback and
+and cleanup. The v0.14.13 macOS release receipt also exercises verified-backup restore/rollback and
 OS-keyring set/read/delete through the installed wheel. Windows, installer signing, application
 update rollback, native auto-launch, and production qualification remain unverified gates.
+
+## Experimental installed-wheel launcher
+
+`proofline launch` applies this lifecycle without requiring development paths or Node.js. It binds
+to `127.0.0.1`, selects a dynamic port, serves the bundled web UI, writes temporary readiness
+metadata in the selected application state directory and opens the local URL in the default
+browser. `--no-browser` keeps the same lifecycle while leaving URL opening to the caller.
+
+Default state locations are:
+
+- macOS: `~/Library/Application Support/Proofline`;
+- Windows: `%LOCALAPPDATA%\\Proofline`;
+- Linux: `${XDG_DATA_HOME:-~/.local/share}/proofline`.
+
+The macOS and Windows launcher defaults `PROOFLINE_SECRET_STORE` to `os_keyring`; an explicit
+environment override still wins. `--data-dir` provides a deliberate state-location override for
+tests, migration and recovery. Browser-open failure is reported without stopping the loopback
+server, so the printed readiness URL remains usable.
+
+This launcher is distributed inside the Python wheel. It is not a native application, installer,
+signing receipt, auto-updater or Windows qualification.

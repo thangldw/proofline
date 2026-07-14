@@ -102,6 +102,23 @@ def main(argv: list[str] | None = None) -> None:
     serve.add_argument(
         "--log-level", choices=("critical", "error", "warning", "info"), default="info"
     )
+    launch = subcommands.add_parser(
+        "launch", help="Launch the experimental local app with platform-owned state"
+    )
+    launch.add_argument("--port", default=0, type=int)
+    launch.add_argument(
+        "--data-dir",
+        type=Path,
+        help="Override the operating-system application data directory",
+    )
+    launch.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Start without opening the local UI in the default browser",
+    )
+    launch.add_argument(
+        "--log-level", choices=("critical", "error", "warning", "info"), default="warning"
+    )
     subcommands.add_parser("seed", help="Index the bundled example decision")
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
@@ -203,6 +220,18 @@ def main(argv: list[str] | None = None) -> None:
             )
         except (OSError, RuntimeError, ValueError) as exc:
             raise SystemExit(f"serve failed: {type(exc).__name__}") from exc
+    elif args.command == "launch":
+        data_dir = Path(os.environ.get("PROOFLINE_HOME", Path.cwd() / ".proofline"))
+        try:
+            run_server(
+                "127.0.0.1",
+                args.port,
+                ready_file=data_dir / "proofline-ready.json",
+                log_level=args.log_level,
+                open_browser=not args.no_browser,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise SystemExit(f"launch failed: {type(exc).__name__}") from exc
     elif args.command == "seed":
         seed_demo()
     elif args.command == "eval":

@@ -28,3 +28,8 @@ Reconsider Tauri only after all of these evidence gates are met:
 Proofline remains a local web/API pre-alpha and does not claim desktop application support. This
 avoids prematurely adding Rust, platform installers and updater complexity. Desktop capture remains
 a later roadmap item rather than implemented behavior.
+
+The platform-aware `proofline launch` command added in v0.14.13 does not change this decision. It
+provides an application-data directory, loopback dynamic port, OS-keyring default and browser launch
+from the installed Python wheel, but it does not create a native shell, installer, signature or
+update channel.

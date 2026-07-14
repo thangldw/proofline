@@ -5,12 +5,21 @@ import json
 import os
 import signal
 import socket
+import sys
 import tempfile
+import webbrowser
 from pathlib import Path
 
 import uvicorn
 
 from . import __version__
+
+
+def _open_local_ui(url: str) -> bool:
+    try:
+        return webbrowser.open(url)
+    except Exception:
+        return False
 
 
 def _write_ready_file(path: Path, payload: dict[str, object]) -> None:
@@ -34,6 +43,7 @@ async def _serve(
     *,
     ready_file: Path | None,
     log_level: str,
+    open_browser: bool,
 ) -> None:
     listener = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -73,6 +83,14 @@ async def _serve(
         if ready_file is not None:
             _write_ready_file(ready_file, payload)
         print(json.dumps(payload, sort_keys=True), flush=True)
+        if open_browser:
+            url = f"http://{host}:{actual_port}/"
+            if not _open_local_ui(url):
+                print(
+                    json.dumps({"event": "browser_open_failed", "url": url}, sort_keys=True),
+                    file=sys.stderr,
+                    flush=True,
+                )
         await task
     finally:
         for signal_name, previous_handler in previous_handlers.items():
@@ -88,7 +106,16 @@ def run_server(
     *,
     ready_file: Path | None = None,
     log_level: str = "info",
+    open_browser: bool = False,
 ) -> None:
     if not 0 <= port <= 65535:
         raise ValueError("port must be between 0 and 65535")
-    asyncio.run(_serve(host, port, ready_file=ready_file, log_level=log_level))
+    asyncio.run(
+        _serve(
+            host,
+            port,
+            ready_file=ready_file,
+            log_level=log_level,
+            open_browser=open_browser,
+        )
+    )
