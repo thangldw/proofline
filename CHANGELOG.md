@@ -24,6 +24,7 @@ No changes have been recorded after `v0.14.15`.
 
 - Pass the ASGI application object directly to Uvicorn so the frozen sidecar does not depend on a
   dynamic import that PyInstaller cannot discover.
+- Exclude generated Rust, sidecar and Node build trees from the Python source distribution.
 - Revisit ADR 0003 now that the lifecycle prerequisite is implemented; native installers remain
   unsigned and Windows qualification remains open.
 
