@@ -220,4 +220,15 @@ records where authorized.
 6. Freeze a read-only export, compute hashes, calculate metrics, and obtain owner sign-off.
 7. Commit only synthetic-safe templates or explicitly approved anonymized aggregates.
 
+After freezing the private directory with the non-template filenames described in
+`evals/pilot/README.md`, calculate an aggregate unsigned gate review with:
+
+```bash
+.venv/bin/python scripts/analyze_pilot.py /private/path/to/pilot --output /private/path/to/gate-review.json
+```
+
+The analyzer validates the manifest hashes before reading metrics and emits no question text,
+source text, participant identity, answer or citation quote. Owners must still review and sign the
+result; the generated file alone is not external-pilot evidence.
+
 Templates contain no pilot evidence and MUST remain clearly labeled as blank or synthetic examples.
