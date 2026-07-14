@@ -1,141 +1,38 @@
-# Proofline evaluations
+# Evaluations
 
-Evaluation datasets are versioned inputs, not product marketing claims.
+Everything checked into `evals/` is synthetic or a target-specific development receipt. It protects
+deterministic contracts and must not be presented as real-model, external-pilot, adoption, or
+production-performance evidence.
 
-`reranking/seed-v1.json` and `benchmarks/reranker-token-overlap-v1.json` bind an optional local
-reranker to a synthetic MRR receipt. `benchmarks/vector-index-1000-v1.json` records local index,
-search, memory, storage, and update measurements for generated vectors. Neither is pilot or
-real-model evidence, and neither qualifies the 10,000-file/1-GB target.
-
-## Synthetic pilot simulation
-
-`pilot-simulation/engineering-context-v1.json` contains invented sources and seven scripted tasks
-across five engineering personas. It exercises real local migrations, immutable source revisions,
-deterministic ingestion and retrieval, the grounded-answer path, and exact citation resolution.
-
-Run it without credentials or network access:
-
-```bash
-make simulate-pilot
-```
-
-The report includes task completion against scripted expectations, citation resolution and source
-precision, and local latency observations. It also compares the number of unique cited sources with
-a deliberately naive deterministic reference: scan sources in sorted URI order until all expected
-sources have been encountered, or scan the full corpus for an expected abstention. This is a source
-inspection count, not measured human time and not a comparison with a team's real tools.
-
-Every report is labeled `synthetic_pilot_simulation`. These fixtures cannot satisfy any external
-pilot gate, estimate human usefulness, adoption, willingness to pay, or production latency. They
-only validate the pilot metric shape and credential-free product path. A checked-in observation may
-be kept under `pilot-simulation/receipts/`; its latency applies only to the recorded local run.
-
-`retrieval/seed-v1.json` remains the immutable first synthetic lexical baseline, including three
-paraphrase queries that record its known lexical-overlap gap. `retrieval/seed-v2.json` is the current
-credential-free gate. V2 has 26 queries, Unicode lexical cases, and ten sources with an initial and
-current revision. Each revision pair has a positive current-term query and an `expected_empty`
-superseded-term query.
-
-Run the current gate with:
+## Quality gate
 
 ```bash
 make eval
 ```
 
-Positive queries retain graded relevance at source URI level. The runner reports Recall@k,
-Precision@k, reciprocal rank, and nDCG@k after deduplicating chunk hits by source. Expected-empty
-queries instead contribute only to `expected_empty_accuracy`; they are deliberately excluded from
-positive-query MRR/nDCG aggregation. This prevents a correct empty result from either lowering MRR
-or being mislabeled as a relevant retrieval. Add a new dataset version instead of rewriting
-historical judgments.
+The gate runs:
 
-The synthetic corpus does not satisfy the roadmap requirement for at least 25 real pilot questions.
-That dataset must be collected with permission, sanitized, labeled with source evidence, and marked
-with non-synthetic provenance before it can support product-quality or go/no-go claims.
+- `extraction/seed-v1.json`: deterministic memory kinds and exact evidence.
+- `retrieval/seed-v2.json`: current-version lexical retrieval, Unicode, and expected-empty cases.
+- `grounded-qa/seed-v1.json`: scripted grounded answers, citation resolution, and abstention.
 
-## Deterministic extraction regression gate
+Expected scores are intentionally perfect because these are regression fixtures. Change behavior by
+adding a new dataset version rather than silently weakening an existing expectation.
 
-`extraction/seed-v1.json` is a synthetic credential-free corpus for the production deterministic
-ingestion/extraction path. It covers decisions, assumptions, constraints, and alternatives; exact
-status and statement matching; exact evidence slices and SHA-256 quote hashes; supported
-English/Vietnamese markers; CJK statements after supported markers; headings; and negative prose
-that must not be extracted.
+## Benchmarks
 
-Run the gate with:
+`benchmarks/` records environment-specific watcher, lexical, vector-index, and deterministic
+reranker observations. Reproduce them with the matching Make target or script. A benchmark receipt
+describes only its revision, fixture, hardware, and command; it is not a portable scale guarantee.
 
-```bash
-proofline eval-extraction --dataset evals/extraction/seed-v1.json \
-  --min-precision 1.0 --min-recall 1.0 --min-f1 1.0 \
-  --min-evidence-resolution 1.0 --min-expected-evidence-accuracy 1.0 \
-  --min-negative-source-accuracy 1.0
-```
+## Model comparison
 
-An extracted object matches an expectation only when source URI, memory kind, statement, and status
-all match. The report uses micro object-level precision, recall, and F1. `evidence_resolution` is the
-share of all extracted objects whose single persisted evidence record resolves to the same immutable
-source/version, exact non-empty code-point span, quote, and quote hash.
-`expected_evidence_accuracy` is the share of matched expected objects whose exact persisted quote
-also matches the dataset expectation. `negative_source_accuracy` is the share of sources with no
-expected memories that produced none. The report also records `model_run_count`; the gate requires
-zero because this corpus exercises deterministic production extraction only.
+`real-model/` contains the versioned comparison shape and explicit mock fixtures. Mock execution
+requires `--allow-mock`, uses no provider network, and produces `mock_integration` qualification.
+Real-model comparison remains outside the current execution scope.
 
-These fixtures contain explicit synthetic markers and expected strings. A perfect score proves a
-deterministic parser/provenance regression contract only; it is not evidence of real-model
-extraction quality, semantic understanding, pilot precision/recall, or coverage of unmarked prose.
+## Pilot material
 
-## Grounded-QA regression gate
-
-`grounded-qa/seed-v1.json` is a synthetic, scripted regression corpus for the complete local answer
-path. It runs real migrations, ingestion, lexical retrieval, context selection, `answer_question`,
-structured-output validation, and server-side citation resolution. Its deterministic provider reads
-the bounded user request and translates expected source titles to evidence IDs that Proofline issued
-in that request. Missing evidence therefore reaches the normal unknown-citation repair/fail-closed
-path; the evaluator does not inject citations directly into an answer.
-
-Run it without credentials or network access:
-
-```bash
-proofline eval-grounded \
-  --dataset evals/grounded-qa/seed-v1.json \
-  --min-citation-resolution 1.0 \
-  --min-citation-precision 1.0 \
-  --min-grounded-success 1.0 \
-  --min-status-accuracy 1.0
-```
-
-The report counts evidence IDs emitted by the scripted draft, citations resolved by the production
-answer path, and resolved citations whose source URI is relevant according to the dataset. Aggregate
-metrics are:
-
-- `citation_resolution`: resolved citations divided by emitted citation IDs;
-- `citation_precision`: relevant citations divided by resolved citations;
-- `grounded_success`: expected-grounded queries that returned a grounded answer; and
-- `expected_status_accuracy`: queries whose actual status matched the expected status.
-
-Per-query output also records expected/actual statement kinds and model-run count. The explicit
-insufficient-evidence fixture must create no model run. These values test deterministic contracts;
-because statements and expectations are synthetic and scripted, they are not estimates of real-model
-answer quality, pilot citation precision, useful-answer rate, or semantic entailment accuracy.
-
-## Local lexical benchmark
-
-The CLI can measure SQLite FTS5 query latency against a generated, deterministic, temporary
-fixture without using a network or model provider:
-
-```bash
-proofline benchmark --sources 1000 --queries 100
-```
-
-The report identifies the fixture version and provenance, source/chunk/query counts, matched query
-count, result limit, and per-query p50, p95, and maximum latency in milliseconds. The temporary
-database is deleted after the run. Change `--sources`, `--queries`, or `--limit` to describe a
-different local measurement explicitly.
-
-This command records an environment-specific measurement; it does not enforce a latency threshold
-and is not evidence for the roadmap's 10,000-file scale target. Any published comparison must also
-record the Proofline revision, operating system, SQLite/Python versions, hardware, fixture arguments,
-and whether other workloads were active.
-
-Committed observations live in [`benchmarks/`](./benchmarks/) and include the exact Proofline
-revision, environment, command, fixture provenance, and qualification. They are receipts for a
-specific run, not portable performance guarantees.
+`pilot/` contains private-study templates only. `pilot-simulation/` contains invented personas and
+scripted tasks for credential-free workflow regression. Neither directory contains external pilot
+evidence. Follow [`docs/pilot-protocol.md`](../docs/pilot-protocol.md) for a real study.

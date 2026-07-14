@@ -1,30 +1,31 @@
-# ADR-001: Event transport for the ingestion pipeline
-
-Date: 2026-07-12
+# ADR: Local ingestion queue
 
 ## Context
 
-The first release runs on one machine and processes fewer than 10,000 source updates per day. The team needs jobs to survive process restarts without operating a separate cluster.
+Proofline runs as a single-user local application. Ingestion jobs must survive process restarts
+without requiring another service.
 
-## Decision: Use a SQLite-backed job queue for the local MVP
+## Decision: Keep ingestion jobs in SQLite
 
-Rationale: SQLite keeps local installation simple, provides transactional state changes, and is sufficient for the measured workload.
+Rationale: SQLite provides transactional state and recovery inside the existing local database.
 Status: active
 
-## Assumption: A single process owns the local write path
+## Assumption: One local runtime owns writes
 
-Rationale: The pre-alpha deployment is single-user and runs on one machine.
+Rationale: The current supported experiment has one user and one supervised application runtime.
 
-## Constraint: Local development must not require an external service
+## Constraint: Local development works without infrastructure
 
-Rationale: A clean checkout must remain useful without provider credentials or infrastructure.
+Rationale: Deterministic ingestion, retrieval, and review must run without credentials or external
+services.
 
-## Alternative: Run Kafka as the ingestion queue
+## Alternative: Operate a separate message broker
 
-Rationale: Kafka was rejected for the local MVP because its operational cost is disproportionate to the measured workload.
+Rationale: A broker adds deployment and recovery cost that the current local workload does not
+justify.
 Status: rejected
 
-## Consequences
+## Consequence
 
-Workers lease jobs from the database. We will retain a queue interface so that a hosted deployment can later use NATS without changing ingestion code.
-
+Workers lease jobs from SQLite. A future hosted profile may implement the queue interface with a
+managed broker, but it cannot change historical source identity or evidence spans.

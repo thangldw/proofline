@@ -1,21 +1,17 @@
-# Proofline desktop shell
+# Desktop shell
 
-This Tauri v2 shell starts a bundled Proofline Python sidecar on a random
-loopback port, waits for a structured readiness event, and then navigates the
-native webview to the local application. Persistent state is owned by the
-operating-system application data directory. Provider credentials continue to
-use the operating-system keyring.
+The Tauri v2 shell starts a target-specific frozen Python sidecar, waits for loopback readiness,
+and opens the bundled Proofline UI in a native webview. State uses the operating-system application
+data directory and provider secrets use the OS keyring.
 
-Build on the target operating system; PyInstaller binaries are not
-cross-platform. From the repository root:
+From the repository root:
 
 ```bash
 make desktop-check
 make desktop-build
 ```
 
-The first command creates the target-triple-named sidecar and compiles a debug
-shell without producing an installer. The second produces the installers
-supported by the current platform. macOS distribution still requires Apple
-signing/notarization; Windows distribution still requires a real Windows build
-and qualification receipt.
+PyInstaller sidecars are not cross-platform. Build and qualify on the target OS. Current macOS
+packages are experimental and unsigned; Windows requires the workflow in
+[`docs/windows-release.md`](../../docs/windows-release.md). Signing, notarization, uninstall,
+upgrade, and updater rollback remain open gates.

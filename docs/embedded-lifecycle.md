@@ -1,90 +1,36 @@
-# Embedded runtime lifecycle
+# Embedded lifecycle
 
-Proofline v0.10.0 defines the process contract, and v0.11.0 bundles the web UI into the installed
-wheel so a future native shell or local service manager
-can supervise. This is a packaging foundation, not a signed desktop application or a production
-support claim.
+The bundled launcher and Tauri sidecar share one local runtime contract.
 
-## Start contract
+## Start
 
-Use one process for the API and an already-built web archive:
+1. Resolve a platform application-data directory or an explicit `--data-dir`.
+2. Create owner-controlled state and configure SQLite inside it.
+3. Apply migrations before accepting requests.
+4. Bind FastAPI to loopback on the requested or a dynamic port.
+5. Write readiness metadata only after the server and bundled UI respond.
+6. Open the local UI unless `--no-browser` is set.
 
 ```bash
-proofline serve \
-  --host 127.0.0.1 \
-  --port 0 \
-  --data-dir "$HOME/Library/Application Support/Proofline" \
-  --ready-file ./proofline-ready.json \
-  --shutdown-file ./proofline-shutdown
+.venv/bin/proofline launch
+.venv/bin/proofline launch --no-browser --port 0
 ```
 
-- `--port 0` asks the OS for an available port and avoids a fixed-port collision.
-- `--data-dir` owns the default `proofline.db` and `providers.json`. With
-  `PROOFLINE_SECRET_STORE=os_keyring`, that JSON contains only non-secret provider settings; file
-  mode may also keep API keys there with owner-only permissions. The equivalent environment
-  variable is `PROOFLINE_HOME`; an explicit `PROOFLINE_DATABASE_URL` still overrides the database.
-- The bundled web UI, API, and `/health` share one origin. `--no-web` starts API-only mode;
-  `--web-dir` explicitly replaces the bundled UI and must contain `index.html`.
-- `--ready-file` is written atomically with owner-only permissions after migrations, ingestion
-  recovery, and watcher startup succeed. The same JSON is written to stdout.
-- Failure before readiness exits without leaving a ready file. Error output contains a stable
-  category, not source text or credentials.
-- A native shell may create the private `--shutdown-file` to request the same graceful stop on
-  platforms where delivering a process signal is unreliable. The marker is removed on exit.
+## Stop
 
-The ready document contains only supervision metadata:
+SIGINT/SIGTERM and the desktop private shutdown endpoint request graceful server termination. The
+ready file is removed after clean shutdown. The private token is process-local and must not appear
+in logs or public API responses.
 
-```json
-{"event":"ready","host":"127.0.0.1","port":49152,"version":"0.10.0"}
-```
+## Desktop wrapper
 
-```mermaid
-flowchart LR
-    shell["Native shell or service manager"] --> start["Start Proofline on port 0"]
-    start --> migrate["Run migrations and recovery"]
-    migrate --> ready["Publish atomic readiness receipt"]
-    ready --> health["Open same-origin web and health endpoint"]
-    shell --> signal["Send SIGTERM or SIGINT"]
-    signal --> drain["Stop watcher and API gracefully"]
-    drain --> cleanup["Remove readiness receipt"]
-```
+The Tauri application starts the target-specific frozen sidecar, waits for its readiness file, and
+navigates its webview to the same-origin loopback UI. It kills the child only when graceful shutdown
+cannot complete. The current macOS package is unsigned and experimental.
 
-## Stop and recovery contract
+## Failure states
 
-Send `SIGTERM` or `SIGINT` and wait for a zero exit code. Proofline stops accepting work, shuts down
-the folder watcher, closes the API, and removes the ready file. If the process is killed after a
-database write begins, the existing SQLite transaction and startup recovery rules still apply.
-
-Before replacing or migrating a data directory, use the verified backup and integrity workflows in
-[Data export, backup, and recovery](./backup-recovery.md). A wrapper must never copy a live SQLite
-database file directly and must keep rollback data until the restored process is healthy.
-
-## Support boundary
-
-This contract has local automated coverage for dynamic-port startup, readiness, bundled same-origin
-web serving from a cleanly installed wheel, data-directory creation, `/health`, graceful `SIGTERM`,
-and cleanup. The v0.14.13 macOS release receipt also exercises verified-backup restore/rollback and
-OS-keyring set/read/delete through the installed wheel. Windows, installer signing, application
-update rollback, native auto-launch, and production qualification remain unverified gates.
-
-## Experimental installed-wheel launcher
-
-`proofline launch` applies this lifecycle without requiring development paths or Node.js. It binds
-to `127.0.0.1`, selects a dynamic port, serves the bundled web UI, writes temporary readiness
-metadata in the selected application state directory and opens the local URL in the default
-browser. `--no-browser` keeps the same lifecycle while leaving URL opening to the caller.
-
-Default state locations are:
-
-- macOS: `~/Library/Application Support/Proofline`;
-- Windows: `%LOCALAPPDATA%\\Proofline`;
-- Linux: `${XDG_DATA_HOME:-~/.local/share}/proofline`.
-
-The macOS and Windows launcher defaults `PROOFLINE_SECRET_STORE` to `os_keyring`; an explicit
-environment override still wins. `--data-dir` provides a deliberate state-location override for
-tests, migration and recovery. Browser-open failure is reported without stopping the loopback
-server, so the printed readiness URL remains usable.
-
-This launcher is distributed inside the Python wheel. The experimental v0.14.15 Tauri shell uses
-the same contract with a frozen sidecar; neither path is an Apple-notarized application,
-auto-updater or Windows qualification.
+Migration, bind, readiness, sidecar, and browser-open failures are explicit. A stale readiness file
+does not prove a live server. No lifecycle receipt proves installer signing, uninstall, upgrade,
+rollback, Windows behavior, or production readiness unless those observations are recorded on the
+target platform.
