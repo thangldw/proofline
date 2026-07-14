@@ -41,6 +41,15 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["apps/api/proofline"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/apps/desktop/src-tauri/binaries",
+  "/apps/desktop/src-tauri/gen",
+  "/apps/desktop/src-tauri/target",
+  "/build",
+  "/node_modules",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests"]
 
