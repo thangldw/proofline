@@ -1,8 +1,8 @@
 # Proofline — công việc còn lại
 
-**Cập nhật:** 2026-07-13  
-**Trạng thái hiện tại:** public support/ownership policy, installed-wheel macOS lifecycle, backup
-restore/rollback và OS-keyring qualification receipt đã hoàn thành cho `v0.14.11`; Windows, native packaging, production qualification, real-model
+**Cập nhật:** 2026-07-14
+**Trạng thái hiện tại:** repository public, support/ownership policy, installed-wheel macOS lifecycle,
+backup restore/rollback và OS-keyring qualification receipt đã hoàn thành cho `v0.14.12`; Windows, native packaging, production qualification, real-model
 evaluation và external pilot vẫn mở.
 **Mục đích:** điểm tiếp tục công việc cho ngày 2026-07-14. Đây là backlog thực tế; không coi mục “planned” là đã hoàn thành.
 
@@ -98,7 +98,14 @@ Không mốc nào ở trên cho phép rich-text editor, canvas, graph database h
 - [x] Ghi data-loss escalation, backup responsibility và upgrade/database rollback flow.
 - [x] Định nghĩa release cadence pre-alpha và latest-release-only support.
 - [x] Ghi current maintainer cùng production ownership gaps chưa được nhận.
-- [ ] GitHub repository visibility vẫn private; không tự đổi public nếu chưa có xác nhận trực tiếp.
+- [x] Chuyển GitHub repository sang public sau khi chủ sở hữu xác nhận trực tiếp.
+
+### v0.14.12 — Public experimental repository
+
+- [x] Chuyển `thangldw/proofline` sang public và xác nhận lại visibility qua GitHub API.
+- [x] Xác nhận default branch, Issues, description và topics công khai.
+- [x] Cập nhật release/readiness documentation để không còn tuyên bố repository private.
+- [x] Giữ nhãn experimental pre-alpha; không suy diễn public thành production-ready.
 
 ## Việc nên làm đầu tiên ngày mai
 

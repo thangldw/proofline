@@ -7,7 +7,17 @@ semantic-versioning compatibility between pre-releases.
 
 ## [Unreleased]
 
-No changes have been recorded after `v0.14.11`.
+No changes have been recorded after `v0.14.12`.
+
+## [0.14.12] - 2026-07-14
+
+### Changed
+
+- Publish the GitHub repository as a public experimental pre-alpha project after explicit owner
+  approval.
+- Verify the public repository description, topics, Issues setting and `main` default branch.
+- Update release and readiness documentation to distinguish public availability from production
+  qualification.
 
 ## [0.14.11] - 2026-07-14
 

@@ -22,17 +22,17 @@ profile.
 
 | Area | Required evidence | Status | Current evidence or blocker |
 | --- | --- | --- | --- |
-| Public repository | License, community docs, current support policy, no contributor-machine paths, accurate implemented/planned claims | Complete except visibility | License, conduct, contribution, security, support and maintainer documents exist; GitHub repository remains private |
-| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.11` GitHub assets and checksummed platform receipt |
-| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.11` installed-release platform receipt; native signing remains a separate gate |
+| Public repository | License, community docs, current support policy, no contributor-machine paths, accurate implemented/planned claims | Complete for experimental pre-alpha | `thangldw/proofline` is public with license, conduct, contribution, security, support and maintainer documents |
+| Reproducible release | Versioned source, wheel, bundled web archive, checksums, clean installed-package smoke | Complete for local macOS | `v0.14.12` GitHub assets and checksummed platform receipt |
+| macOS lifecycle | Install, start, readiness, same-origin UI, migration, graceful stop, integrity and recovery | Complete for installed wheel | `v0.14.12` installed-release platform receipt; native signing remains a separate gate |
 | Windows lifecycle | Same installed-artifact and recovery path on a real Windows target | Blocked | No Windows runner or machine receipt |
 | Native packaging | Signed macOS and Windows installers, application data paths, uninstall behavior and update rollback | Blocked | Tauri remains deferred by ADR 0003 |
 | Data integrity | Versioned migrations, immutable source identity, exact spans, deletion cascade and semantic verification | Complete for tested local schema | Migration, provenance, deletion and integrity suites |
-| Backup/recovery | Encrypted retention policy plus successful backup, restore and rollback drills from release artifacts | Partial | `v0.14.11` receipt proves atomic restore and rollback from the installed artifact; encrypted retention policy remains operator-owned and unqualified |
+| Backup/recovery | Encrypted retention policy plus successful backup, restore and rollback drills from release artifacts | Partial | `v0.14.12` receipt proves atomic restore and rollback from the installed artifact; encrypted retention policy remains operator-owned and unqualified |
 | Offline core | Useful ingestion, retrieval, memory review and Studio behavior without external services | Complete for deterministic scope | Credential-free regression and UI suites |
 | Model quality | Frozen real corpus, pinned local/remote models, extraction/citation/abstention/latency/cost report | Blocked | Only `mock_integration` evidence exists |
 | External utility | Permissioned pilot with at least 25 questions, temporal cases, baseline and useful-answer metrics | Blocked | Templates exist; no external pilot evidence |
-| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Complete on macOS; Windows receipt pending | `v0.14.11` includes OS keyring storage, migration, rollback and UI removal; macOS installed-wheel receipt exercises set/read/delete |
+| Provider secrets | Per-device secure storage, rotation/removal and no inclusion in logs, exports or backups | Complete on macOS; Windows receipt pending | `v0.14.12` includes OS keyring storage, migration, rollback and UI removal; macOS installed-wheel receipt exercises set/read/delete |
 | Operational support | Supported versions, issue handling, upgrade/rollback policy, data-loss escalation and release cadence | Complete for pre-alpha; production commitments blocked | `SUPPORT.md` names current best-effort policy and rollback flow; `MAINTAINERS.md` records unassigned signing, updater and incident-response ownership |
 | Security qualification | Threat-boundary verification and release security assessment | Blocked | Explicitly excluded from the current work scope; production claim is impossible while excluded |
 
@@ -47,9 +47,8 @@ profile.
 
 ## Next execution order
 
-1. Finish public repository hygiene and publish the next pre-release metadata accurately.
-2. Add durable macOS installed-release lifecycle and recovery receipts.
-3. Implement the desktop wrapper on top of the qualified lifecycle and OS-keyring contract.
-4. Obtain a real Windows environment and close the same receipt contract.
-5. Run the frozen real-model comparison and external pilot.
-6. Complete security qualification before changing the production claim.
+1. Keep public metadata, support boundaries and implemented/planned claims accurate in each release.
+2. Implement the desktop wrapper on top of the qualified lifecycle and OS-keyring contract.
+3. Obtain a real Windows environment and close the same receipt contract.
+4. Run the frozen real-model comparison and external pilot.
+5. Complete security qualification before changing the production claim.

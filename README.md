@@ -168,7 +168,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.11 wheel includes the web UI, so Node.js is not required after installation:
+The v0.14.12 wheel includes the web UI, so Node.js is not required after installation:
 
 ```bash
 .venv/bin/proofline serve --port 0 --data-dir .proofline-runtime \
@@ -254,10 +254,10 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.11` is the latest experimental pre-alpha release. It publishes the root support and
-maintainer policies needed for an honest public repository, including data-loss escalation,
-upgrade/database rollback and explicit production ownership gaps. It retains the reversible backup
-restore receipt from v0.14.10. See the [release notes](docs/releases/v0.14.11.md) and verify
+`v0.14.12` is the latest experimental pre-alpha release. The source repository is now public with
+an explicit license, contribution and conduct rules, issue templates, support boundaries and named
+pre-alpha ownership. It retains the reversible backup restore and macOS installed-wheel
+qualification from earlier releases. See the [release notes](docs/releases/v0.14.12.md) and verify
 `SHA256SUMS` before installation.
 
 Public issue handling, data-loss escalation, upgrade/rollback expectations and ownership gaps are
@@ -282,7 +282,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.11
+make release-local TAG=v0.14.12
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an

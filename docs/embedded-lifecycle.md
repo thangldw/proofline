@@ -60,6 +60,6 @@ database file directly and must keep rollback data until the restored process is
 
 This contract has local automated coverage for dynamic-port startup, readiness, bundled same-origin
 web serving from a cleanly installed wheel, data-directory creation, `/health`, graceful `SIGTERM`,
-and cleanup. The v0.14.11 macOS release receipt also exercises verified-backup restore/rollback and
+and cleanup. The v0.14.12 macOS release receipt also exercises verified-backup restore/rollback and
 OS-keyring set/read/delete through the installed wheel. Windows, installer signing, application
 update rollback, native auto-launch, and production qualification remain unverified gates.
