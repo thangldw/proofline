@@ -2,6 +2,22 @@
 
 Proofline remains pre-alpha at v0.14.17.
 
+```mermaid
+flowchart LR
+    P["Pre-alpha"] --> X["Cross-platform receipts"]
+    X --> N["Native package qualification"]
+    N --> D["Permissioned dataset"]
+    D --> U["Utility thresholds"]
+    U --> A["Alpha"]
+
+    classDef current fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef gate fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef target fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    class P current;
+    class X,N,D,U gate;
+    class A target;
+```
+
 ## Supported experiment
 
 - One local user on a developer-controlled macOS or Linux machine.

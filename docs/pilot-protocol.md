@@ -3,6 +3,28 @@
 The pilot tests whether Proofline improves real engineering context recovery. Raw pilot material
 stays in a private, access-controlled workspace and is never committed to this repository.
 
+```mermaid
+flowchart LR
+    C["Consent + permissions"] --> Q["25 real questions"]
+    Q --> B["Paired baseline"]
+    B --> F["Freeze files + hashes"]
+    F --> A["Aggregate analyzer"]
+    A --> O{"Owner sign-off"}
+    O -->|approved aggregate| P["Public metric summary"]
+    O -->|not approved| R["Private remediation"]
+
+    classDef private fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef public fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    class C,Q,B private;
+    class F,A process;
+    class O gate;
+    class P public;
+    class R evidence;
+```
+
 ## Minimum dataset
 
 - Five permissioned engineering teams or design partners.

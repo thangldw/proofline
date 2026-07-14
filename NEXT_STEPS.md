@@ -3,6 +3,26 @@
 Current baseline: **v0.14.17 experimental pre-alpha**. The evidence-first vertical slice is
 implemented and released. Planned behavior below must not be presented as shipped.
 
+```mermaid
+flowchart LR
+    P0["P0 · Platform qualification"] --> P1["P1 · External evidence"]
+    P1 --> G{"Pilot proves value?"}
+    G -->|yes| P2["P2 · Media & sources"]
+    G -->|no| R["Refine core workflow"]
+    P2 --> P3["P3 · Team & commercial"]
+
+    classDef now fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef later fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    classDef loop fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    class P0 now;
+    class P1 evidence;
+    class G gate;
+    class P2,P3 later;
+    class R loop;
+```
+
 ## P0 — Qualify the existing product
 
 - [ ] Run the installed artifact and MSI/NSIS workflow on a real Windows x64 machine.

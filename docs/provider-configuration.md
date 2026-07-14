@@ -3,6 +3,28 @@
 Deterministic ingestion, lexical search, review, backup, and portability do not require a model.
 Generation and embeddings are optional and can be configured in the UI under **Settings**.
 
+```mermaid
+flowchart LR
+    UI["Settings UI"] --> C["Non-secret config"]
+    ENV["Environment overrides"] --> C
+    UI --> K["OS keyring"]
+    C --> H{"Capability health"}
+    K --> H
+    H -->|available| G["Generation / embedding"]
+    H -->|degraded| D["Visible offline mode"]
+
+    classDef input fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef config fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef secret fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef success fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    class UI,ENV input;
+    class C config;
+    class K secret;
+    class H gate;
+    class G,D success;
+```
+
 ## Fields
 
 - Generation: provider, base URL, model, and API key.

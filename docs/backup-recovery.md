@@ -2,6 +2,28 @@
 
 Use only recoverable test data. Keep verified backups outside the active application-data directory.
 
+```mermaid
+flowchart LR
+    L["Live database"] --> B["Create backup"]
+    B --> V{"Verify"}
+    V -->|pass| S["Store outside app data"]
+    V -->|fail| X["Discard + investigate"]
+    S --> R["Restore candidate"]
+    R --> C["Create rollback copy"]
+    C --> A["Atomic replace"]
+    A --> I{"Integrity check"}
+
+    classDef data fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef action fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef safe fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef blocked fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
+    class L,B,R,C,A action;
+    class V,I gate;
+    class S safe;
+    class X blocked;
+```
+
 ## Create and verify
 
 ```bash

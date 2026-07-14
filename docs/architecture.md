@@ -5,15 +5,45 @@ optional Tauri desktop wrapper. External model providers are optional and sit be
 
 ## Data flow
 
-```text
-approved source
-  → stable source identity
-  → immutable source version
-  → deterministic chunks with offsets and lines
-  → lexical/vector retrieval
-  → exact evidence records
-  → grounded answer, memory, study item, proposal, or Studio artifact
-  → human review and audit history
+```mermaid
+flowchart LR
+    subgraph Inputs["Approved inputs"]
+        F["Files & folders"]
+        N["Notes"]
+        G["Local Git"]
+    end
+    subgraph Core["Deterministic evidence core"]
+        I["Stable identity"] --> V["Immutable version"]
+        V --> C["Chunks + exact spans"]
+        C --> R["Lexical / vector retrieval"]
+        R --> E["Resolved evidence IDs"]
+    end
+    subgraph Outputs["Governed outputs"]
+        Q["Grounded answer"]
+        M["Decision memory"]
+        L["Study material"]
+        P["Action proposal"]
+        S["Studio artifact"]
+    end
+    F --> I
+    N --> I
+    G --> I
+    E --> Q
+    E --> M
+    E --> L
+    E --> P
+    E --> S
+    Q & M & L & P & S --> H{"Human review"}
+    H --> A["Audit history"]
+
+    classDef source fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef core fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef output fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef human fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    class F,N,G source;
+    class I,V,C,R,E core;
+    class Q,M,L,P,S output;
+    class H,A human;
 ```
 
 ## Components

@@ -17,6 +17,23 @@ Proofline keeps every derived object attached to an immutable source version and
 shows uncertainty, abstains when evidence is insufficient, and requires humans to accept or reject
 governed memory and action proposals.
 
+```mermaid
+flowchart LR
+    C["Scattered context"] --> P["Proofline"]
+    P --> E["Exact evidence"]
+    E --> D["Reviewable decision"]
+    D --> O["Faster context recovery"]
+
+    classDef problem fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
+    classDef product fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef outcome fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    class C problem;
+    class P product;
+    class E,D evidence;
+    class O outcome;
+```
+
 ## Current user
 
 The working hypothesis is an individual senior engineer or a small engineering team maintaining a

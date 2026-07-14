@@ -4,6 +4,24 @@ These templates contain no external pilot results. Copy them to a private access
 workspace, remove the synthetic example row, and never commit raw questions, answers, source spans,
 company names, participant identities, credentials, prompts, or model output.
 
+```mermaid
+flowchart LR
+    T["Copy templates privately"] --> D["Collect consented data"]
+    D --> F["Freeze version + hashes"]
+    F --> A["Run aggregate analyzer"]
+    A --> S{"Owner sign-off"}
+    S -->|approved| O["Aggregate result only"]
+
+    classDef private fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
+    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    class T,D private;
+    class F,A process;
+    class S gate;
+    class O evidence;
+```
+
 ## Templates
 
 - `manifest.v1.template.json`: consent, ownership, retention, dataset version, and hashes.
