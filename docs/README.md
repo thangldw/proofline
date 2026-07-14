@@ -12,6 +12,7 @@ way and trace every answer back to exact source evidence.
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [v0.14.12 notes](./releases/v0.14.12.md) | Public experimental repository and qualification boundary | Current pre-release |
 | [v0.11.0 notes](./releases/v0.11.0.md) | One-command installed app with bundled web UI | Pre-alpha |
 | [Alpha support boundary](./alpha-support-boundary.md) | Current exclusions and evidence required for alpha | Current |
 | [Production readiness](./production-readiness.md) | Evidence gate matrix for the first supported local desktop profile | Current |
