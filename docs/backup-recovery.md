@@ -1,154 +1,41 @@
-# Data export, backup, and recovery
+# Backup and recovery
 
-Status: **Implemented for the local SQLite deployment.** The commands in this
-document are covered by automated integrity and recovery tests. They do not
-replace an operator-owned backup retention, encryption, or disaster-recovery
-policy.
+Use only recoverable test data. Keep verified backups outside the active application-data directory.
 
-## Choose the right artifact
-
-Proofline produces two different artifacts:
-
-| Artifact | Purpose | Contains | Does not contain |
-| --- | --- | --- | --- |
-| Portable JSON export | Inspectable, provider-neutral knowledge snapshot, empty-database restore, or explicit no-overwrite merge | immutable source versions, exact chunks/evidence, governed memories, study/review history, grounded proposals, Studio artifacts, safe model-run lineage, relevant audit and terminal ingestion metadata | embeddings, private staged retry inputs, credentials, prompts; overwrite import is not supported |
-| SQLite backup | Exact recovery of the current local deployment | the complete SQLite database, including source contents, historical versions, indexes, embeddings, audit data, model metadata, and staged ingestion inputs | external files or secrets stored outside SQLite |
-
-The portable export can restore an empty initialized database or be explicitly merged into a
-non-empty target with deterministic all-ID remapping. It is not an exact replacement for the
-SQLite backup because private retry inputs and embeddings are intentionally excluded. Its SHA-256
-manifest detects accidental modification and the verifier checks internal references and exact
-evidence spans; it is not a digital signature or proof of authenticity.
-
-## Create and verify a portable export
-
-Run commands from the repository root after `make setup`:
+## Create and verify
 
 ```bash
-.venv/bin/proofline export --output proofline-export.json
-.venv/bin/proofline verify-export proofline-export.json
+.venv/bin/proofline backup --output /safe/path/proofline.db
+.venv/bin/proofline verify-backup /safe/path/proofline.db
+.venv/bin/proofline verify-integrity
 ```
 
-Both export and backup refuse to overwrite an existing output unless `--force`
-is supplied. Output files are created with owner-only permissions (`0600`).
+Backup uses SQLite's consistent backup mechanism and refuses accidental overwrite unless `--force`
+is supplied. Verification checks the database structure and Proofline provenance contracts without
+publishing source content.
 
-## Restore a portable export into an empty database
+## Restore
+
+Stop Proofline before restoring. Verify the candidate, choose a rollback path outside the active
+database, then run:
 
 ```bash
-PROOFLINE_DATABASE_URL=sqlite:///./restored.db \
-  .venv/bin/proofline import proofline-export.json
+.venv/bin/proofline restore-backup /safe/path/proofline.db \
+  --rollback-output /safe/path/proofline-before-restore.db
 ```
 
-The importer verifies the size-bounded schema-v2 document before writing and upgrades verified
-schema-v1 core snapshots in memory. It preserves exported IDs and timestamps, rebuilds SQLite FTS
-rows from the exported exact chunks without running extraction,
-leaves embeddings empty for explicit re-indexing, and commits a unique receipt for the payload
-hash. Any validation, constraint, indexing, or final payload-equivalence failure rolls back the
-whole import.
+Restore rejects the active database path, SQLite sidecars, invalid schema, and unsafe path overlap.
+It writes a rollback copy before atomically replacing the active database and performs post-restore
+verification. Preserve both files until the application has been exercised successfully.
 
-A target containing any domain data, index rows, retry inputs, or previous import receipt fails
-with `target_not_empty` unless the explicit merge workflow below is used. Source URIs are preserved
-as provenance metadata and may refer to paths that do not exist on the new machine. Terminal
-ingestion diagnostics preserve their historical `retryable` value for exact payload fidelity, but
-excluded staged inputs cannot be recreated. Retrying one fails closed to `dead_letter` with
-`ingestion_input_missing`; operators must re-ingest the authorized source.
-
-## Merge a portable export into a non-empty database
-
-First create a content-free preview against the target database:
+## Portable transfer
 
 ```bash
-PROOFLINE_DATABASE_URL=sqlite:///./target.db \
-  .venv/bin/proofline import proofline-export.json --preview-merge
+.venv/bin/proofline export --output /safe/path/proofline.json
+.venv/bin/proofline verify-export /safe/path/proofline.json
+.venv/bin/proofline import /safe/path/proofline.json
 ```
 
-Review the target/incoming counts, deterministic ID map and `preview_sha256`, then apply that exact
-plan:
-
-```bash
-PROOFLINE_DATABASE_URL=sqlite:///./target.db \
-  .venv/bin/proofline import proofline-export.json \
-  --merge --preview-sha256 <digest>
-```
-
-Every incoming domain ID and provenance reference is remapped consistently. Existing target rows
-are never updated or deleted. A stale preview, duplicate payload, validation failure, constraint
-failure or final provenance mismatch rolls back the complete merge savepoint.
-
-## Create and verify a SQLite backup
-
-```bash
-.venv/bin/proofline backup --output proofline-backup.db
-.venv/bin/proofline verify-backup proofline-backup.db
-```
-
-The backup command uses SQLite's online backup API, so it takes a consistent
-snapshot while the API can remain available. Before publishing the file,
-Proofline checks database integrity, foreign keys, required tables, and the
-exact current migration set. Verification is read-only and does not initialize
-or migrate the candidate database.
-
-The backup contains sensitive source text and may contain private staged retry
-payloads, request identifiers, and embeddings. File permissions are not
-encryption. Encrypt backups at rest, restrict access, and store keys separately.
-
-## Verify live provenance
-
-After restoring either format, run the read-only semantic verifier against the configured live
-database:
-
-```bash
-PROOFLINE_DATABASE_URL=sqlite:////absolute/proofline.db \
-  .venv/bin/proofline verify-integrity
-```
-
-Unlike `verify-backup`, which proves SQLite structure, foreign keys, schema, and migration state,
-this command also checks Proofline's provenance invariants: immutable version hashes and lengths,
-source/current-version coherence, exact chunk and evidence offsets and lines, evidence quote
-hashes, embedding ownership, and exact FTS row correspondence. It does not repair data or emit
-source content. A failure exits nonzero with a stable content-free code.
-
-## Restore a verified local backup
-
-Stop the Proofline API and workers, then run the restore with the same Proofline version that will
-open the database:
-
-```bash
-PROOFLINE_DATABASE_URL=sqlite:////absolute/proofline.db \
-  .venv/bin/proofline restore-backup proofline-backup.db \
-  --rollback-output /absolute/proofline-before-restore.db
-```
-
-The command verifies the candidate without migrating it, refuses an in-memory or non-SQLite
-target, refuses a live target with `-wal`, `-shm` or `-journal` sidecars, and requires a new rollback path when
-the target already exists. It copies the candidate with mode `0600`, verifies that copy, preserves
-the current target without overwrite, atomically replaces the configured database, and verifies
-the published result. Candidate, target, and rollback paths must be distinct.
-
-Start Proofline and check `/health`, source and memory counts, one known search, and the exact
-evidence span behind one known memory. Keep the rollback copy until the restored deployment has
-been validated. To reverse the restore, stop Proofline and run the same command with the rollback
-copy as the candidate and a new rollback-output path.
-
-Example read-only recovery inspection using an isolated database path:
-
-```bash
-cp proofline-backup.db /tmp/proofline-recovery-drill.db
-chmod 600 /tmp/proofline-recovery-drill.db
-.venv/bin/proofline verify-backup /tmp/proofline-recovery-drill.db
-PROOFLINE_DATABASE_URL=sqlite:////tmp/proofline-recovery-drill.db \
-  .venv/bin/proofline serve
-```
-
-An online backup is a standalone SQLite database; do not copy a live database file manually. A
-backup from a different schema version is rejected rather than silently migrated by the verifier.
-The local release receipt exercises backup creation, restore to the older snapshot and a reverse
-restore from the preserved rollback copy through the installed wheel.
-
-## Retention and deletion
-
-Deleting a source removes its derived live records, but previously created
-backups can still contain that data. Operators must define a retention window,
-expire old backups, and securely destroy copies that are no longer authorized.
-Test recovery periodically; creation without a successful restore drill is not
-evidence that a backup is usable.
+Import into a non-empty database requires preview plus explicit merge with the preview SHA-256.
+Merge remaps identifiers deterministically and rolls back atomically on failure; it never performs a
+destructive overwrite.

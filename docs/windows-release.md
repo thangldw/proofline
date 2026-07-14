@@ -1,8 +1,7 @@
-# Real-Windows qualification and local release
+# Windows local release
 
-Windows support is not inferred from cross-compilation or a macOS build. Run this workflow from a
-real Windows x64 machine with Python 3.12, Node.js, Rust/MSVC, WebView2, WiX/NSIS prerequisites and
-GitHub CLI authentication:
+Run this only on a real Windows x64 machine with Python 3.12, Node.js, Rust/MSVC, WebView2,
+WiX/NSIS prerequisites, and authenticated GitHub CLI.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -11,11 +10,11 @@ npm install
 powershell -ExecutionPolicy Bypass -File scripts\release_windows.ps1 -Tag v0.14.17
 ```
 
-The script requires clean `main == origin/main` and a `[skip ci]` release commit. It runs the full
-credential-free test/evaluation gate, builds the wheel, frozen sidecar, MSI and NSIS installers,
-qualifies the installed wheel and Windows Credential Locker, writes checksummed Windows receipts,
-then creates the tag/release directly through `gh`. It does not invoke GitHub Actions.
+The script requires a clean `main` equal to `origin/main` and a release commit containing
+`[skip ci]`. It runs local tests/evaluations, builds wheel, web bundle, frozen sidecar, MSI, and
+NSIS, creates installed-wheel and desktop receipts, writes checksums, pushes the tag, and publishes
+through GitHub CLI without relying on GitHub Actions.
 
-The Windows desktop receipt proves only the target-specific build and frozen-sidecar lifecycle.
-Installer UI, uninstall, upgrade/rollback and Authenticode signing remain explicit manual gates and
-must not be marked complete from this receipt alone.
+`windows_desktop_receipt.py` refuses non-Windows hosts. The receipt proves a target-specific build
+and sidecar smoke only; it does not prove Authenticode, installer UI, uninstall, upgrade, rollback,
+reputation, or production readiness.

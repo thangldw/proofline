@@ -1,53 +1,45 @@
 # Provider configuration
 
-Proofline runs with model providers disabled by default. Use the Settings screen or
-`PUT /api/v1/model/configuration` to configure generation and embedding independently.
+Deterministic ingestion, lexical search, review, backup, and portability do not require a model.
+Generation and embeddings are optional and can be configured in the UI under **Settings**.
 
-Proofline defaults to writing `.proofline/providers.json` atomically with owner-only permissions.
-Set `PROOFLINE_PROVIDER_CONFIG_PATH` to choose another local path. Environment variables retain
-precedence over local storage, which keeps container and managed deployments declarative.
+## Fields
 
-Desktop wrappers should enable the operating-system credential store before startup:
+- Generation: provider, base URL, model, and API key.
+- Embedding: provider, base URL, model, and API key.
+- Remote access: explicit `allow_remote_ai` opt-in.
+
+Environment variables override saved settings:
+
+```bash
+export PROOFLINE_AI_PROVIDER=openai_compatible
+export PROOFLINE_AI_BASE_URL=http://127.0.0.1:11434/v1
+export PROOFLINE_AI_MODEL=model-name
+export PROOFLINE_AI_API_KEY=optional-secret
+export PROOFLINE_EMBEDDING_PROVIDER=openai_compatible
+export PROOFLINE_EMBEDDING_BASE_URL=http://127.0.0.1:11434/v1
+export PROOFLINE_EMBEDDING_MODEL=embedding-model
+export PROOFLINE_EMBEDDING_API_KEY=optional-secret
+export PROOFLINE_ALLOW_REMOTE_AI=false
+```
+
+## Secret storage
+
+Desktop launch on macOS and Windows defaults to the OS keyring. Development defaults to an
+owner-readable local configuration file. Override only when you understand the tradeoff:
 
 ```bash
 export PROOFLINE_SECRET_STORE=os_keyring
-proofline serve --port 0 --data-dir "$HOME/Library/Application Support/Proofline"
 ```
 
-The `os_keyring` mode uses macOS Keychain on macOS and Windows Credential Locker on Windows through
-the Python `keyring` backend. Non-secret provider settings remain in `providers.json`; generation
-and embedding API keys do not. The Settings screen reports which storage mode is active and lets
-the user replace or explicitly remove either saved key. On the first successful save in keyring
-mode, legacy keys are moved out of `providers.json`. If provider validation fails, both the file
-and keyring changes are rolled back. Startup fails explicitly when keyring mode is selected but no
-usable OS backend is available. Use `PROOFLINE_SECRET_STORE=file` (the default) only when the
-owner-only local file behavior is intended.
+The API reports whether a key is configured but never returns it. Replacing or removing a key is
+explicit. Provider keys are excluded from model-run records, exports, backups, and normal logs.
 
-Supported generation profiles are `qwen`, `deepseek`, `ollama`, `vllm`, and
-`openai_compatible`. Embedding profiles are `ollama`, `vllm`, and `openai_compatible`. Qwen,
-DeepSeek, and other non-loopback endpoints require `allow_remote_ai=true`. API keys are accepted
-on write, are never returned on read, and are not included in model-run diagnostics, portable
-exports, SQLite backups or platform receipts.
+## Failure behavior
 
-Capability checks:
+Generation, embedding, and reranking health are reported separately. Transient requests use bounded
+retry; failed model runs remain visible and can enter the dead-letter/retry workflow. Proofline never
+silently falls back from a local provider to a remote provider.
 
-```text
-GET /api/v1/model/provider?check_health=true
-GET /api/v1/model/embedding-provider?check_health=true
-GET /api/v1/model/reranking-provider
-```
-
-Reranking currently reports `disabled`. A failed generation or embedding provider does not stop
-deterministic ingestion or lexical retrieval.
-
-Transient network/timeouts, `408`, `409`, `425`, `429`, and selected `5xx` responses receive at
-most three attempts. Other failures are not retried. Exhaustion creates a `dead_letter` run.
-Retry an extraction run with its original immutable source:
-
-```text
-POST /api/v1/model/runs/{run_id}/retry
-{"source_id":"...","operation":"extract_memories"}
-```
-
-The configured provider ID and model ID must exactly match the failed run. Proofline never falls
-back to another provider.
+Mock provider runs require explicit opt-in and remain labelled `mock_integration`. They test wiring,
+not model quality.

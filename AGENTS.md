@@ -1,35 +1,27 @@
-# AGENTS.md
+# Repository instructions
 
-These instructions apply to the entire repository.
+Build Proofline as an evidence-first Engineering Decision Memory. Every derived claim, decision,
+or answer must resolve to an immutable source identity and exact source span.
 
-## Mission
+## Scope
 
-Build Proofline as an evidence-first Engineering Decision Memory system. Every
-derived claim, decision, or answer must be traceable to an immutable source
-identity and an exact source span.
-
-## Current phase
-
-The project is pre-alpha. Work toward the smallest end-to-end vertical slice
-described in the root README and current roadmap. Do not add a rich editor,
-canvas, collaboration, generic agents, graph database, or additional connector
-matrix unless a tracked milestone explicitly requires it.
+The project is experimental pre-alpha. Work on the smallest tracked vertical slice. Do not add a
+rich editor, canvas, generic agents, graph database, collaboration, or connector matrix unless the
+current roadmap explicitly opens that milestone.
 
 ## Engineering rules
 
 - Preserve provenance across every transformation.
-- Prefer deterministic parsing and retrieval before introducing an LLM.
+- Prefer deterministic parsing and retrieval before an LLM.
 - Keep provider-specific AI code behind interfaces.
 - Use migrations for persistent schema changes.
-- Never silently discard ingestion or extraction failures.
-- Deletion must include derived chunks and indexes.
-- Do not log source contents, credentials, or model prompts by default.
-- Add tests for behavior changes and regressions.
+- Never hide ingestion or extraction failures.
+- Cascade deletion through chunks, indexes, and derived records.
+- Do not log source content, credentials, or prompts by default.
+- Test behavior changes and regressions.
 - Keep local development functional without external services.
 
-## Definition of done
+## Completion rule
 
-A change is done when its behavior is tested, user-visible configuration is
-documented, failure modes are explicit, and the relevant quality commands pass.
-Planned behavior must not be presented as implemented behavior.
-
+Behavior is complete only when tested, user-visible configuration is documented, failure modes are
+explicit, and relevant quality commands pass. Never describe planned behavior as implemented.

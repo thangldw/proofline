@@ -1,75 +1,34 @@
-# External pilot artifacts
+# External pilot templates
 
-These version 1 templates support the [external pilot protocol](../../docs/pilot-protocol.md).
-They contain no external pilot results. The single question row is synthetic and exists only to
-show valid JSONL shape; it MUST be removed before a real dataset is frozen.
+These templates contain no external pilot results. Copy them to a private access-controlled
+workspace, remove the synthetic example row, and never commit raw questions, answers, source spans,
+company names, participant identities, credentials, prompts, or model output.
 
-Use copies in a private, access-controlled workspace. Do not commit raw questions, answers, source
-text, source spans, company names, participant identities, credentials, prompts, or model output.
-Only explicitly approved anonymized aggregates may return to this repository.
+## Templates
 
-The separate [`pilot-simulation/`](../pilot-simulation/) corpus tests the workflow with invented
-personas and sources. Its output is always simulation-only and MUST NOT be copied into these
-external-pilot templates as evidence.
-
-## Files
-
-- `manifest.v1.template.json`: consent, ownership, study window, retention, and security policy.
-- `questions.v1.template.jsonl`: question and relevance-judgment grain, one record per question.
-- `attempts.v1.template.csv`: one paired baseline/Proofline observation per eligible question and
-  participant, including safe configuration/cost/latency metadata.
+- `manifest.v1.template.json`: consent, ownership, retention, dataset version, and hashes.
+- `questions.v1.template.jsonl`: one question/relevance record per line.
+- `attempts.v1.template.csv`: paired manual and Proofline observation.
 - `citations.v1.template.csv`: one human judgment per emitted citation.
-- `weekly-usage.v1.template.csv`: one team/week adoption observation.
-- `commercial-signals.v1.template.csv`: one dated buyer signal per team.
-- `security-platform.v1.template.csv`: team security constraints, deletion checks, findings, and
-  supported-platform receipts.
-- `gate-review.v1.template.json`: blank decision record with formulas and thresholds fixed in
-  advance.
+- `weekly-usage.v1.template.csv`: one team/week observation.
+- `commercial-signals.v1.template.csv`: dated buyer signals.
+- `security-platform.v1.template.csv`: platform and security observations.
+- `gate-review.v1.template.json`: fixed thresholds and owner decision.
 
-## Conventions
+Use UTC timestamps, ISO weeks, lowercase booleans, opaque random IDs, explicit missingness, and a new
+dataset version for every frozen revision. Verify unique IDs, foreign keys, paired timing, one
+judgment per citation, at least 25 eligible questions, at least 10 temporal questions, and SHA-256
+for every artifact.
 
-- Timestamps use UTC ISO 8601; study weeks use ISO `YYYY-Www`.
-- Durations use integer milliseconds or seconds as named in the header.
-- Missing measured values are empty; categorical missingness uses `not_available` only where the
-  protocol permits it. Never substitute zero.
-- Boolean CSV values are lowercase `true` or `false`.
-- IDs are random opaque values. Do not derive participant IDs from email addresses.
-- Multi-value CSV fields contain JSON arrays, for example `"[""markdown"",""adr""]"`.
-- CSV files are UTF-8 with a header row. JSONL contains one JSON object per line.
+## Aggregate analysis
 
-## Required enums
-
-| Field | Values |
-| --- | --- |
-| `intent` | `decision`, `rationale`, `ownership`, `change`, `incident`, `validity` |
-| `record_status` | `synthetic_example`, `eligible`, `excluded`, `withdrawn` |
-| `completion_status` | `completed`, `insufficient_evidence`, `timeout`, `environment_failure`, `withdrawn` |
-| `answer_status` | `grounded`, `insufficient_evidence`, `provider_unavailable`, `not_applicable` |
-| `citation_judgment` | `supported`, `unsupported`, `unresolved`, `unjudgeable` |
-| `adjudication_status` | `not_needed`, `pending`, `adjudicated` |
-| `wtp_status` | `concrete`, `exploratory`, `declined`, `unknown` |
-| `finding_severity` | `none`, `low`, `medium`, `high`, `critical` |
-| `gate_status` | `open`, `pass`, `fail`, `not_applicable` |
-
-Before analysis, verify at minimum: unique IDs; foreign keys; exactly one eligible question record
-per `question_id`; at least 25 eligible real questions and 10 temporal; paired timing coverage;
-one judgment for every emitted citation; no synthetic rows in the calculation; and frozen artifact
-SHA-256 hashes recorded in the manifest and gate review.
-
-## Aggregate analyzer
-
-Copy the five data templates into an access-controlled directory using these exact names:
-`questions.jsonl`, `attempts.csv`, `citations.csv`, `weekly-usage.csv`, and
-`commercial-signals.csv`. Create `manifest.json` with `artifact_status` set to
-`frozen_private_dataset`, a shared `dataset_version`, and an `artifact_sha256` entry for every data
-file. Then run:
+Rename private working copies to `manifest.json`, `questions.jsonl`, `attempts.csv`, `citations.csv`,
+`weekly-usage.csv`, and `commercial-signals.csv`, then run:
 
 ```bash
 .venv/bin/python scripts/analyze_pilot.py /private/path/to/frozen-pilot \
   --output /private/path/to/pilot-gate-review.json
 ```
 
-The analyzer fails closed on hash, version, ID, foreign-key, synthetic-row, and citation-resolution
-problems. Its output is an unsigned aggregate calculation, not pilot evidence or owner approval.
-Do not commit the private input directory or the generated review without explicit aggregate-use
-consent.
+The output is an unsigned aggregate calculation until data and metric owners sign it. Follow the
+full [`pilot protocol`](../../docs/pilot-protocol.md).
