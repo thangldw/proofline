@@ -1,6 +1,6 @@
 # Proofline
 
-[Product website](https://thangldw.github.io/proofline/) · [Latest pre-release](https://github.com/thangldw/proofline/releases/tag/v0.14.15)
+[Product website](https://thangldw.github.io/proofline/) · [Latest pre-release](https://github.com/thangldw/proofline/releases/tag/v0.14.16)
 
 **Evidence-backed engineering memory.**
 
@@ -170,7 +170,7 @@ npm run test:e2e
 
 ## One-command local run
 
-The v0.14.15 wheel includes the web UI, so Node.js is not required after installation. For the
+The v0.14.16 wheel includes the web UI, so Node.js is not required after installation. For the
 fastest installed-app experiment, run:
 
 ```bash
@@ -273,10 +273,9 @@ production qualification. They do not block an explicitly experimental pre-alpha
 Provider profiles, secret-handling rules, health checks, and retry semantics are documented in
 the [provider configuration guide](docs/provider-configuration.md).
 
-`v0.14.15` is the latest experimental pre-alpha release. It adds the Tauri desktop shell,
-target-specific frozen sidecar and graceful private shutdown contract while retaining portable
-schema-v2 evidence round trips. See the
-[release notes](docs/releases/v0.14.15.md) and verify
+`v0.14.16` is the latest experimental pre-alpha release. It adds fail-closed Studio evidence
+packages with `.pptx`, PNG and CSV outputs while retaining the experimental desktop shell. See the
+[release notes](docs/releases/v0.14.16.md) and verify
 `SHA256SUMS` before installation.
 
 Public issue handling, data-loss escalation, upgrade/rollback expectations and ownership gaps are
@@ -285,7 +284,8 @@ documented in [SUPPORT.md](SUPPORT.md) and [MAINTAINERS.md](MAINTAINERS.md).
 Open **Studio**, select an indexed source, then choose an artifact type. Generation is deterministic
 and local in this release. Every section opens the immutable source version and exact cited lines.
 Audio uses the browser's installed speech engine; video is an interactive storyboard preview.
-Proofline does not yet export downloadable audio/video, `.pptx`, or raster infographic files.
+Download packages include exact-citation manifests, `.pptx` presentations, PNG infographics, CSV,
+Markdown, narration scripts and self-contained storyboard HTML. Rendered MP3/MP4 remains deferred.
 
 To derive study cards, place explicit adjacent pairs in any indexed source and select it under
 **Study**:
@@ -301,7 +301,7 @@ release commit before pushing `main`, then build and publish from a clean, up-to
 ```bash
 git commit -m "feat: describe the release [skip ci]"
 git push origin main
-make release-local TAG=v0.14.15
+make release-local TAG=v0.14.16
 ```
 
 The command runs the normal test, build, evaluation and smoke-install gates locally, creates an

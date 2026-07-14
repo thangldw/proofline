@@ -4,6 +4,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
   Layers3,
   Network,
@@ -145,7 +146,13 @@ export function StudioView({
         </div>
       )}
 
-      {selected && <ArtifactPreview artifact={selected} onDelete={() => void remove(selected)} />}
+      {selected && (
+        <ArtifactPreview
+          artifact={selected}
+          onDelete={() => void remove(selected)}
+          onMessage={setMessage}
+        />
+      )}
       {!selected && artifacts.length === 0 && (
         <div className="empty-card studio-empty">Choose a source and create your first Studio artifact.</div>
       )}
@@ -153,7 +160,15 @@ export function StudioView({
   );
 }
 
-function ArtifactPreview({ artifact, onDelete }: { artifact: StudioArtifact; onDelete: () => void }) {
+function ArtifactPreview({
+  artifact,
+  onDelete,
+  onMessage,
+}: {
+  artifact: StudioArtifact;
+  onDelete: () => void;
+  onMessage: (message: string) => void;
+}) {
   const [active, setActive] = useState(0);
   const [citation, setCitation] = useState<StudioCitation | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -184,6 +199,15 @@ function ArtifactPreview({ artifact, onDelete }: { artifact: StudioArtifact; onD
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(narration));
   }
 
+  async function download() {
+    try {
+      await api.downloadStudioArtifact(artifact.id);
+      onMessage(`${artifact.title} evidence package downloaded.`);
+    } catch (reason) {
+      onMessage(reason instanceof Error ? reason.message : "Could not download artifact");
+    }
+  }
+
   return (
     <article className={`studio-preview studio-format-${artifact.content.format}`}>
       <header>
@@ -196,6 +220,9 @@ function ArtifactPreview({ artifact, onDelete }: { artifact: StudioArtifact; onD
           {artifact.kind === "audio_overview" && (
             <button type="button" onClick={speak}><Play size={15} /> Play narration</button>
           )}
+          <button type="button" onClick={() => void download()}>
+            <Download size={15} /> Download
+          </button>
           <button className="studio-delete" type="button" onClick={onDelete} aria-label={`Delete ${artifact.title}`}>
             <Trash2 size={16} />
           </button>

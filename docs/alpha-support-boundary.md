@@ -1,6 +1,6 @@
 # Alpha release criteria and support boundary
 
-Proofline remains pre-alpha through the current `v0.14.15` release. Versioned GitHub artifacts are
+Proofline remains pre-alpha through the current `v0.14.16` release. Versioned GitHub artifacts are
 stable snapshots of their documented behavior, but they do not carry production support,
 compatibility, uptime, or data-loss guarantees.
 
