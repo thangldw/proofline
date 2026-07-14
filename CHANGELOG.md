@@ -13,6 +13,8 @@ line.
   development artifacts. Product behavior and evaluation fixtures are unchanged.
 - Standardized offline system typography and added labelled collaborative-canvas diagrams for
   architecture, lifecycle, evaluation, recovery, roadmap, and release workflows.
+- Reworked the public project page with the current Evidence Studio screenshot, bright offline
+  system typography, labelled canvas-style workflow cards, and explicit pre-alpha boundaries.
 
 ## [0.14.17] - 2026-07-14
 
