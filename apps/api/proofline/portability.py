@@ -1453,6 +1453,7 @@ def atomic_write_export(path: Path, document: dict[str, Any], *, force: bool = F
     try:
         os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "wb") as handle:
+            descriptor = -1
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
@@ -1464,7 +1465,8 @@ def atomic_write_export(path: Path, document: dict[str, Any], *, force: bool = F
             except FileExistsError as exc:
                 raise PortabilityError("output_exists") from exc
             temporary.unlink()
-        os.chmod(path, 0o600)
     finally:
+        if descriptor >= 0:
+            os.close(descriptor)
         if temporary.exists():
             temporary.unlink()

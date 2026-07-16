@@ -28,6 +28,7 @@ Changelog = "https://github.com/thangldw/proofline/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 dev = [
   "build>=1.2,<2",
+  "hypothesis>=6,<7",
   "pyinstaller>=6.21,<7",
   "pytest>=8,<9",
   "ruff>=0.8,<1",

@@ -41,9 +41,17 @@ adding a new dataset version rather than silently weakening an existing expectat
 
 ## Benchmarks
 
-`benchmarks/` records environment-specific watcher, lexical, vector-index, and deterministic
-reranker observations. Reproduce them with the matching Make target or script. A benchmark receipt
-describes only its revision, fixture, hardware, and command; it is not a portable scale guarantee.
+`benchmarks/` records environment-specific watcher, lexical, vector-index, provenance-scale, and
+deterministic reranker observations. Reproduce them with the matching Make target or script. A
+benchmark receipt describes only its revision, fixture, hardware, and command; it is not a portable
+scale guarantee.
+
+## Provenance conformance
+
+`provenance/conformance-v1.json` is a content-free receipt from real SQLite ingestion, decision
+package, deterministic archive, source revision, portable export/import, and live-integrity paths.
+Reproduce it with `make verify-provenance`. It establishes deterministic local invariants, not
+authenticity, signature trust, external-model behavior, or production readiness.
 
 ## Model comparison
 

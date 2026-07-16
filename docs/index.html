@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Proofline is a local-first engineering decision memory. Recover why a system was built and verify every claim against immutable source versions and exact source lines.">
+  <meta name="description" content="Proofline is verifiable engineering decision memory: every decision resolves to immutable sources, exact spans, and a portable evidence package.">
   <link rel="canonical" href="https://thangldw.github.io/proofline/">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Proofline — Recover the why. Verify every claim.">
-  <meta property="og:description" content="Local-first engineering decision memory with immutable sources and exact citations.">
+  <meta property="og:title" content="Proofline — Verifiable decision memory">
+  <meta property="og:description" content="Trace every engineering decision to immutable sources, exact spans, and a portable evidence package.">
   <meta property="og:url" content="https://thangldw.github.io/proofline/">
   <meta property="og:image" content="https://thangldw.github.io/proofline/assets/proofline-demo.png">
-  <meta property="og:image:alt" content="Proofline Evidence Studio showing evidence-backed learning artifact tools">
+  <meta property="og:image:alt" content="Proofline local evidence interface">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#f7fbff">
-  <title>Proofline — Recover the why. Verify every claim.</title>
-  <link rel="stylesheet" href="proofline-page.css?v=20260714c">
+  <title>Proofline — Verifiable decision memory</title>
+  <link rel="stylesheet" href="proofline-page.css?v=20260716a">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -25,8 +25,8 @@
       <a class="brand" href="#top" aria-label="Proofline home"><span class="brand-mark">P</span>Proofline</a>
       <nav aria-label="Page navigation">
         <a href="#workflow">How it works</a>
-        <a href="#studio">Studio</a>
-        <a href="#evidence">Evidence</a>
+        <a href="#package">Evidence package</a>
+        <a href="#verify">Verify</a>
         <a href="#limits">Limitations</a>
       </nav>
       <a class="button compact secondary github-button" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">
@@ -40,11 +40,11 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <p class="status"><span></span>v0.14.17 · experimental pre-alpha</p>
-          <p class="eyebrow">Evidence-first engineering decision memory</p>
-          <h1>Recover the why. <em>Verify every claim.</em></h1>
-          <p class="lede">Turn approved documents, notes, and local Git history into searchable decision memory. Every derived answer stays linked to an immutable source version and exact source lines.</p>
+          <p class="eyebrow">Verifiable engineering decision memory</p>
+          <h1>Keep the decision. <em>Prove where it came from.</em></h1>
+          <p class="lede">Proofline turns approved documents, notes, and local Git history into decision memory that can be inspected later. Every claim keeps its source version, exact source lines and offsets, transformation record, and content hash.</p>
           <div class="actions hero-actions">
-            <a class="button primary" href="#studio">See the product</a>
+            <a class="button primary" href="#package">See the evidence contract</a>
             <a class="button secondary" href="https://github.com/thangldw/proofline/releases/tag/v0.14.17" target="_blank" rel="noopener noreferrer">Download v0.14.17</a>
           </div>
           <div class="quickstart-label">Local quickstart · no cloud account</div>
@@ -61,58 +61,58 @@
 
         <figure class="product-shot">
           <div class="shot-bar" aria-hidden="true"><span></span><span></span><span></span><b>Proofline · local workspace</b></div>
-          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Proofline Evidence Studio with nine evidence-backed learning artifact tools" fetchpriority="high">
-          <figcaption>Current bundled interface · seeded example source · no external model required</figcaption>
+          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Proofline local evidence interface" fetchpriority="high">
+          <figcaption>Current bundled interface · synthetic example · deterministic local path</figcaption>
         </figure>
       </div>
       <ul class="trust-strip" aria-label="Proofline product principles">
         <li><b>Local-first</b><span>Loopback runtime and platform-owned storage</span></li>
-        <li><b>Evidence-first</b><span>Immutable versions and exact source spans</span></li>
-        <li><b>Provider-optional</b><span>Deterministic core works without external AI</span></li>
+        <li><b>Traceable</b><span>Immutable versions and exact source spans</span></li>
+        <li><b>Verifiable</b><span>Content hashes and deterministic evidence packages</span></li>
       </ul>
     </section>
 
     <section class="section workflow-section" id="workflow">
       <div class="section-head split">
-        <div><p class="eyebrow">One inspectable path</p><h2>From approved source to reviewed decision memory.</h2></div>
-        <p>The workflow is deterministic before any model is involved. Unknown, deleted, cross-workspace, or hash-mismatched evidence fails closed instead of becoming an uncited answer.</p>
+        <div><p class="eyebrow">One inspectable chain</p><h2>From source to decision, without losing the proof.</h2></div>
+        <p>Proofline preserves identity at every transformation. Unknown, deleted, cross-workspace, out-of-range, or hash-mismatched evidence is rejected instead of becoming an unsupported claim.</p>
       </div>
       <ol class="canvas-flow" aria-label="Proofline evidence workflow">
         <li class="canvas-source"><span>01 · INPUT</span><b>Approved source</b><small>Markdown, notes, registered folders, or local Git.</small></li>
         <li class="canvas-evidence"><span>02 · PRESERVE</span><b>Immutable version</b><small>Stable identity, content hash, offsets, and exact lines.</small></li>
-        <li class="canvas-process"><span>03 · RETRIEVE</span><b>Evidence set</b><small>Lexical or optional hybrid retrieval with visible lineage.</small></li>
-        <li class="canvas-human"><span>04 · REVIEW</span><b>Human gate</b><small>Accept, reject, revise, or inspect the supporting quote.</small></li>
-        <li class="canvas-outcome"><span>05 · REMEMBER</span><b>Governed outcome</b><small>Answer, decision, study item, proposal, or Studio artifact.</small></li>
+        <li class="canvas-process"><span>03 · DERIVE</span><b>Transformation</b><small>Versioned operation with explicit parent nodes.</small></li>
+        <li class="canvas-human"><span>04 · REVIEW</span><b>Human decision</b><small>Accept, reject, or revise with the evidence visible.</small></li>
+        <li class="canvas-outcome"><span>05 · PACKAGE</span><b>Verifiable memory</b><small>Portable DAG, root hash, and content-free verification.</small></li>
       </ol>
       <p class="diagram-note">Colors identify semantic roles and every state is also labelled; the flow never relies on color alone.</p>
     </section>
 
-    <section class="section studio-section" id="studio">
+    <section class="section studio-section" id="package">
       <div class="section-head split">
-        <div><p class="eyebrow">Evidence Studio</p><h2>Turn one source into useful learning artifacts.</h2></div>
-        <p>Each generated section retains the immutable source identity and exact supporting lines. The current Studio works locally with deterministic generation.</p>
+        <div><p class="eyebrow">Decision Evidence Package</p><h2>A portable receipt for the whole decision.</h2></div>
+        <p>Each source version, chunk, citation, transformation, artifact, and review is a hashed node. Their parent-child relationships form a deterministic Merkle DAG with one root hash.</p>
       </div>
       <div class="studio-layout">
         <figure class="studio-shot">
-          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Evidence Studio source selector and artifact catalogue" loading="lazy">
+          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Proofline local evidence workspace" loading="lazy">
         </figure>
         <div class="artifact-panel">
-          <p class="label">Nine current artifact types</p>
-          <div class="artifact-grid" aria-label="Evidence Studio artifact types">
-            <span>Audio overview</span><span>Presentation</span><span>Video overview</span>
-            <span>Mind map</span><span>Report</span><span>Flashcards</span>
-            <span>Quiz</span><span>Infographic</span><span>Data table</span>
+          <p class="label">Package contents</p>
+          <div class="artifact-grid" aria-label="Decision Evidence Package contents">
+            <span>Source hashes</span><span>Exact citation spans</span>
+            <span>Transformation version</span><span>Parent-child links</span>
+            <span>Review outcome</span><span>Root hash</span>
           </div>
-          <p class="artifact-note">No screenshot mockup: this is the current bundled web interface running against the checked-in example source.</p>
+          <p class="artifact-note">The package proves internal integrity and lineage. It does not prove author identity or authenticity; signatures and trust management are a later milestone.</p>
         </div>
       </div>
     </section>
 
-    <section class="section" id="evidence">
+    <section class="section" id="verify">
       <div class="section-head">
-        <p class="eyebrow">Evidence contract</p>
-        <h2>The receipt travels with the claim.</h2>
-        <p>Proofline preserves provenance across ingestion, retrieval, memory, study, proposals, and Studio artifacts.</p>
+        <p class="eyebrow">Verification workflow</p>
+        <h2>Inspect, verify, and compare without opening the source database.</h2>
+        <p>Evidence packages are deterministic JSON or ZIP files. Verification runs locally and reports content-free failure codes.</p>
       </div>
       <div class="evidence-layout">
         <article class="receipt" aria-label="Example Proofline evidence receipt">
@@ -124,9 +124,9 @@
           </div>
         </article>
         <div class="evidence-copy">
-          <article><b>Deterministic before generative</b><p>Parsing, versioning, retrieval, citation resolution, backup, and integrity checks remain useful without a model.</p></article>
-          <article><b>Provider code stays behind interfaces</b><p>Optional Qwen, DeepSeek, Ollama, vLLM, and OpenAI-compatible endpoints require explicit configuration.</p></article>
-          <article><b>Failures remain visible</b><p>Ingestion, extraction, deletion, and evidence-integrity errors are not silently discarded.</p></article>
+          <article><b>proofline verify-package evidence.zip</b><p>Recompute every node and relationship, then compare the deterministic root hash.</p></article>
+          <article><b>proofline explain ARTIFACT_ID</b><p>Trace one artifact back through citations, chunks, source versions, and transformations.</p></article>
+          <article><b>proofline diff before.zip after.zip</b><p>Compare package structure and hashes without printing private source content.</p></article>
         </div>
       </div>
     </section>
@@ -138,7 +138,7 @@
       </div>
       <div class="limits-grid">
         <article><span>Platform</span><b>macOS ARM64 receipt only</b><p>A real Windows lifecycle run remains open.</p></article>
-        <article><span>Packaging</span><b>Unsigned experimental app</b><p>Signing, notarization, updater rollback, and uninstall qualification remain open.</p></article>
+        <article><span>Packaging</span><b>Unsigned experimental app</b><p>Qualification for signed native installers, notarization, updater rollback, and uninstall remains open.</p></article>
         <article><span>Model quality</span><b>Mock is not real-model evidence</b><p>Scripted providers validate wiring, not production extraction quality.</p></article>
         <article><span>Operations</span><b>No production support claim</b><p>External pilot evidence, security qualification, and support commitments remain open.</p></article>
       </div>
@@ -146,7 +146,7 @@
 
     <section class="section get-started" id="get-started">
       <div class="closing">
-        <div><p class="eyebrow">MIT licensed · local-first · inspectable</p><h2>Keep the decision and the exact proof behind it.</h2></div>
+        <div><p class="eyebrow">MIT licensed · local-first · inspectable</p><h2>Build decision memory that can defend itself.</h2></div>
         <div class="actions">
           <a class="button primary" href="https://github.com/thangldw/proofline/releases/tag/v0.14.17" target="_blank" rel="noopener noreferrer">Try v0.14.17</a>
           <a class="button secondary github-button" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer"><img src="assets/github.svg" alt="">Star or fork</a>
@@ -155,7 +155,7 @@
     </section>
   </main>
 
-  <footer><span>Proofline · MIT License</span><span>Evidence-first engineering decision memory.</span></footer>
-  <script src="proofline-page.js?v=20260714c"></script>
+  <footer><span>Proofline · MIT License</span><span>Verifiable engineering decision memory.</span></footer>
+  <script src="proofline-page.js?v=20260716a"></script>
 </body>
 </html>

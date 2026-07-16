@@ -24,6 +24,14 @@ from .evaluation import (
     extraction_report_meets_thresholds,
     grounded_report_meets_thresholds,
 )
+from .evidence_packages import (
+    EvidencePackageError,
+    atomic_write_package,
+    build_decision_package,
+    diff_decision_packages,
+    explain_decision_package,
+    load_and_verify_package,
+)
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
@@ -186,6 +194,23 @@ def main(argv: list[str] | None = None) -> None:
     export.add_argument("--force", action="store_true")
     verify_export = subcommands.add_parser("verify-export", help="Verify a portable JSON snapshot")
     verify_export.add_argument("path", type=Path)
+    package = subcommands.add_parser(
+        "export-package", help="Write a verifiable evidence package for one memory artifact"
+    )
+    package.add_argument("artifact_id")
+    package.add_argument("--output", type=Path, required=True)
+    package.add_argument("--force", action="store_true")
+    verify_package = subcommands.add_parser(
+        "verify-package", help="Verify a Decision Evidence Package without database access"
+    )
+    verify_package.add_argument("path", type=Path)
+    explain = subcommands.add_parser(
+        "explain", help="Explain one memory artifact and its exact provenance"
+    )
+    explain.add_argument("artifact_id")
+    diff = subcommands.add_parser("diff", help="Compare two verified Decision Evidence Packages")
+    diff.add_argument("before", type=Path)
+    diff.add_argument("after", type=Path)
     import_export = subcommands.add_parser(
         "import", help="Restore or explicitly merge a verified portable JSON snapshot"
     )
@@ -341,6 +366,47 @@ def main(argv: list[str] | None = None) -> None:
         except PortabilityError as exc:
             raise SystemExit(f"export verification failed: {exc.code}") from exc
         print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
+    elif args.command == "export-package":
+        initialize_database()
+        try:
+            with SessionLocal() as session:
+                document = build_decision_package(session, args.artifact_id)
+            atomic_write_package(args.output, document, force=args.force)
+        except EvidencePackageError as exc:
+            raise SystemExit(f"package export failed: {exc.code}") from exc
+        print(
+            json.dumps(
+                {
+                    "schema": document["manifest"]["schema"],
+                    "root_hash": document["manifest"]["root_hash"],
+                    "artifact_id": document["payload"]["artifact"]["id"],
+                },
+                sort_keys=True,
+            )
+        )
+    elif args.command == "verify-package":
+        try:
+            _document, report = load_and_verify_package(args.path)
+        except EvidencePackageError as exc:
+            raise SystemExit(f"package verification failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
+    elif args.command == "explain":
+        initialize_database()
+        try:
+            with SessionLocal() as session:
+                document = build_decision_package(session, args.artifact_id)
+            report = explain_decision_package(document)
+        except EvidencePackageError as exc:
+            raise SystemExit(f"artifact explanation failed: {exc.code}") from exc
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    elif args.command == "diff":
+        try:
+            before, _before_report = load_and_verify_package(args.before)
+            after, _after_report = load_and_verify_package(args.after)
+            report = diff_decision_packages(before, after)
+        except EvidencePackageError as exc:
+            raise SystemExit(f"package diff failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
     elif args.command == "import":
         initialize_database()
         try:

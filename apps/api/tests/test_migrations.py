@@ -5,6 +5,7 @@ import pytest
 from proofline.backup import create_sqlite_backup, verify_sqlite_backup
 from proofline.database import initialize_database, make_engine
 from proofline.ingestion import delete_source, source_deletion_impact
+from proofline.integrity import verify_live_database
 from proofline.migrations import MIGRATIONS, _initial_schema
 from proofline.models import ImportReceipt, Source
 from proofline.portability import build_portable_export, verify_portable_export
@@ -52,6 +53,40 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "studio_artifacts",
         "studio_citations",
     } <= tables
+    engine.dispose()
+
+
+@pytest.mark.parametrize("prefix_length", range(1, len(MIGRATIONS) + 1))
+def test_every_recorded_database_version_upgrades_to_current_with_integrity(
+    tmp_path, prefix_length
+):
+    engine = make_engine(f"sqlite:///{tmp_path / f'version-{prefix_length}.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:prefix_length]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        versions = connection.execute(
+            text("SELECT version FROM schema_migrations ORDER BY version")
+        ).scalars()
+        assert list(versions) == list(range(1, len(MIGRATIONS) + 1))
+    assert verify_live_database(engine)["valid"] is True
     engine.dispose()
 
 

@@ -1,55 +1,56 @@
 # Proofline
 
-Proofline is a local-first Engineering Decision Memory. It turns Markdown, text, notes, registered
-folders, and local Git repositories into searchable evidence while preserving an immutable source
-identity and exact source span for every derived claim.
+Proofline is a local-first Engineering Decision Memory. It preserves the evidence behind a
+decision—not just the decision text—so a later reader can verify which immutable source version,
+exact span, and transformation produced each claim.
 
-Current release: **v0.14.17 experimental pre-alpha**. Use approved, recoverable test data only.
-Windows qualification, signed installers, external pilot evidence, and production support remain
-open.
+Current release: **v0.14.17 experimental pre-alpha**. The provenance-depth implementation phase
+closed on 2026-07-16; see the [phase closeout](docs/phase-closeout-2026-07.md). Use approved,
+recoverable test data only. Proofline is not production-qualified.
 
-## Product demo
+## Why Proofline
 
-![Proofline Evidence Studio showing evidence-backed learning artifact tools](docs/assets/proofline-demo.png)
-
-Evidence Studio running locally with the bundled example source. The screenshot shows the current
-web bundle and does not depend on an external model or font service.
-
-## Product flow
+Engineering teams rarely lose the final answer. They lose the context: which document was current,
+which lines supported the choice, what changed, and whether an old conclusion still refers to the
+same evidence. Proofline keeps that chain inspectable.
 
 ```mermaid
 flowchart LR
-    S["Approved source"] --> V["Immutable version"]
-    V --> C["Exact chunks"]
-    C --> R["Retrieve evidence"]
-    R --> A["Answer or artifact"]
-    A --> H{"Human review"}
-    H -->|accept| M["Decision memory"]
-    H -->|reject| X["Audit trail"]
+    S["Approved source"] -->|version + hash| V["Immutable version"]
+    V -->|exact offsets| C["Citation"]
+    C -->|versioned operation| D["Decision"]
+    D -->|human review| P["Evidence package"]
+    P -->|recompute root| X{"Verified?"}
+    X -->|yes| M["Decision memory"]
+    X -->|no| F["Visible failure"]
 
     classDef source fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
-    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
     classDef evidence fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
-    classDef human fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
+    classDef process fill:#DDEBFF,stroke:#5B7DB1,color:#172B4D;
+    classDef gate fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
     classDef outcome fill:#EEE4FF,stroke:#765E9C,color:#172B4D;
+    classDef blocked fill:#FFE4E1,stroke:#A35D57,color:#172B4D;
     class S source;
-    class V,C,R evidence;
-    class A process;
-    class H human;
-    class M,X outcome;
+    class V,C,P evidence;
+    class D process;
+    class X gate;
+    class M outcome;
+    class F blocked;
 ```
 
-## What works
+## Current vertical slice
 
-- Deterministic ingestion with immutable source versions, exact offsets, and line numbers.
-- Local Git repository ingestion pinned to commit SHA and tracked file path.
-- FTS5 retrieval, optional embeddings/reranking, grounded answers, and explicit abstention.
-- Reviewable decisions, assumptions, constraints, alternatives, and temporal decision relations.
-- Notes with revisions, hashtags, wiki-links, backlinks, study cards, and review history.
-- Evidence Studio artifacts with exact citations and downloadable evidence packages.
-- Workspace isolation, deletion preview/cascade, audit history, backup/restore, and portable export.
-- Provider settings for local and OpenAI-compatible services with optional OS keyring storage.
-- Bundled web UI, one-command local launcher, and an experimental Tauri macOS application.
+- Immutable ingestion for Markdown, text, notes, registered folders, and tracked local Git files.
+- Exact citation offsets and line ranges with workspace isolation and fail-closed validation.
+- Deterministic lexical retrieval, optional hybrid retrieval, grounded answers, and abstention.
+- Human-reviewed decisions, assumptions, constraints, alternatives, notes, and action proposals.
+- Deterministic JSON/ZIP Decision Evidence Packages backed by a content-hashed Merkle DAG.
+- Offline package verification, artifact explanation, and content-free package comparison.
+- Verified backup/restore, portable transfer, deletion cascade, and integrity checks.
+- Optional model providers behind interfaces; the deterministic core works without external AI.
+
+Artifact variety is not the current product priority. The active technical direction is deeper
+provenance: stronger lineage, verification, recovery, migration, fuzz, and scale guarantees.
 
 ## Quick start
 
@@ -63,71 +64,57 @@ make setup
 ```
 
 The launcher binds to loopback, chooses an available port, stores state in the platform application
-data directory, and opens the bundled UI. For development with live frontend reload:
+data directory, and opens the bundled UI. For live frontend development, run `make dev-api` and
+`make dev-web` in separate terminals.
+
+## Verify a decision
 
 ```bash
-make dev-api
-make dev-web
+.venv/bin/proofline export-package ARTIFACT_ID --output evidence.zip
+.venv/bin/proofline verify-package evidence.zip
+.venv/bin/proofline explain ARTIFACT_ID
+.venv/bin/proofline diff before.zip after.zip
 ```
 
-Run the quality gate before submitting a change:
+The package contains hashed source-version, chunk, citation, transformation, artifact, review, and
+root nodes. Verification proves package integrity and internal lineage. It does not prove who
+created the package; signatures and trust management are not implemented.
+
+See [Decision Evidence Packages](docs/evidence-packages.md) for the hash contract and explicit
+failure modes.
+
+## Development quality gate
 
 ```bash
 make test
 make check
+make verify-provenance
 ```
 
-## Evidence contract
+Tests cover exact-span invariants, cross-workspace rejection, deterministic export/import,
+source-version immutability, archive fuzzing, migration upgrades, crash recovery, and synthetic
+1K/10K/100K provenance benchmarks. Synthetic receipts are regression evidence, not production
+performance claims.
 
-Every accepted derived object must retain:
+## Boundaries
 
-```text
-workspace → source → immutable version → exact offsets/lines → derived object
-```
+The supported experiment is one local user on a developer-controlled macOS or Linux machine using
+recoverable test data. Windows qualification, signed installers, automatic updates, shared
+workspaces, hosted sync, production security, external pilot evidence, and real-model quality
+claims remain open.
 
-Unknown, deleted, cross-workspace, or hash-mismatched evidence fails closed. Re-ingestion is
-idempotent, extraction failures remain visible, and source deletion includes derived indexes,
-memories, study material, proposals, and Studio citations.
-
-## Model providers
-
-Proofline works offline for deterministic ingestion, retrieval, and review. AI features are
-optional. Configure providers in **Settings** or with environment variables. Secrets are never
-returned by the API; desktop launch defaults to the operating-system keyring.
-
-See [provider configuration](docs/provider-configuration.md) for supported fields and failure
-behavior. Synthetic and mock evaluations are regression evidence only, not model-quality claims.
-
-## Data operations
-
-```bash
-.venv/bin/proofline verify-integrity
-.venv/bin/proofline backup --help
-.venv/bin/proofline restore-backup --help
-.venv/bin/proofline export --help
-.venv/bin/proofline import --help
-```
-
-Read [backup and recovery](docs/backup-recovery.md) before upgrades or restore drills.
-
-## Desktop builds
-
-The GitHub release contains an unsigned experimental macOS ARM64 DMG. A Windows build workflow is
-available but must run on real Windows hardware before Windows support can be claimed. Native
-signing, notarization, update rollback, and uninstall qualification are not complete.
+Do not add collaboration, a graph database, rich editing, a generic agent builder, or a connector
+matrix unless the roadmap explicitly opens that milestone.
 
 ## Documentation
 
 - [Documentation index](docs/README.md)
 - [Architecture](docs/architecture.md)
-- [Visual language and typography](docs/visual-language.md)
-- [Current roadmap](NEXT_STEPS.md)
+- [Decision Evidence Packages](docs/evidence-packages.md)
+- [Roadmap](NEXT_STEPS.md)
+- [Support boundary](docs/alpha-support-boundary.md)
 - [Production readiness](docs/production-readiness.md)
-- [Alpha support boundary](docs/alpha-support-boundary.md)
-- [Release notes](docs/releases/v0.14.17.md)
 
-## Project status
-
-Proofline is public under the [MIT License](LICENSE). Issues are welcome, but there is no SLA or
+Proofline is released under the [MIT License](LICENSE). Issues are welcome; there is no SLA or
 production warranty. Read [support](SUPPORT.md), [security reporting](SECURITY.md), and
 [contributing](CONTRIBUTING.md) before sharing diagnostics or proposing changes.

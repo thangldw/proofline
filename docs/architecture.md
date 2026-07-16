@@ -18,23 +18,21 @@ flowchart LR
         C --> R["Lexical / vector retrieval"]
         R --> E["Resolved evidence IDs"]
     end
-    subgraph Outputs["Governed outputs"]
-        Q["Grounded answer"]
-        M["Decision memory"]
-        L["Study material"]
-        P["Action proposal"]
-        S["Studio artifact"]
+    subgraph Outputs["Governed decision memory"]
+        Q["Grounded claim"]
+        M["Reviewed decision"]
+        P["Evidence package"]
     end
     F --> I
     N --> I
     G --> I
     E --> Q
     E --> M
-    E --> L
     E --> P
-    E --> S
-    Q & M & L & P & S --> H{"Human review"}
-    H --> A["Audit history"]
+    Q --> H{"Human review"}
+    M --> H
+    H -->|accepted or rejected| A["Audit history"]
+    A -->|hashed lineage| P
 
     classDef source fill:#FFF4C2,stroke:#7A6F45,color:#172B4D;
     classDef core fill:#DDF7EA,stroke:#4C8B6B,color:#172B4D;
@@ -42,7 +40,7 @@ flowchart LR
     classDef human fill:#FDE1EF,stroke:#9C5E7B,color:#172B4D;
     class F,N,G source;
     class I,V,C,R,E core;
-    class Q,M,L,P,S output;
+    class Q,M,P output;
     class H,A human;
 ```
 
@@ -61,9 +59,15 @@ flowchart LR
 3. Offsets, line numbers, and quote hashes must resolve against stored content.
 4. Unknown, deleted, or cross-workspace evidence is rejected.
 5. Re-ingestion and retries are idempotent; failures remain queryable.
-6. Deleting a source removes derived chunks, indexes, embeddings, evidence, memory, study, proposal,
-   and Studio records in the same governed operation.
+6. Deleting a source removes every dependent chunk, index, embedding, citation, and derived record
+   in the same governed operation.
 7. Provider credentials and source contents are not logged by default.
+
+Decision Evidence Package v1 materializes one decision lineage as domain-separated hashed
+source-version, chunk, citation, transformation, artifact, review, and root nodes. The resulting
+Merkle DAG is deterministic for unchanged state and can be verified without database access.
+Review state is a child node rather than part of the semantic artifact identity. See
+[Decision Evidence Packages](evidence-packages.md).
 
 ## Persistence
 
