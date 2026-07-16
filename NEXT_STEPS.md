@@ -1,6 +1,6 @@
 # Proofline roadmap
 
-Baseline: **v1.0.0 experimental** with the completed Decision Evidence Package vertical slice. The
+Baseline: **v1.1.0 experimental** with the completed stale-decision evidence vertical slice. The
 provenance-depth phase closed on 2026-07-16. This file now records only
 future work; unchecked items must never be described as implemented.
 

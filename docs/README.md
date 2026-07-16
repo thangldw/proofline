@@ -1,6 +1,6 @@
 # Documentation
 
-These documents describe the current v1.0.0 codebase and completed provenance vertical slice. The active
+These documents describe the current v1.1.0 codebase and completed provenance vertical slice. The active
 set is organized around one contract: every derived claim resolves to an immutable source identity
 and exact source span. Historical implementation detail belongs in Git history and release notes.
 
@@ -21,7 +21,8 @@ and exact source span. Historical implementation detail belongs in Git history a
 | [Production readiness](production-readiness.md) | Evidence gates and current blockers |
 | [Alpha support boundary](alpha-support-boundary.md) | Supported experiment and alpha criteria |
 | [Windows release](windows-release.md) | Real-Windows build and receipt workflow |
-| [v1.0.0 release](releases/v1.0.0.md) | Current published release notes |
+| [v1.1.0 release](releases/v1.1.0.md) | Current published release notes |
+| [v1.0.0 release](releases/v1.0.0.md) | Previous release notes |
 
 Architecture decisions are under [`adr/`](adr/). The executable backlog is
 [`NEXT_STEPS.md`](../NEXT_STEPS.md).
