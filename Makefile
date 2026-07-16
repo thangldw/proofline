@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance benchmark-retrieval benchmark-provenance benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance benchmark-retrieval benchmark-provenance benchmark-evidence-package benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -58,6 +58,11 @@ benchmark-provenance:
 	.venv/bin/python scripts/benchmark_provenance.py \
 		--counts 1000 10000 100000 \
 		--output evals/benchmarks/provenance-scale-v1.json --force
+
+benchmark-evidence-package:
+	.venv/bin/python scripts/benchmark_evidence_package.py \
+		--iterations 100 \
+		--output evals/benchmarks/decision-evidence-package-v1.json --force
 
 check:
 	.venv/bin/ruff check .

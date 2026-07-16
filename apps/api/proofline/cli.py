@@ -6,6 +6,8 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from . import __version__
 from .backup import (
     BackupError,
@@ -15,6 +17,7 @@ from .backup import (
 )
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
+from .decision_health import DecisionHealthError, check_decision_health
 from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
@@ -26,6 +29,7 @@ from .evaluation import (
 )
 from .evidence_packages import (
     EvidencePackageError,
+    atomic_write_html_report,
     atomic_write_package,
     build_decision_package,
     diff_decision_packages,
@@ -55,6 +59,7 @@ from .real_model_evaluation import (
 )
 from .schemas import SourceCreate
 from .server import run_server
+from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
 
 
 def unit_interval(value: str) -> float:
@@ -200,6 +205,11 @@ def main(argv: list[str] | None = None) -> None:
     package.add_argument("artifact_id")
     package.add_argument("--output", type=Path, required=True)
     package.add_argument("--force", action="store_true")
+    package.add_argument(
+        "--html-report",
+        type=Path,
+        help="Also write a self-contained, human-readable HTML projection",
+    )
     verify_package = subcommands.add_parser(
         "verify-package", help="Verify a Decision Evidence Package without database access"
     )
@@ -232,6 +242,18 @@ def main(argv: list[str] | None = None) -> None:
     subcommands.add_parser(
         "verify-integrity", help="Verify live SQLite provenance without changing it"
     )
+    check_decisions = subcommands.add_parser(
+        "check-decisions",
+        help="Read-only CI check that approved citations still resolve in current sources",
+    )
+    check_decisions.add_argument("--format", choices=("text", "json"), default="text")
+    demo = subcommands.add_parser("demo", help="Run a self-contained product story")
+    demo_commands = demo.add_subparsers(dest="demo_name", required=True)
+    stale_demo = demo_commands.add_parser(
+        "stale-decision", help="Show an ADR becoming stale after its requirement changes"
+    )
+    stale_demo.add_argument("--output-dir", type=Path, default=Path(DEMO_DIRECTORY))
+    stale_demo.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "serve":
         if args.no_web:
@@ -369,9 +391,16 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "export-package":
         initialize_database()
         try:
+            if (
+                args.html_report is not None
+                and args.output.expanduser().resolve() == args.html_report.expanduser().resolve()
+            ):
+                raise EvidencePackageError("report_output_conflicts_with_package")
             with SessionLocal() as session:
                 document = build_decision_package(session, args.artifact_id)
             atomic_write_package(args.output, document, force=args.force)
+            if args.html_report is not None:
+                atomic_write_html_report(args.html_report, document, force=args.force)
         except EvidencePackageError as exc:
             raise SystemExit(f"package export failed: {exc.code}") from exc
         print(
@@ -465,6 +494,49 @@ def main(argv: list[str] | None = None) -> None:
         except IntegrityVerificationError as exc:
             raise SystemExit(f"integrity verification failed: {exc.code}") from exc
         print(json.dumps(report, sort_keys=True))
+    elif args.command == "check-decisions":
+        try:
+            with SessionLocal() as session:
+                findings = check_decision_health(session)
+        except DecisionHealthError as exc:
+            raise SystemExit(f"decision check failed: {exc.code}") from exc
+        except (OSError, SQLAlchemyError) as exc:
+            raise SystemExit("decision check failed: database_unavailable") from exc
+        if args.format == "json":
+            print(
+                json.dumps(
+                    {
+                        "valid": not findings,
+                        "finding_count": len(findings),
+                        "findings": [finding.model_dump() for finding in findings],
+                    },
+                    sort_keys=True,
+                )
+            )
+        elif findings:
+            for finding in findings:
+                print("Decision requires review")
+                print(f"{finding.locator} changed after this decision was approved.")
+        else:
+            print("All approved decision citations resolve in current sources.")
+        if findings:
+            raise SystemExit(1)
+    elif args.command == "demo" and args.demo_name == "stale-decision":
+        try:
+            result = run_stale_decision_demo(args.output_dir, force=args.force)
+        except EvidencePackageError as exc:
+            raise SystemExit(f"demo failed: {exc.code}") from exc
+        finding = result["finding"]
+        print("1. ADR-007 approved with exact requirement evidence.")
+        print("2. requirement.md updated to a new immutable version.")
+        print("3. Proofline compared the approved citation with the current source.")
+        print()
+        print("Decision requires review")
+        print(f"{finding.locator} changed after this decision was approved.")
+        print()
+        print(f"Offline package: {result['package']}")
+        print(f"Readable report: {result['report']}")
+        print(f"Verification: valid · root {result['verification']['root_hash']}")
 
 
 if __name__ == "__main__":

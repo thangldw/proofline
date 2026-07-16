@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Proofline is verifiable engineering decision memory: every decision resolves to immutable sources, exact spans, and a portable evidence package.">
+  <meta name="description" content="Proofline keeps an ADR tied to the exact immutable source version and lines that justified it, then flags the decision when that evidence changes.">
   <link rel="canonical" href="https://thangldw.github.io/proofline/">
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Proofline — Verifiable decision memory">
-  <meta property="og:description" content="Trace every engineering decision to immutable sources, exact spans, and a portable evidence package.">
+  <meta property="og:title" content="Proofline — ADRs with evidence">
+  <meta property="og:description" content="Know exactly which source version justified a decision—and when that evidence changes.">
   <meta property="og:url" content="https://thangldw.github.io/proofline/">
-  <meta property="og:image" content="https://thangldw.github.io/proofline/assets/proofline-demo.png">
-  <meta property="og:image:alt" content="Proofline local evidence interface">
+  <meta property="og:image" content="https://thangldw.github.io/proofline/assets/stale-decision-demo.gif">
+  <meta property="og:image:alt" content="Proofline stale decision demo">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#f7fbff">
-  <title>Proofline — Verifiable decision memory</title>
-  <link rel="stylesheet" href="proofline-page.css?v=20260716a">
+  <title>Proofline — ADRs with evidence</title>
+  <link rel="stylesheet" href="proofline-page.css?v=20260716b">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -24,10 +24,11 @@
     <div class="nav" aria-label="Primary navigation">
       <a class="brand" href="#top" aria-label="Proofline home"><span class="brand-mark">P</span>Proofline</a>
       <nav aria-label="Page navigation">
-        <a href="#workflow">How it works</a>
-        <a href="#package">Evidence package</a>
-        <a href="#verify">Verify</a>
-        <a href="#limits">Limitations</a>
+        <a href="#story">The story</a>
+        <a href="#report">HTML report</a>
+        <a href="#format">Open format</a>
+        <a href="#ci">CI check</a>
+        <a href="#limits">Boundaries</a>
       </nav>
       <a class="button compact secondary github-button" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">
         <img src="assets/github.svg" alt="">View on GitHub
@@ -39,123 +40,177 @@
     <section class="hero" id="top">
       <div class="hero-grid">
         <div class="hero-copy">
-          <p class="status"><span></span>v1.0.0 · experimental</p>
-          <p class="eyebrow">Verifiable engineering decision memory</p>
-          <h1>Keep the decision. <em>Prove where it came from.</em></h1>
-          <p class="lede">Proofline turns approved documents, notes, and local Git history into decision memory that can be inspected later. Every claim keeps its source version, exact source lines and offsets, transformation record, and content hash.</p>
+          <p class="status"><span></span>v1.0.0 · experimental pre-alpha · local-first</p>
+          <p class="eyebrow">Engineering decision memory</p>
+          <h1>Know what justified a decision. <em>Know when it changes.</em></h1>
+          <p class="lede">Proofline keeps an ADR tied to the immutable requirement version and exact source lines that justified it. When that evidence changes, the decision becomes reviewable—not silently stale.</p>
           <div class="actions hero-actions">
-            <a class="button primary" href="#package">See the evidence contract</a>
-            <a class="button secondary" href="https://github.com/thangldw/proofline/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">Download v1.0.0</a>
+            <a class="button primary" href="#demo">Run the demo</a>
+            <a class="button secondary" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">Inspect the source</a>
           </div>
-          <div class="quickstart-label">Local quickstart · no cloud account</div>
-          <div class="quickstart" aria-label="Proofline local quickstart">
-            <pre><code><span>1</span> pip install <b>proofline-1.0.0-py3-none-any.whl</b>
-<span>2</span> <b>proofline launch</b></code></pre>
-            <button class="icon-button" id="copy-demo" type="button" aria-label="Copy quickstart commands">
+          <div class="quickstart-label">Credential-free product story</div>
+          <div class="quickstart" aria-label="Proofline stale decision demo command">
+            <pre><code><span>$</span> <b>proofline demo stale-decision</b></code></pre>
+            <button class="icon-button" id="copy-demo" type="button" aria-label="Copy demo command">
               <img src="assets/clipboard-document.svg" alt="">
             </button>
           </div>
-          <button class="text-button" id="copy-demo-primary" type="button">Copy quickstart commands</button>
-          <p id="copy-status" class="copy-status" aria-live="polite">Runs on loopback and stores application data locally.</p>
+          <button class="text-button" id="copy-demo-primary" type="button">Copy demo command</button>
+          <p id="copy-status" class="copy-status" aria-live="polite">Runs locally with an ephemeral database and no model provider.</p>
         </div>
 
-        <figure class="product-shot">
-          <div class="shot-bar" aria-hidden="true"><span></span><span></span><span></span><b>Proofline · local workspace</b></div>
-          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Proofline local evidence interface" fetchpriority="high">
-          <figcaption>Current bundled interface · synthetic example · deterministic local path</figcaption>
+        <figure class="demo-shot">
+          <div class="shot-bar" aria-hidden="true"><span></span><span></span><span></span><b>proofline · stale decision demo</b></div>
+          <img src="assets/stale-decision-demo.gif" width="1200" height="675" alt="Animated Proofline demo showing an ADR citation becoming stale" fetchpriority="high">
+          <figcaption>One ADR · one changed requirement · one review signal</figcaption>
         </figure>
       </div>
-      <ul class="trust-strip" aria-label="Proofline product principles">
-        <li><b>Local-first</b><span>Loopback runtime and platform-owned storage</span></li>
-        <li><b>Traceable</b><span>Immutable versions and exact source spans</span></li>
-        <li><b>Verifiable</b><span>Content hashes and deterministic evidence packages</span></li>
+      <ul class="trust-strip" aria-label="Proofline product outcomes">
+        <li><b>Exact evidence</b><span>Immutable source identity, version, offsets, lines, and quote hash</span></li>
+        <li><b>Actionable review</b><span>A precise stale citation instead of a generic document-changed alert</span></li>
+        <li><b>Offline proof</b><span>Readable HTML plus a package verified without database or network access</span></li>
       </ul>
     </section>
 
-    <section class="section workflow-section" id="workflow">
+    <section class="section story-section" id="story">
       <div class="section-head split">
-        <div><p class="eyebrow">One inspectable chain</p><h2>From source to decision, without losing the proof.</h2></div>
-        <p>Proofline preserves identity at every transformation. Unknown, deleted, cross-workspace, out-of-range, or hash-mismatched evidence is rejected instead of becoming an unsupported claim.</p>
+        <div><p class="eyebrow">The product story</p><h2>An ADR should remember its reason—not only its answer.</h2></div>
+        <p>Proofline follows one narrow vertical slice from approved requirement to reviewable decision. Every derived claim keeps a resolvable source identity and exact source span.</p>
       </div>
-      <ol class="canvas-flow" aria-label="Proofline evidence workflow">
-        <li class="canvas-source"><span>01 · INPUT</span><b>Approved source</b><small>Markdown, notes, registered folders, or local Git.</small></li>
-        <li class="canvas-evidence"><span>02 · PRESERVE</span><b>Immutable version</b><small>Stable identity, content hash, offsets, and exact lines.</small></li>
-        <li class="canvas-process"><span>03 · DERIVE</span><b>Transformation</b><small>Versioned operation with explicit parent nodes.</small></li>
-        <li class="canvas-human"><span>04 · REVIEW</span><b>Human decision</b><small>Accept, reject, or revise with the evidence visible.</small></li>
-        <li class="canvas-outcome"><span>05 · PACKAGE</span><b>Verifiable memory</b><small>Portable DAG, root hash, and content-free verification.</small></li>
+      <ol class="story-flow" aria-label="Stale decision workflow">
+        <li class="canvas-source"><span>01 · REQUIREMENT</span><b>Approve the source</b><small><code>requirement.md:42-48</code> rules out a network dependency and defines crash recovery.</small></li>
+        <li class="canvas-process"><span>02 · ADR</span><b>Make the decision</b><small>ADR-007 chooses SQLite and cites that immutable requirement version.</small></li>
+        <li class="canvas-evidence"><span>03 · CHANGE</span><b>Revise the requirement</b><small>A new immutable source version changes the exact approved evidence.</small></li>
+        <li class="canvas-human"><span>04 · REVIEW</span><b>Surface the consequence</b><small>Proofline fails visibly and routes the decision back to a human reviewer.</small></li>
       </ol>
-      <p class="diagram-note">Colors identify semantic roles and every state is also labelled; the flow never relies on color alone.</p>
+      <div class="decision-alert" role="note" aria-label="Example stale decision output">
+        <div><span>Review signal</span><strong>Decision requires review</strong></div>
+        <code>requirement.md:42-48 changed after this decision was approved.</code>
+      </div>
     </section>
 
-    <section class="section studio-section" id="package">
+    <section class="section demo-section" id="demo">
       <div class="section-head split">
-        <div><p class="eyebrow">Decision Evidence Package</p><h2>A portable receipt for the whole decision.</h2></div>
-        <p>Each source version, chunk, citation, transformation, artifact, and review is a hashed node. Their parent-child relationships form a deterministic Merkle DAG with one root hash.</p>
+        <div><p class="eyebrow">Run it yourself</p><h2>From clean checkout to offline verification.</h2></div>
+        <p>The demo is deterministic in behavior, isolated from your Proofline state, and explicit about every artifact it writes.</p>
       </div>
-      <div class="studio-layout">
-        <figure class="studio-shot">
-          <img src="assets/proofline-demo.png" width="1440" height="1013" alt="Proofline local evidence workspace" loading="lazy">
-        </figure>
-        <div class="artifact-panel">
-          <p class="label">Package contents</p>
-          <div class="artifact-grid" aria-label="Decision Evidence Package contents">
-            <span>Source hashes</span><span>Exact citation spans</span>
-            <span>Transformation version</span><span>Parent-child links</span>
-            <span>Review outcome</span><span>Root hash</span>
-          </div>
-          <p class="artifact-note">The package proves internal integrity and lineage. It does not prove author identity or authenticity; signatures and trust management are a later milestone.</p>
+      <div class="command-panel">
+        <div class="command-title"><span>Terminal</span><b>Local demo</b></div>
+        <pre><code><span>git clone</span> https://github.com/thangldw/proofline.git
+<span>cd</span> proofline
+<span>make</span> setup
+<span>.venv/bin/proofline</span> demo stale-decision
+<span>.venv/bin/proofline</span> verify-package proofline-demo-stale-decision/evidence.zip</code></pre>
+      </div>
+      <div class="artifact-row" aria-label="Demo outputs">
+        <article><span>01</span><div><b>evidence.zip</b><p>Normative Decision Evidence Package, self-contained and verifiable offline.</p></div></article>
+        <article><span>02</span><div><b>report.html</b><p>A readable decision, exact citation, source hashes, and verification guidance.</p></div></article>
+        <article><span>03</span><div><b>decision-health.json</b><p>A content-free receipt linking the stale finding to both versions and package root.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section report-section" id="report">
+      <div class="section-head split">
+        <div><p class="eyebrow">Human-readable evidence</p><h2>Verification should not require reading raw JSON.</h2></div>
+        <p>Every exported package can include a self-contained HTML projection. It is escaped, CSP-restricted, private by default, and works without remote fonts or assets.</p>
+      </div>
+      <div class="report-layout">
+        <article class="report-preview" aria-label="Example HTML evidence report">
+          <div class="report-kicker">Decision Evidence Package · offline report</div>
+          <h3>ADR-007 · Keep the durable queue in SQLite</h3>
+          <p>Use SQLite for the desktop application's durable local queue.</p>
+          <span class="accepted">accepted</span>
+          <div class="report-warning"><b>Evidence changed</b><span>requirement.md:42-48 changed after this decision was approved.</span></div>
+          <dl>
+            <div><dt>Package root</dt><dd>16ec914f…eacd61</dd></div>
+            <div><dt>Source version</dt><dd>immutable · SHA-256 verified</dd></div>
+            <div><dt>Exact citation</dt><dd>lines 42-48 · offsets preserved</dd></div>
+          </dl>
+        </article>
+        <div class="report-copy">
+          <article><span>Readable</span><b>Decision first, proof underneath.</b><p>A reviewer sees the conclusion, rationale, status, exact quote, and hashes in one offline document.</p></article>
+          <article><span>Safe projection</span><b>HTML is not the normative package.</b><p>The companion JSON or ZIP remains the object verified by the reference verifier.</p></article>
+          <article><span>One command</span><b><code>--html-report report.html</code></b><p>Generate it alongside an evidence package without a model or external service.</p></article>
         </div>
       </div>
     </section>
 
-    <section class="section" id="verify">
-      <div class="section-head">
-        <p class="eyebrow">Verification workflow</p>
-        <h2>Inspect, verify, and compare without opening the source database.</h2>
-        <p>Evidence packages are deterministic JSON or ZIP files. Verification runs locally and reports content-free failure codes.</p>
+    <section class="section format-section" id="format">
+      <div class="section-head split">
+        <div><p class="eyebrow">Open Decision Evidence Package</p><h2>A format others can implement and test.</h2></div>
+        <p>DEP v1 publishes its structure and compatibility rules instead of treating Proofline as the only possible verifier.</p>
       </div>
-      <div class="evidence-layout">
-        <article class="receipt" aria-label="Example Proofline evidence receipt">
-          <div class="receipt-head"><div><small>Source</small><b>architecture-decision.md</b></div><div><small>Version</small><b>immutable</b></div><div><small>Status</small><b class="verified">verified</b></div></div>
-          <div class="receipt-body">
-            <p class="label">Exact supporting span</p>
-            <blockquote>Queue state must survive process restarts and remain inspectable without an external service.</blockquote>
-            <dl><div><dt>Location</dt><dd>Exact lines + offsets</dd></div><div><dt>Integrity</dt><dd>Quote hash verified</dd></div><div><dt>Scope</dt><dd>Local workspace</dd></div></dl>
-          </div>
-        </article>
-        <div class="evidence-copy">
-          <article><b>proofline verify-package evidence.zip</b><p>Recompute every node and relationship, then compare the deterministic root hash.</p></article>
-          <article><b>proofline explain ARTIFACT_ID</b><p>Trace one artifact back through citations, chunks, source versions, and transformations.</p></article>
-          <article><b>proofline diff before.zip after.zip</b><p>Compare package structure and hashes without printing private source content.</p></article>
+      <div class="format-grid">
+        <a href="https://github.com/thangldw/proofline/blob/main/spec/decision-evidence-package/v1/schema.json" target="_blank" rel="noopener noreferrer"><span>Contract</span><b>JSON Schema</b><p>Draft 2020-12, closed objects, explicit required fields.</p><em>Inspect schema →</em></a>
+        <a href="https://github.com/thangldw/proofline/tree/main/spec/decision-evidence-package/v1/test-vectors" target="_blank" rel="noopener noreferrer"><span>Conformance</span><b>Test vectors</b><p>Valid package plus tamper mutations and stable error codes.</p><em>Run vectors →</em></a>
+        <a href="https://github.com/thangldw/proofline/blob/main/spec/decision-evidence-package/VERSIONING.md" target="_blank" rel="noopener noreferrer"><span>Compatibility</span><b>Versioning policy</b><p>Immutable majors and no silent package rewriting.</p><em>Read policy →</em></a>
+      </div>
+      <div class="verify-line"><code>proofline verify-package evidence.zip</code><span>Recomputes source, chunk, citation, transformation, artifact, review, and root hashes offline.</span></div>
+    </section>
+
+    <section class="section ci-section" id="ci">
+      <div class="section-head split">
+        <div><p class="eyebrow">Read-only CI</p><h2>Stop stale decisions before they disappear into history.</h2></div>
+        <p>The CI command validates stored provenance and current citations without ingesting, migrating, repairing, or updating review state.</p>
+      </div>
+      <div class="ci-layout">
+        <div class="command-panel compact-command">
+          <div class="command-title"><span>CI</span><b>Decision health gate</b></div>
+          <pre><code><span>PROOFLINE_HOME</span>=/path/to/state \
+  proofline check-decisions
+
+<span># machine-readable</span>
+proofline check-decisions --format json</code></pre>
         </div>
+        <ul class="ci-facts">
+          <li><b>Exit 0</b><span>Every approved exact citation resolves in the current source.</span></li>
+          <li><b>Exit 1</b><span>At least one decision needs review.</span></li>
+          <li><b>Fail closed</b><span>Missing versions, absent evidence, corrupt spans, or unavailable database.</span></li>
+          <li><b>SQLite mode=ro</b><span>No state directory creation, database mutation, or hidden repair.</span></li>
+        </ul>
       </div>
+    </section>
+
+    <section class="section benchmark-section" id="benchmark">
+      <div class="section-head split">
+        <div><p class="eyebrow">Reproducible receipt</p><h2>Measure the package path, publish the limits.</h2></div>
+        <p>The committed synthetic benchmark records environment, fixture, iteration count, ingest/build/verify latency, package size, and peak Python memory.</p>
+      </div>
+      <div class="metrics" aria-label="Decision Evidence Package benchmark results">
+        <article><span>Ingest</span><b>52.29<small> ms</small></b></article>
+        <article><span>Package build</span><b>8.02<small> ms</small></b></article>
+        <article><span>Median verify</span><b>0.35<small> ms</small></b></article>
+        <article><span>ZIP size</span><b>3,737<small> B</small></b></article>
+        <article><span>Peak memory</span><b>~2.0<small> MB</small></b></article>
+      </div>
+      <p class="qualification">Synthetic credential-free fixture on macOS ARM64 / CPython 3.14.6. Migration time excluded. This is regression evidence—not a production capacity claim.</p>
     </section>
 
     <section class="section limits-section" id="limits">
       <div class="section-head split">
-        <div><p class="eyebrow">Honest release boundary</p><h2>Useful now. Not production-ready yet.</h2></div>
-        <p>v1.0.0 is a public experimental release for approved, recoverable test data. Current evidence does not support broader production claims.</p>
+        <div><p class="eyebrow">Honest boundary</p><h2>Integrity is implemented. Production trust is not.</h2></div>
+        <p>Proofline is not production-ready yet. It is an experimental pre-alpha for one local user with recoverable test data. The demo proves a product interaction, not broader readiness.</p>
       </div>
       <div class="limits-grid">
-        <article><span>Platform</span><b>macOS ARM64 receipt only</b><p>A real Windows lifecycle run remains open.</p></article>
-        <article><span>Packaging</span><b>Unsigned experimental app</b><p>Qualification for signed native installers, notarization, updater rollback, and uninstall remains open.</p></article>
-        <article><span>Model quality</span><b>Mock is not real-model evidence</b><p>Scripted providers validate wiring, not production extraction quality.</p></article>
-        <article><span>Operations</span><b>No production support claim</b><p>External pilot evidence, security qualification, and support commitments remain open.</p></article>
+        <article><span>Authenticity</span><b>No signature trust model</b><p>Integrity does not establish who created a package or whether a source was trustworthy.</p></article>
+        <article><span>Operations</span><b>No production qualification</b><p>Representative scale, security review, support, and disaster operations remain open.</p></article>
+        <article><span>Distribution</span><b>No signed native installers</b><p>Windows qualification, notarization, updater rollback, and signed native installers remain open.</p></article>
+        <article><span>Collaboration</span><b>One local user</b><p>No hosted sync, shared workspaces, RBAC, or permission-aware connector matrix.</p></article>
       </div>
     </section>
 
     <section class="section get-started" id="get-started">
       <div class="closing">
-        <div><p class="eyebrow">MIT licensed · local-first · inspectable</p><h2>Build decision memory that can defend itself.</h2></div>
+        <div><p class="eyebrow">MIT licensed · local-first · inspectable</p><h2>Give an ADR the evidence it deserves.</h2></div>
         <div class="actions">
-          <a class="button primary" href="https://github.com/thangldw/proofline/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">Try v1.0.0</a>
-          <a class="button secondary github-button" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer"><img src="assets/github.svg" alt="">Star or fork</a>
+          <a class="button primary" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">Run the demo</a>
+          <a class="button secondary" href="https://github.com/thangldw/proofline/tree/main/spec/decision-evidence-package" target="_blank" rel="noopener noreferrer">Read the format</a>
         </div>
       </div>
     </section>
   </main>
 
-  <footer><span>Proofline · MIT License</span><span>Verifiable engineering decision memory.</span></footer>
-  <script src="proofline-page.js?v=20260716a"></script>
+  <footer><span>Proofline · MIT License</span><span>Know exactly what justified a decision—and when that evidence changes.</span></footer>
+  <script src="proofline-page.js?v=20260716b"></script>
 </body>
 </html>

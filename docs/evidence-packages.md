@@ -12,19 +12,28 @@ artifact graph, signature format, or proof that a source was trustworthy. SHA-25
 establishes internal integrity after a root hash is known; it does not establish who created the
 package or when.
 
+DEP v1 is also published as an implementation-neutral [open
+format](../spec/decision-evidence-package/README.md) with a Draft 2020-12 JSON Schema, valid and
+invalid test vectors, and an immutable-major versioning policy.
+
 ## Commands
 
 Find an artifact ID in the Decisions or Memories view, then run:
 
 ```bash
 proofline explain ARTIFACT_ID
-proofline export-package ARTIFACT_ID --output evidence.zip
+proofline export-package ARTIFACT_ID --output evidence.zip --html-report report.html
 proofline verify-package evidence.zip
 proofline diff before.zip after.zip
 ```
 
 `explain` reads the local database and prints the artifact, review state, transformation lineage,
 immutable source identity, and citations. It omits the full source text from its output.
+
+`--html-report` writes a self-contained, escaped, CSP-restricted human projection with the decision,
+review state, source hashes, package root, exact cited evidence, and offline verification command.
+HTML is not the normative package and `verify-package` intentionally accepts only canonical JSON or
+the constrained ZIP container.
 
 `verify-package` requires no database or model provider. It recomputes every node hash and checks:
 

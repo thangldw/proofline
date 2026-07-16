@@ -53,6 +53,8 @@ def _bootstrap_data_dir(argv: list[str]) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "check-decisions":
+        os.environ["PROOFLINE_DATABASE_READ_ONLY"] = "true"
     _bootstrap_data_dir(arguments)
 
     from .cli import main as cli_main

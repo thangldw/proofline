@@ -5,7 +5,22 @@ readiness remains an evidence-based claim documented separately.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Product story
+
+- Added `proofline demo stale-decision`, showing an accepted ADR become review-required after its
+  exact requirement citation changes.
+- Added a read-only `proofline check-decisions` CI command and a self-contained HTML evidence
+  report alongside canonical JSON/ZIP packages.
+- Rewrote the README and public project page around the evidence-backed ADR story, with a
+  runnable demo, readable report preview, open-format links, benchmark receipt, and explicit
+  pre-alpha boundaries.
+
+### Open format and evidence
+
+- Published Decision Evidence Package v1 with a Draft 2020-12 JSON Schema, conformance vectors,
+  and immutable-major versioning policy.
+- Added a reproducible package benchmark and qualified receipt covering ingest, build, verify,
+  package size, and peak Python memory.
 
 ## [1.0.0] - 2026-07-16
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import io
 import json
 import os
@@ -755,6 +756,113 @@ def atomic_write_package(path: Path, document: dict[str, Any], *, force: bool = 
         raise EvidencePackageError(exc.code) from exc
     except OSError as exc:
         raise EvidencePackageError("package_publish_failed") from exc
+
+
+def render_decision_package_html(
+    document: dict[str, Any], *, findings: list[dict[str, Any]] | None = None
+) -> str:
+    """Render a verified, self-contained human projection of an evidence package."""
+
+    report = verify_decision_package(document)
+    payload = document["payload"]
+    artifact = payload["artifact"]
+    source = payload["source_version"]
+    citations = payload["citations"]
+    review = payload["review"]
+    findings = findings or []
+
+    def escaped(value: Any) -> str:
+        return html.escape(str(value), quote=True)
+
+    finding_markup = ""
+    if findings:
+        items = "".join(
+            "<li><strong>Decision requires review</strong>"
+            f"<span>{escaped(item['source_title'])}:{escaped(item['start_line'])}-"
+            f"{escaped(item['end_line'])} changed after this decision was approved.</span>"
+            f"<code>cited {escaped(item['cited_content_sha256'])}</code>"
+            f"<code>current {escaped(item['current_content_sha256'])}</code></li>"
+            for item in findings
+        )
+        finding_markup = (
+            f'<section class="alert"><h2>Evidence changed</h2><ul>{items}</ul></section>'
+        )
+    citation_markup = "".join(
+        '<article class="citation">'
+        f'<div class="locator">Lines {citation["start_line"]}-{citation["end_line"]} · '
+        f"SHA-256 {escaped(citation['quote_sha256'])}</div>"
+        f"<pre>{escaped(citation['quote'])}</pre>"
+        "</article>"
+        for citation in citations
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>Decision Evidence · {escaped(artifact["title"])}</title>
+<style>
+:root{{--ink:#172b4d;--muted:#5f6b7a;--green:#ddf7ea;--pink:#fde1ef;
+--line:#b8c4d6;--paper:#f7f9fc}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--paper);color:var(--ink);line-height:1.55;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
+main{{max-width:940px;margin:0 auto;padding:64px 28px 96px}}
+header,section{{background:white;border:1px solid var(--line);border-radius:16px;
+padding:28px;margin-bottom:20px;box-shadow:0 10px 28px #172b4d0d}}
+.eyebrow,.locator{{color:var(--muted);font-size:.82rem;letter-spacing:.04em;
+text-transform:uppercase}}
+h1{{font-size:2rem;line-height:1.15;margin:.35rem 0 1rem}}h2{{margin-top:0}}
+.status{{display:inline-block;background:var(--green);border-radius:999px;
+padding:.25rem .7rem;font-weight:700}}
+.alert{{background:var(--pink);border-color:#9c5e7b}}.alert li{{display:grid;gap:.15rem}}
+dl{{display:grid;grid-template-columns:180px 1fr;gap:.55rem 1rem}}
+dt{{font-weight:700}}dd{{margin:0;overflow-wrap:anywhere}}
+pre{{white-space:pre-wrap;background:#f2f5f9;border-radius:10px;padding:16px;
+overflow-wrap:anywhere}}
+code{{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}}
+.citation+.citation{{margin-top:16px}}
+</style>
+</head>
+<body><main>
+<header>
+<div class="eyebrow">Decision Evidence Package · offline report</div>
+<h1>{escaped(artifact["title"])}</h1>
+<p>{escaped(artifact["statement"])}</p>
+<span class="status">{escaped(review["status"])}</span>
+</header>
+{finding_markup}
+<section><h2>Decision record</h2><dl>
+<dt>Rationale</dt><dd>{escaped(artifact["rationale"] or "—")}</dd>
+<dt>Artifact ID</dt><dd><code>{escaped(artifact["id"])}</code></dd>
+<dt>Package root</dt><dd><code>{escaped(report["root_hash"])}</code></dd>
+<dt>Source version</dt><dd><code>{escaped(source["source_version_id"])}</code></dd>
+<dt>Source content hash</dt><dd><code>{escaped(source["content_sha256"])}</code></dd>
+</dl></section>
+<section><h2>Exact cited evidence</h2>{citation_markup}</section>
+<section><h2>Offline verification</h2>
+<p>This HTML file is a readable projection. Verify the companion JSON or ZIP package with
+<code>proofline verify-package evidence.zip</code>; verification recomputes every node and the
+package root without database or network access.</p></section>
+</main></body></html>"""
+
+
+def atomic_write_html_report(
+    path: Path,
+    document: dict[str, Any],
+    *,
+    findings: list[dict[str, Any]] | None = None,
+    force: bool = False,
+) -> None:
+    try:
+        _atomic_write_bytes(
+            path,
+            render_decision_package_html(document, findings=findings).encode(),
+            force=force,
+        )
+    except OSError as exc:
+        raise EvidencePackageError("report_publish_failed") from exc
 
 
 def explain_decision_package(document: dict[str, Any]) -> dict[str, Any]:

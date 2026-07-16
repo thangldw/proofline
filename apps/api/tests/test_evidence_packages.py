@@ -19,6 +19,7 @@ from proofline.evidence_packages import (
     diff_decision_packages,
     explain_decision_package,
     load_and_verify_package,
+    render_decision_package_html,
     verify_decision_package,
 )
 from proofline.ingestion import ingest_source
@@ -306,10 +307,21 @@ def test_package_cli_exports_verifies_explains_and_fails_closed(
     monkeypatch.setattr(cli_module, "SessionLocal", factory)
     monkeypatch.setattr(cli_module, "initialize_database", lambda: None)
     output = tmp_path / "decision-evidence.json"
+    html_output = tmp_path / "decision-evidence.html"
 
-    main(["export-package", decision.id, "--output", str(output)])
+    main(
+        [
+            "export-package",
+            decision.id,
+            "--output",
+            str(output),
+            "--html-report",
+            str(html_output),
+        ]
+    )
     exported = json.loads(capsys.readouterr().out)
     assert exported["schema"] == DECISION_PACKAGE_SCHEMA
+    assert "Decision Evidence Package" in html_output.read_text(encoding="utf-8")
     main(["verify-package", str(output)])
     assert json.loads(capsys.readouterr().out)["valid"] is True
     main(["explain", decision.id])
@@ -327,6 +339,21 @@ def test_package_cli_exports_verifies_explains_and_fails_closed(
     with pytest.raises(SystemExit, match="artifact explanation failed: artifact_not_found"):
         main(["explain", "00000000-0000-0000-0000-000000000000"])
 
+    conflict = tmp_path / "conflict.zip"
+    with pytest.raises(
+        SystemExit, match="package export failed: report_output_conflicts_with_package"
+    ):
+        main(
+            [
+                "export-package",
+                decision.id,
+                "--output",
+                str(conflict),
+                "--html-report",
+                str(conflict),
+            ]
+        )
+
 
 def test_package_loader_rejects_duplicate_json_keys(tmp_path):
     path = tmp_path / "duplicate.json"
@@ -334,6 +361,21 @@ def test_package_loader_rejects_duplicate_json_keys(tmp_path):
 
     with pytest.raises(EvidencePackageError, match="duplicate_json_key"):
         load_and_verify_package(path)
+
+
+def test_html_report_is_verified_self_contained_and_escapes_content(session):
+    _source, decision = _seed_decision(session)
+    decision.title = "Queue <script>alert(1)</script>"
+    session.commit()
+    package = build_decision_package(session, decision.id)
+
+    report = render_decision_package_html(package)
+
+    assert "Queue &lt;script&gt;alert(1)&lt;/script&gt;" in report
+    assert "Queue <script>" not in report
+    assert "default-src 'none'" in report
+    assert "http://" not in report
+    assert "https://" not in report
 
 
 def _write_test_archive(

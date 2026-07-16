@@ -3,6 +3,10 @@
 Status: **not production-ready**. v1.0.0 is an experimental release for approved,
 recoverable local test data.
 
+The stale-decision demo, read-only CI check, HTML report, open DEP schema, and synthetic benchmark
+strengthen the local provenance story only. They do not close authenticity, distribution, external
+utility, model-quality, security, or representative-scale gates below.
+
 ```mermaid
 flowchart LR
     C["Core integrity"] --> G{"Production gate"}

@@ -5,12 +5,16 @@ on:
     paths:
       - "apps/api/**"
       - "apps/web/**"
+      - "docs/**"
       - "evals/**"
+      - "README.md"
       - "pyproject.toml"
       - "package.json"
       - "package-lock.json"
       - "deploy/**"
       - "scripts/**"
+      - "spec/**"
+      - "Makefile"
       - ".github/workflows/api-ci.yml"
   push:
     branches:
@@ -18,12 +22,16 @@ on:
     paths:
       - "apps/api/**"
       - "apps/web/**"
+      - "docs/**"
       - "evals/**"
+      - "README.md"
       - "pyproject.toml"
       - "package.json"
       - "package-lock.json"
       - "deploy/**"
       - "scripts/**"
+      - "spec/**"
+      - "Makefile"
       - ".github/workflows/api-ci.yml"
   workflow_dispatch:
 
@@ -104,6 +112,26 @@ jobs:
       - name: Test API
         run: |
           pytest -q apps/api
+
+      - name: Verify decision story and read-only CI contract
+        env:
+          PROOFLINE_HOME: ${{ runner.temp }}/proofline-decision-check
+          PROOFLINE_AI_PROVIDER: disabled
+          PROOFLINE_EMBEDDING_PROVIDER: disabled
+          PROOFLINE_ALLOW_REMOTE_AI: "false"
+        run: |
+          proofline seed
+          before_sha256="$(sha256sum "$PROOFLINE_HOME/proofline.db")"
+          proofline check-decisions
+          after_sha256="$(sha256sum "$PROOFLINE_HOME/proofline.db")"
+          test "$before_sha256" = "$after_sha256"
+          proofline demo stale-decision \
+            --output-dir "${{ runner.temp }}/proofline-stale-decision"
+          proofline verify-package \
+            "${{ runner.temp }}/proofline-stale-decision/evidence.zip"
+          test -s "${{ runner.temp }}/proofline-stale-decision/report.html"
+          proofline verify-package \
+            spec/decision-evidence-package/v1/test-vectors/valid-minimal.json
 
       - name: Credential-free evaluation gates
         run: |
