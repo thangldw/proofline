@@ -1,6 +1,6 @@
 # Production readiness
 
-Status: **not production-ready**. v1.0.0 is an experimental release for approved,
+Status: **not production-ready**. v1.1.0 is an experimental release for approved,
 recoverable local test data.
 
 The stale-decision demo, read-only CI check, HTML report, open DEP schema, and synthetic benchmark
@@ -33,7 +33,7 @@ flowchart LR
 | Gate | Status | Evidence or blocker |
 | --- | --- | --- |
 | Public repository and community policy | Complete for pre-alpha | MIT license, contribution, conduct, support, security, and ownership files |
-| Reproducible local release | Complete on macOS ARM64 | v1.0.0 wheel, source, web bundle, DMG, receipts, and checksums |
+| Reproducible local release | Pending v1.1.0 publication | Release gate must reproduce the wheel, source, web bundle, DMG, receipts, and checksums |
 | Immutable provenance and deletion | Complete for tested schema | Migration, exact-evidence, integrity, portability, and deletion suites |
 | Offline deterministic core | Complete | Credential-free ingestion, retrieval, review, and Studio regression suites |
 | Backup and rollback | Complete for tested local SQLite path | Versioned installed-artifact receipt; operator still owns retention and encryption |

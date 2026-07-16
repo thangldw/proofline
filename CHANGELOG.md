@@ -5,6 +5,8 @@ readiness remains an evidence-based claim documented separately.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-16
+
 ### Product story
 
 - Added `proofline demo stale-decision`, showing an accepted ADR become review-required after its
@@ -56,5 +58,6 @@ readiness remains an evidence-based claim documented separately.
 - No real Windows lifecycle receipt, signed/notarized installer, external pilot result,
   real-model quality report, security qualification, or production support commitment.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/thangldw/proofline/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/thangldw/proofline/releases/tag/v1.1.0
 [1.0.0]: https://github.com/thangldw/proofline/releases/tag/v1.0.0
