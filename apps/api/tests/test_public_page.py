@@ -36,6 +36,14 @@ def test_public_page_tells_the_stale_decision_story_without_remote_assets():
     assert "requirement.md:42-48 changed after this decision was approved." in html
     assert "proofline demo stale-decision" in html
     assert "SQLite mode=ro" in html
+    assert "Inspect the result, not only the architecture." in html
+    assert "Why Proofline" in html
+    assert "ADR-only" in html
+    assert "Wiki or Notion" in html
+    assert "Generic RAG" in html
+    assert "assets/stale-decision-terminal.png" in html
+    assert "assets/stale-decision-report.jpg" in html
+    assert "og:image:width" in html
     assert "Merkle DAG" not in html
     assert "proofline demo stale-decision" in script
     assert "@import" not in css

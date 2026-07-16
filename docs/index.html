@@ -10,12 +10,14 @@
   <meta property="og:title" content="Proofline — ADRs with evidence">
   <meta property="og:description" content="Proofline shows what evidence justified an engineering decision and warns you when that evidence changes.">
   <meta property="og:url" content="https://thangldw.github.io/proofline/">
-  <meta property="og:image" content="https://thangldw.github.io/proofline/assets/stale-decision-demo.gif">
-  <meta property="og:image:alt" content="Proofline stale decision demo">
+  <meta property="og:image" content="https://thangldw.github.io/proofline/assets/stale-decision-terminal.png">
+  <meta property="og:image:alt" content="Terminal output from a real Proofline stale-decision demo run">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="760">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#f7fbff">
   <title>Proofline — ADRs with evidence</title>
-  <link rel="stylesheet" href="proofline-page.css?v=20260716b">
+  <link rel="stylesheet" href="proofline-page.css?v=20260717a">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -25,9 +27,9 @@
       <a class="brand" href="#top" aria-label="Proofline home"><span class="brand-mark">P</span>Proofline</a>
       <nav aria-label="Page navigation">
         <a href="#story">The story</a>
-        <a href="#report">HTML report</a>
+        <a href="#evidence">Real output</a>
+        <a href="#why">Why Proofline</a>
         <a href="#format">Open format</a>
-        <a href="#ci">CI check</a>
         <a href="#limits">Boundaries</a>
       </nav>
       <a class="button compact secondary github-button" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">
@@ -43,7 +45,7 @@
           <p class="status"><span></span>v1.1.0 · experimental pre-alpha · local-first</p>
           <p class="eyebrow">Engineering decision memory</p>
           <h1>Know what justified a decision. <em>Know when it changes.</em></h1>
-          <p class="lede">Proofline keeps an ADR tied to the immutable requirement version and exact source lines that justified it. When that evidence changes, the decision becomes reviewable—not silently stale.</p>
+          <p class="lede">Proofline shows what evidence justified an engineering decision and warns you when that evidence changes. It keeps the exact source lines with the decision, then makes the review need visible.</p>
           <div class="actions hero-actions">
             <a class="button primary" href="#demo">Run the demo</a>
             <a class="button secondary" href="https://github.com/thangldw/proofline" target="_blank" rel="noopener noreferrer">Inspect the source</a>
@@ -106,6 +108,36 @@
         <article><span>01</span><div><b>evidence.zip</b><p>Normative Decision Evidence Package, self-contained and verifiable offline.</p></div></article>
         <article><span>02</span><div><b>report.html</b><p>A readable decision, exact citation, source hashes, and verification guidance.</p></div></article>
         <article><span>03</span><div><b>decision-health.json</b><p>A content-free receipt linking the stale finding to both versions and package root.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section evidence-section" id="evidence">
+      <div class="section-head split">
+        <div><p class="eyebrow">Real demo evidence</p><h2>Inspect the result, not only the architecture.</h2></div>
+        <p>These images come from one credential-free local run. The terminal output and generated report share the same run-specific package root.</p>
+      </div>
+      <div class="evidence-grid">
+        <figure class="evidence-shot">
+          <img src="assets/stale-decision-terminal.png" width="1200" height="760" alt="Terminal output showing a changed citation, review signal, and valid offline package">
+          <figcaption><b>Terminal outcome</b><span>The decision needs review and the exported package verifies successfully.</span></figcaption>
+        </figure>
+        <figure class="evidence-shot">
+          <img src="assets/stale-decision-report.jpg" width="1280" height="720" alt="Generated offline decision report showing the accepted ADR and changed evidence">
+          <figcaption><b>Generated report.html</b><span>A reviewer can inspect the decision, change signal, rationale, and provenance without raw JSON.</span></figcaption>
+        </figure>
+      </div>
+      <p class="evidence-note">IDs and hashes differ on each run. The stable behavior is the explicit review finding plus an independently verifiable evidence package.</p>
+    </section>
+
+    <section class="section why-section" id="why">
+      <div class="section-head split">
+        <div><p class="eyebrow">Why Proofline</p><h2>Use the right tool for the part that must remain verifiable.</h2></div>
+        <p>Proofline is narrower than a knowledge base. It complements existing documentation when a decision must retain its original evidence and reveal when that evidence stops matching.</p>
+      </div>
+      <div class="comparison-grid">
+        <article><span>ADR-only</span><b>Records the choice</b><p>Proofline also preserves the exact source version and lines that justified the ADR, then flags it when those lines change.</p></article>
+        <article><span>Wiki or Notion</span><b>Supports flexible team docs</b><p>Proofline adds immutable, independently verifiable evidence for approved decisions instead of relying only on mutable pages and links.</p></article>
+        <article><span>Generic RAG</span><b>Finds likely context</b><p>Proofline uses deterministic source identities and exact spans for claims that must remain auditable after retrieval.</p></article>
       </div>
     </section>
 
@@ -210,7 +242,7 @@ proofline check-decisions --format json</code></pre>
     </section>
   </main>
 
-  <footer><span>Proofline · MIT License</span><span>Know exactly what justified a decision—and when that evidence changes.</span></footer>
-  <script src="proofline-page.js?v=20260716b"></script>
+  <footer><span>Proofline · MIT License</span><span>See what justified a decision—and when it changes.</span></footer>
+  <script src="proofline-page.js?v=20260717a"></script>
 </body>
 </html>
