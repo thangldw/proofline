@@ -1,8 +1,8 @@
 # Proofline
 
-![Proofline catches a stale engineering decision](docs/assets/stale-decision-demo.gif)
+> Proofline shows what evidence justified an engineering decision and warns you when that evidence changes.
 
-> Know exactly which source version justified a decision—and when that evidence changes.
+![Proofline catches a stale engineering decision](docs/assets/stale-decision-demo.gif)
 
 Proofline is a local-first Engineering Decision Memory for **ADRs with evidence**. It keeps the
 decision, the immutable source version that justified it, and the exact cited lines together—then
@@ -37,6 +37,15 @@ proofline verify-package proofline-demo-stale-decision/evidence.zip
 
 Then open `proofline-demo-stale-decision/report.html` in any local browser.
 
+## Real demo output
+
+These screenshots come from one credential-free local run of the command above. IDs and hashes are
+run-specific; the review finding and independently verifiable package are the stable behavior.
+
+![Terminal output from a real Proofline stale-decision demo run](docs/assets/stale-decision-terminal.png)
+
+![The generated offline report showing the decision and changed evidence](docs/assets/stale-decision-report.jpg)
+
 ## Use case: an ADR with evidence
 
 An ADR says “keep the durable desktop queue in SQLite.” Proofline records not only that choice, but
@@ -46,6 +55,19 @@ When those lines change, reviewers get a precise reason to revisit the ADR inste
 
 The check is deterministic: a source can change elsewhere without invalidating the ADR, but the
 approved exact quote must still resolve in the current source version.
+
+## Why Proofline instead of ADR-only, a wiki, or generic RAG?
+
+- **ADR-only:** an ADR records the choice; Proofline also preserves the exact source version and
+  lines that justified it, then flags the decision when that evidence changes.
+- **Wiki or Notion:** a wiki is better for flexible team documentation; Proofline is narrower and
+  keeps approved evidence immutable and independently verifiable instead of relying on mutable
+  pages and links.
+- **Generic RAG:** RAG retrieves likely relevant context at question time; Proofline uses
+  deterministic source identities and exact spans for claims that must remain auditable.
+
+Proofline can complement all three. It is for decisions where recovering the original evidence—and
+knowing when it stopped matching—matters more than broad knowledge capture.
 
 ## Quick start
 

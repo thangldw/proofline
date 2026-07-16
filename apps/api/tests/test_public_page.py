@@ -1,4 +1,5 @@
 import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -71,3 +72,30 @@ def test_public_page_benchmark_values_match_committed_receipt():
     assert f"{receipt['package_build_latency_ms']:.2f}" in html
     assert f"{receipt['verify_latency_ms_median']:.2f}" in html
     assert f"{receipt['package_zip_bytes']:,}" in html
+
+
+def test_public_docs_include_real_demo_evidence_and_scoped_starter_tasks():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    release_notes = (DOCS / "releases/v1.1.0.md").read_text(encoding="utf-8")
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    description = (
+        "Proofline shows what evidence justified an engineering decision and warns you when that "
+        "evidence changes."
+    )
+
+    assert description in readme
+    assert description in (DOCS / "index.html").read_text(encoding="utf-8")
+    assert "Why Proofline instead of ADR-only, a wiki, or generic RAG?" in readme
+
+    terminal = DOCS / "assets/stale-decision-terminal.png"
+    report = DOCS / "assets/stale-decision-report.jpg"
+    assert terminal.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert report.read_bytes().startswith(b"\xff\xd8\xff")
+    assert "docs/assets/stale-decision-terminal.png" in readme
+    assert "docs/assets/stale-decision-report.jpg" in readme
+    release_asset_root = "https://github.com/thangldw/proofline/releases/download/v1.1.0/"
+    assert f"{release_asset_root}stale-decision-terminal.png" in release_notes
+    assert f"{release_asset_root}stale-decision-report.jpg" in release_notes
+
+    starter_tasks = re.findall(r"^\d+\. \*\*.+?\*\*", contributing, re.MULTILINE)
+    assert len(starter_tasks) == 3
