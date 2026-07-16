@@ -26,6 +26,19 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import sessionmaker
 
 
+def assert_failed_ingestion_has_no_partial_domain_state(session, job_id: str) -> None:
+    session.expire_all()
+    job = session.get(IngestionJob, job_id)
+    assert job.state == "failed"
+    assert job.stage == "indexing"
+    assert job.retryable is True
+    assert job.error_code == "ingestion_error"
+    assert session.get(IngestionJobInput, job_id) is not None
+    for model in (Source, SourceVersion, Chunk, Decision, Evidence):
+        assert session.scalar(select(func.count()).select_from(model)) == 0
+    assert session.execute(text("SELECT count(*) FROM chunk_search")).scalar_one() == 0
+
+
 def test_idempotency_key_reuses_success_and_rejects_payload_mismatch(client, session):
     payload = {
         "title": "Idempotent ADR",
@@ -110,6 +123,83 @@ def test_crash_rolls_back_domain_then_retry_claim_succeeds(client, session, monk
     assert session.scalar(select(func.count()).select_from(SourceVersion)) == 1
     assert session.get(IngestionJobInput, job_id) is None
     assert client.post(f"/api/v1/jobs/{job_id}/retry").status_code == 409
+
+
+@pytest.mark.parametrize("fault_boundary", ["chunk_parse", "memory_extract"])
+def test_ingestion_fault_matrix_rolls_back_before_and_after_chunk_index(
+    client, session, monkeypatch, fault_boundary
+):
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("private staged fault content")
+
+    monkeypatch.setattr(
+        ingestion_module,
+        "chunk_markdown" if fault_boundary == "chunk_parse" else "extract_memories",
+        fail,
+    )
+    response = client.post(
+        "/api/v1/sources",
+        json={
+            "title": f"Fault {fault_boundary}",
+            "uri": f"fault:///{fault_boundary}.md",
+            "content": "Decision: Roll back every partial provenance record",
+        },
+    )
+
+    assert response.status_code == 500
+    assert_failed_ingestion_has_no_partial_domain_state(
+        session, response.headers["x-proofline-job-id"]
+    )
+
+
+def test_ingestion_fault_at_fts_write_rolls_back_chunk_and_source(session, monkeypatch):
+    original_execute = session.execute
+
+    def fail_fts(statement, *args, **kwargs):
+        if "INSERT INTO chunk_search" in str(statement):
+            raise RuntimeError("private FTS write fault")
+        return original_execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(session, "execute", fail_fts)
+    with pytest.raises(IngestionExecutionError) as raised:
+        run_ingestion_job(
+            session,
+            SourceCreate(
+                title="FTS fault",
+                uri="fault:///fts.md",
+                content="Decision: FTS and chunks commit together",
+            ),
+        )
+
+    monkeypatch.setattr(session, "execute", original_execute)
+    assert_failed_ingestion_has_no_partial_domain_state(session, raised.value.job_id)
+
+
+def test_ingestion_fault_at_terminal_commit_rolls_back_all_domain_writes(session, monkeypatch):
+    original_commit = session.commit
+    commit_count = 0
+
+    def fail_terminal_commit():
+        nonlocal commit_count
+        commit_count += 1
+        if commit_count == 3:
+            raise OSError("private terminal commit fault")
+        return original_commit()
+
+    monkeypatch.setattr(session, "commit", fail_terminal_commit)
+    with pytest.raises(IngestionExecutionError) as raised:
+        run_ingestion_job(
+            session,
+            SourceCreate(
+                title="Commit fault",
+                uri="fault:///commit.md",
+                content="Decision: Commit terminal state with its provenance",
+            ),
+        )
+
+    monkeypatch.setattr(session, "commit", original_commit)
+    assert commit_count == 4
+    assert_failed_ingestion_has_no_partial_domain_state(session, raised.value.job_id)
 
 
 def test_repeated_failure_dead_letters_and_purges_staged_input(client, session, monkeypatch):

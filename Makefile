@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval benchmark-retrieval benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance benchmark-retrieval benchmark-provenance benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -35,6 +35,10 @@ eval:
 		--min-citation-resolution 1.0 --min-citation-precision 1.0 \
 		--min-grounded-success 1.0 --min-status-accuracy 1.0
 
+verify-provenance:
+	.venv/bin/python scripts/provenance_conformance.py \
+		--output evals/provenance/conformance-v1.json --force
+
 simulate-pilot:
 	@.venv/bin/python scripts/simulate_pilot.py \
 		--dataset evals/pilot-simulation/engineering-context-v1.json
@@ -49,6 +53,11 @@ benchmark-retrieval:
 benchmark-watcher:
 	.venv/bin/python scripts/benchmark_folder_watcher.py --files 1000 \
 		--output evals/benchmarks/folder-watcher-1000-v1.json
+
+benchmark-provenance:
+	.venv/bin/python scripts/benchmark_provenance.py \
+		--counts 1000 10000 100000 \
+		--output evals/benchmarks/provenance-scale-v1.json --force
 
 check:
 	.venv/bin/ruff check .

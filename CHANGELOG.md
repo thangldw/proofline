@@ -6,15 +6,26 @@ line.
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic JSON/ZIP Decision Evidence Package v1 export with hashed source-version,
+  chunk, citation, transformation, artifact, and review nodes; offline verification, artifact
+  explanation, content-free semantic diff commands, and fail-closed archive validation.
+- Added property/fuzz provenance coverage, an every-version migration upgrade matrix, package
+  publish and ingestion-stage fault recovery, a machine-readable local conformance receipt, and a
+  qualified 1K/10K/100K deterministic provenance benchmark receipt.
+
 ### Changed
 
+- Closed the provenance-depth implementation phase on 2026-07-16 with an explicit delivery,
+  verification, deferral, and reopening record.
 - Consolidated active documentation around v0.14.17 and removed superseded roadmaps, audits,
   historical release-note copies, screenshots, receipts, unused platform icons, and generated
   development artifacts. Product behavior and evaluation fixtures are unchanged.
 - Standardized offline system typography and added labelled collaborative-canvas diagrams for
   architecture, lifecycle, evaluation, recovery, roadmap, and release workflows.
-- Reworked the public project page with the current Evidence Studio screenshot, bright offline
-  system typography, labelled canvas-style workflow cards, and explicit pre-alpha boundaries.
+- Rewrote the public project page and active Markdown documentation around verifiable decision
+  memory, Decision Evidence Packages, provenance depth, and explicit pre-alpha boundaries.
 
 ## [0.14.17] - 2026-07-14
 
