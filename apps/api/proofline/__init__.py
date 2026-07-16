@@ -1,3 +1,3 @@
 """Proofline API package."""
 
-__version__ = "0.14.17"
+__version__ = "1.0.0"

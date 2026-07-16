@@ -34,7 +34,8 @@ def test_public_product_page_has_resolvable_local_assets_and_fragments() -> None
     inventory.feed(content)
 
     assert f"v{__version__}" in content
-    assert "experimental pre-alpha" in content.lower()
+    assert "experimental" in content.lower()
+    assert "not production-ready yet" in content.lower()
     assert "not a signed" not in content.lower()  # boundary uses affirmative factual wording
     assert "signed native installers" in content
     assert "exact source lines" in content

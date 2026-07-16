@@ -1,6 +1,6 @@
 # Alpha support boundary
 
-Proofline remains pre-alpha at v0.14.17.
+Proofline v1.0.0 remains an experimental, non-production-qualified release.
 
 ```mermaid
 flowchart LR

@@ -1,7 +1,7 @@
 {
   "name": "@proofline/desktop",
   "private": true,
-  "version": "0.14.17",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri",

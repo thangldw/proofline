@@ -1,52 +1,45 @@
 # Changelog
 
-Proofline follows semantic versioning while pre-alpha APIs and schemas may still change. Historical
-details remain available in Git tags and GitHub Releases; this file tracks only the active release
-line.
+Proofline follows semantic versioning. A version number identifies a release surface; production
+readiness remains an evidence-based claim documented separately.
 
 ## [Unreleased]
 
-### Added
+No unreleased changes.
 
-- Added deterministic JSON/ZIP Decision Evidence Package v1 export with hashed source-version,
-  chunk, citation, transformation, artifact, and review nodes; offline verification, artifact
-  explanation, content-free semantic diff commands, and fail-closed archive validation.
-- Added property/fuzz provenance coverage, an every-version migration upgrade matrix, package
-  publish and ingestion-stage fault recovery, a machine-readable local conformance receipt, and a
-  qualified 1K/10K/100K deterministic provenance benchmark receipt.
+## [1.0.0] - 2026-07-16
 
-### Changed
+### Verifiable provenance
 
-- Closed the provenance-depth implementation phase on 2026-07-16 with an explicit delivery,
-  verification, deferral, and reopening record.
-- Consolidated active documentation around v0.14.17 and removed superseded roadmaps, audits,
-  historical release-note copies, screenshots, receipts, unused platform icons, and generated
-  development artifacts. Product behavior and evaluation fixtures are unchanged.
-- Standardized offline system typography and added labelled collaborative-canvas diagrams for
-  architecture, lifecycle, evaluation, recovery, roadmap, and release workflows.
-- Rewrote the public project page and active Markdown documentation around verifiable decision
-  memory, Decision Evidence Packages, provenance depth, and explicit pre-alpha boundaries.
+- Added deterministic JSON/ZIP Decision Evidence Package v1 with hashed source-version, chunk,
+  citation, transformation, artifact, review, and root nodes.
+- Added offline package verification, local artifact explanation, content-free semantic diff, and
+  fail-closed archive validation.
+- Added exact-span, workspace, hash, relationship, deterministic round-trip, and immutable-source
+  validation across the full decision lineage.
 
-## [0.14.17] - 2026-07-14
+### Reliability
 
-### Added
+- Added property and fuzz coverage, an every-version migration matrix, and ingest/export
+  crash-recovery tests.
+- Added a reproducible local provenance conformance receipt and qualified synthetic
+  1K/10K/100K provenance benchmark receipt.
+- Preserved verified backup/restore, portable transfer, deletion cascade, offline operation, and
+  provider isolation.
 
-- A real-Windows local release workflow for wheel, frozen sidecar, MSI, NSIS, platform receipt, and
-  direct GitHub publication without CI.
-- A frozen private-pilot analyzer that verifies hashes, versions, identifiers, foreign keys, and
-  citation resolution before emitting aggregate-only metrics.
+### Product and documentation
 
-### Current release surface
-
-- Immutable ingestion and exact evidence across files, notes, folders, and local Git repositories.
-- Grounded retrieval, governed memory, study workflows, action proposals, and Evidence Studio.
-- Portable evidence archive v2, verified backup/restore, OS keyring support, bundled web launcher,
-  and experimental Tauri desktop packaging.
+- Closed the first provenance-depth phase with explicit delivered scope, verification evidence,
+  deferrals, and reopening criteria.
+- Rewrote the public project page and active documentation around verifiable decision memory.
+- Retained explicit boundaries: v1.0.0 is experimental and is not production-qualified.
 
 ### Limitations
 
-- No real Windows receipt, signed/notarized installer, external pilot result, or production claim.
-- Real-model comparison and security qualification have not been completed.
+- No package signature or authenticity trust model.
+- No PDF source contract or representative-corpus production scale qualification.
+- No real Windows lifecycle receipt, signed/notarized installer, external pilot result,
+  real-model quality report, security qualification, or production support commitment.
 
-[Unreleased]: https://github.com/thangldw/proofline/compare/v0.14.17...HEAD
-[0.14.17]: https://github.com/thangldw/proofline/releases/tag/v0.14.17
+[Unreleased]: https://github.com/thangldw/proofline/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/thangldw/proofline/releases/tag/v1.0.0
