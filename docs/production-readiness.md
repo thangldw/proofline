@@ -1,6 +1,6 @@
 # Production readiness
 
-Status: **not production-ready**. v0.14.17 is an experimental pre-alpha release for approved,
+Status: **not production-ready**. v1.0.0 is an experimental release for approved,
 recoverable local test data.
 
 ```mermaid
@@ -29,7 +29,7 @@ flowchart LR
 | Gate | Status | Evidence or blocker |
 | --- | --- | --- |
 | Public repository and community policy | Complete for pre-alpha | MIT license, contribution, conduct, support, security, and ownership files |
-| Reproducible local release | Complete on macOS ARM64 | v0.14.17 wheel, source, web bundle, DMG, receipts, and checksums |
+| Reproducible local release | Complete on macOS ARM64 | v1.0.0 wheel, source, web bundle, DMG, receipts, and checksums |
 | Immutable provenance and deletion | Complete for tested schema | Migration, exact-evidence, integrity, portability, and deletion suites |
 | Offline deterministic core | Complete | Credential-free ingestion, retrieval, review, and Studio regression suites |
 | Backup and rollback | Complete for tested local SQLite path | Versioned installed-artifact receipt; operator still owns retention and encryption |

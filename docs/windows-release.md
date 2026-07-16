@@ -26,7 +26,7 @@ flowchart LR
 py -3.12 -m venv .venv
 .venv\Scripts\pip.exe install -e ".[dev]"
 npm install
-powershell -ExecutionPolicy Bypass -File scripts\release_windows.ps1 -Tag v0.14.17
+powershell -ExecutionPolicy Bypass -File scripts\release_windows.ps1 -Tag v1.0.0
 ```
 
 The script requires a clean `main` equal to `origin/main` and a release commit containing

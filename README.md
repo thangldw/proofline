@@ -4,7 +4,7 @@ Proofline is a local-first Engineering Decision Memory. It preserves the evidenc
 decision—not just the decision text—so a later reader can verify which immutable source version,
 exact span, and transformation produced each claim.
 
-Current release: **v0.14.17 experimental pre-alpha**. The provenance-depth implementation phase
+Current release: **v1.0.0 experimental**. The provenance-depth implementation phase
 closed on 2026-07-16; see the [phase closeout](docs/phase-closeout-2026-07.md). Use approved,
 recoverable test data only. Proofline is not production-qualified.
 

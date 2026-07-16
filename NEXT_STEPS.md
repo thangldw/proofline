@@ -1,7 +1,7 @@
 # Proofline roadmap
 
-Baseline: **v0.14.17 experimental pre-alpha** plus the completed, unreleased Decision Evidence
-Package vertical slice. The provenance-depth phase closed on 2026-07-16. This file now records only
+Baseline: **v1.0.0 experimental** with the completed Decision Evidence Package vertical slice. The
+provenance-depth phase closed on 2026-07-16. This file now records only
 future work; unchecked items must never be described as implemented.
 
 The product direction is narrow: make engineering decision memory independently inspectable and
