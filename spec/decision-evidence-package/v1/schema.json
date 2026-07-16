@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thangldw/proofline/blob/main/spec/decision-evidence-package/v1/schema.json",
+  "title": "Decision Evidence Package v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest", "payload"],
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "created_at", "app_version", "root_hash"],
+      "properties": {
+        "schema": {"const": "proofline-decision-evidence-package-v1"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "app_version": {"type": "string", "minLength": 1},
+        "root_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_version", "chunks", "citations", "transformation", "artifact", "review"
+      ],
+      "properties": {
+        "source_version": {"$ref": "#/$defs/sourceVersion"},
+        "chunks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/chunk"}
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/citation"}
+        },
+        "transformation": {"$ref": "#/$defs/transformation"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "review": {"$ref": "#/$defs/review"}
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nonEmptyString": {"type": "string", "minLength": 1},
+    "nullableString": {"type": ["string", "null"], "minLength": 1},
+    "nullableDateTime": {"type": ["string", "null"], "format": "date-time"},
+    "sourceVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_id", "source_id", "source_identity_sha256", "source_version_id",
+        "version_number", "content", "content_sha256", "content_length", "parser_version",
+        "node_hash"
+      ],
+      "properties": {
+        "workspace_id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_identity_sha256": {"$ref": "#/$defs/hash"},
+        "source_version_id": {"$ref": "#/$defs/nonEmptyString"},
+        "version_number": {"type": "integer", "minimum": 1},
+        "content": {"type": "string"},
+        "content_sha256": {"$ref": "#/$defs/hash"},
+        "content_length": {"type": "integer", "minimum": 0},
+        "parser_version": {"$ref": "#/$defs/nonEmptyString"},
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "chunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "source_node_hash", "source_id", "source_version_id", "ordinal",
+        "start_offset", "end_offset", "start_line", "end_line", "content",
+        "content_sha256", "node_hash"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_node_hash": {"$ref": "#/$defs/hash"},
+        "source_id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_version_id": {"$ref": "#/$defs/nonEmptyString"},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "start_offset": {"type": "integer", "minimum": 0},
+        "end_offset": {"type": "integer", "minimum": 1},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "content": {"type": "string", "minLength": 1},
+        "content_sha256": {"$ref": "#/$defs/hash"},
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "source_node_hash", "chunk_node_hashes", "source_id", "source_version_id",
+        "start_offset", "end_offset", "start_line", "end_line", "quote", "quote_sha256",
+        "node_hash"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_node_hash": {"$ref": "#/$defs/hash"},
+        "chunk_node_hashes": {
+          "type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hash"}
+        },
+        "source_id": {"$ref": "#/$defs/nonEmptyString"},
+        "source_version_id": {"$ref": "#/$defs/nonEmptyString"},
+        "start_offset": {"type": "integer", "minimum": 0},
+        "end_offset": {"type": "integer", "minimum": 1},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1},
+        "quote": {"type": "string", "minLength": 1},
+        "quote_sha256": {"$ref": "#/$defs/hash"},
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "modelRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "workspace_id", "provider_id", "model_id", "operation", "template_version",
+        "input_hashes", "parent_run_id", "attempt_number", "repair_reason", "status",
+        "validation_status"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmptyString"},
+        "workspace_id": {"$ref": "#/$defs/nonEmptyString"},
+        "provider_id": {"$ref": "#/$defs/nonEmptyString"},
+        "model_id": {"$ref": "#/$defs/nonEmptyString"},
+        "operation": {"const": "generate"},
+        "template_version": {"$ref": "#/$defs/nonEmptyString"},
+        "input_hashes": {"type": "array", "items": {"$ref": "#/$defs/hash"}},
+        "parent_run_id": {"type": ["string", "null"]},
+        "attempt_number": {"type": "integer", "minimum": 1},
+        "repair_reason": {"$ref": "#/$defs/nullableString"},
+        "status": {"enum": ["running", "succeeded", "failed"]},
+        "validation_status": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "parser_version", "model_runs", "input_node_hashes", "node_hash"],
+      "properties": {
+        "method": {"enum": ["deterministic", "model"]},
+        "parser_version": {"$ref": "#/$defs/nonEmptyString"},
+        "model_runs": {"type": "array", "items": {"$ref": "#/$defs/modelRun"}},
+        "input_node_hashes": {
+          "type": "array", "minItems": 3, "items": {"$ref": "#/$defs/hash"}
+        },
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "kind", "title", "statement", "rationale", "confidence", "valid_from",
+        "valid_to", "transformation_node_hash", "citation_node_hashes", "node_hash"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmptyString"},
+        "kind": {"enum": ["decision", "assumption", "constraint", "alternative"]},
+        "title": {"$ref": "#/$defs/nonEmptyString"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "rationale": {"$ref": "#/$defs/nullableString"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "valid_from": {"$ref": "#/$defs/nullableDateTime"},
+        "valid_to": {"$ref": "#/$defs/nullableDateTime"},
+        "transformation_node_hash": {"$ref": "#/$defs/hash"},
+        "citation_node_hashes": {
+          "type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hash"}
+        },
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_node_hash", "status", "created_at", "updated_at", "node_hash"],
+      "properties": {
+        "artifact_node_hash": {"$ref": "#/$defs/hash"},
+        "status": {"enum": ["candidate", "active", "accepted", "rejected", "obsolete"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "node_hash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}

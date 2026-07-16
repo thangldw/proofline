@@ -1,0 +1,26 @@
+[
+  {
+    "name": "source-content-tampered",
+    "pointer": "/payload/source_version/content",
+    "value": "tampered",
+    "expected_error": "source_content_invalid"
+  },
+  {
+    "name": "citation-offset-tampered",
+    "pointer": "/payload/citations/0/start_offset",
+    "value": 1,
+    "expected_error": "citation_span_invalid"
+  },
+  {
+    "name": "artifact-statement-tampered",
+    "pointer": "/payload/artifact/statement",
+    "value": "tampered",
+    "expected_error": "artifact_node_hash_mismatch"
+  },
+  {
+    "name": "review-status-tampered",
+    "pointer": "/payload/review/status",
+    "value": "rejected",
+    "expected_error": "review_node_hash_mismatch"
+  }
+]

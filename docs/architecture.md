@@ -69,6 +69,10 @@ Merkle DAG is deterministic for unchanged state and can be verified without data
 Review state is a child node rather than part of the semantic artifact identity. See
 [Decision Evidence Packages](evidence-packages.md).
 
+The detailed identity, span, citation, transformation, and Merkle relationships live in the
+[provenance model](provenance-model.md). Product-facing documentation intentionally describes the
+ADR review story without making the DAG the primary user concept.
+
 ## Persistence
 
 SQLite is the authority for local state. Schema evolution uses ordered migrations. FTS5 provides
@@ -93,3 +97,7 @@ uses the same contract through a frozen sidecar and a private shutdown token.
 The supported experiment is a single local user. Remote providers receive only the bounded request
 explicitly authorized by configuration. Shared tenancy, internet-facing deployment, sync, and
 permission-aware connectors are future profiles and cannot inherit local readiness claims.
+
+See [production readiness](production-readiness.md) for the complete evidence gates and blockers;
+none of the local integrity guarantees imply authenticity, multi-user authorization, internet-safe
+deployment, signed distribution, external utility, or production capacity.

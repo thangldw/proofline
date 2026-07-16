@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var installCommands = "pip install proofline-1.0.0-py3-none-any.whl\nproofline launch";
+  var demoCommand = "proofline demo stale-decision";
   var copyButtons = [
     document.querySelector("#copy-demo"),
     document.querySelector("#copy-demo-primary"),
@@ -10,10 +10,10 @@
 
   async function copyQuickstart() {
     try {
-      await navigator.clipboard.writeText(installCommands);
-      copyStatus.textContent = "Quickstart copied. Download the wheel, then paste into your terminal.";
+      await navigator.clipboard.writeText(demoCommand);
+      copyStatus.textContent = "Demo command copied. Paste it into your terminal.";
     } catch (_error) {
-      copyStatus.textContent = installCommands;
+      copyStatus.textContent = demoCommand;
     }
   }
 
