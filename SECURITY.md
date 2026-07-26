@@ -1,13 +1,5 @@
-# Security policy
+# Security / Bảo mật / セキュリティ
 
-Proofline is experimental pre-alpha and is not approved for production, regulated, sensitive, or
-irreplaceable data. Security qualification is currently excluded and therefore production readiness
-cannot be claimed.
-
-Report suspected vulnerabilities privately to `thangldw@gmail.com`. Include the affected version,
-safe reproduction steps, and impact. Do not send credentials, private sources, databases, prompts,
-model responses, participant identities, or exploit traffic against systems you do not own.
-
-Only the latest pre-release receives best-effort fixes. Public GitHub issues are appropriate for
-ordinary defects but not for vulnerabilities or leaked data. There is no response-time or fix-time
-SLA.
+- **English:** Report vulnerabilities privately with GitHub Security Advisories. Do not include credentials, private source content or production data.
+- **Tiếng Việt:** Báo lỗ hổng riêng tư qua GitHub Security Advisories. Không gửi credential, nội dung nguồn private hoặc dữ liệu production.
+- **日本語:** 脆弱性は GitHub Security Advisories で非公開報告し、認証情報、非公開ソース本文、本番データを含めないでください。
