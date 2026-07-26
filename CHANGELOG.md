@@ -1,63 +1,23 @@
-# Changelog
+# Proofline changelog / Lịch sử thay đổi / 変更履歴
 
-Proofline follows semantic versioning. A version number identifies a release surface; production
-readiness remains an evidence-based claim documented separately.
+## [1.0.0] - 2026-07-26
 
-## [Unreleased]
+### English
 
-## [1.1.0] - 2026-07-16
+- Consolidated every merged provenance, stale-decision, evidence-package, backup and local UI capability into the `1.0.0` baseline.
+- Kept deterministic exact-span checks, offline package verification and fail-closed integrity behavior.
+- Removed automatic GitHub Actions and historical release documentation.
 
-### Product story
+### Tiếng Việt
 
-- Added `proofline demo stale-decision`, showing an accepted ADR become review-required after its
-  exact requirement citation changes.
-- Added a read-only `proofline check-decisions` CI command and a self-contained HTML evidence
-  report alongside canonical JSON/ZIP packages.
-- Rewrote the README and public project page around the evidence-backed ADR story, with a
-  runnable demo, readable report preview, open-format links, benchmark receipt, and explicit
-  pre-alpha boundaries.
+- Hợp nhất toàn bộ tính năng provenance, phát hiện quyết định lỗi thời, evidence package, backup và UI local đã merge vào baseline `1.0.0`.
+- Giữ kiểm tra exact-span xác định, xác minh package offline và cơ chế fail-closed.
+- Xóa GitHub Actions tự động và tài liệu release lịch sử.
 
-### Open format and evidence
+### 日本語
 
-- Published Decision Evidence Package v1 with a Draft 2020-12 JSON Schema, conformance vectors,
-  and immutable-major versioning policy.
-- Added a reproducible package benchmark and qualified receipt covering ingest, build, verify,
-  package size, and peak Python memory.
+- マージ済みの来歴、古い判断の検出、証拠パッケージ、バックアップ、ローカル UI を `1.0.0` に統合しました。
+- 決定的な引用範囲検査、オフライン検証、fail-closed の整合性を維持しました。
+- 自動 GitHub Actions と過去リリース文書を削除しました。
 
-## [1.0.0] - 2026-07-16
-
-### Verifiable provenance
-
-- Added deterministic JSON/ZIP Decision Evidence Package v1 with hashed source-version, chunk,
-  citation, transformation, artifact, review, and root nodes.
-- Added offline package verification, local artifact explanation, content-free semantic diff, and
-  fail-closed archive validation.
-- Added exact-span, workspace, hash, relationship, deterministic round-trip, and immutable-source
-  validation across the full decision lineage.
-
-### Reliability
-
-- Added property and fuzz coverage, an every-version migration matrix, and ingest/export
-  crash-recovery tests.
-- Added a reproducible local provenance conformance receipt and qualified synthetic
-  1K/10K/100K provenance benchmark receipt.
-- Preserved verified backup/restore, portable transfer, deletion cascade, offline operation, and
-  provider isolation.
-
-### Product and documentation
-
-- Closed the first provenance-depth phase with explicit delivered scope, verification evidence,
-  deferrals, and reopening criteria.
-- Rewrote the public project page and active documentation around verifiable decision memory.
-- Retained explicit boundaries: v1.0.0 is experimental and is not production-qualified.
-
-### Limitations
-
-- No package signature or authenticity trust model.
-- No PDF source contract or representative-corpus production scale qualification.
-- No real Windows lifecycle receipt, signed/notarized installer, external pilot result,
-  real-model quality report, security qualification, or production support commitment.
-
-[Unreleased]: https://github.com/thangldw/proofline/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/thangldw/proofline/releases/tag/v1.1.0
 [1.0.0]: https://github.com/thangldw/proofline/releases/tag/v1.0.0

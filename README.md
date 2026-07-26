@@ -1,134 +1,54 @@
 # Proofline
 
-> Proofline shows what evidence justified an engineering decision and warns you when that evidence changes.
+[English](#english) · [Tiếng Việt](#tiếng-việt) · [日本語](#日本語)
 
-![Proofline catches a stale engineering decision](docs/assets/stale-decision-demo.gif)
+Proofline shows which immutable evidence justified an engineering decision and warns when the cited evidence changes.
 
-Proofline is a local-first Engineering Decision Memory for **ADRs with evidence**. It keeps the
-decision, the immutable source version that justified it, and the exact cited lines together—then
-flags the ADR when that evidence changes.
-
-## See the product story
-
-```bash
-proofline demo stale-decision
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#FFFFFF","fontFamily":"Arial, sans-serif","lineColor":"#667085","primaryTextColor":"#172B4D"}}}%%
+flowchart LR
+    S["Source version<br/>Nguồn / ソース"]:::yellow
+    P["Exact span<br/>Dòng trích / 引用範囲"]:::blue
+    D["Decision<br/>Quyết định / 判断"]:::purple
+    C["Deterministic check<br/>Kiểm tra / 検証"]:::green
+    R["Review warning<br/>Cảnh báo / 警告"]:::pink
+    S --> P --> D --> C
+    C -->|changed| R
+    classDef yellow fill:#FFF4A3,stroke:#C9A227,stroke-width:2px,color:#172B4D
+    classDef blue fill:#D9EAFD,stroke:#4C78A8,stroke-width:2px,color:#172B4D
+    classDef purple fill:#E9DDF7,stroke:#8064A2,stroke-width:2px,color:#172B4D
+    classDef green fill:#DDF5E3,stroke:#4F9D69,stroke-width:2px,color:#172B4D
+    classDef pink fill:#FFE1E6,stroke:#C96A7B,stroke-width:2px,color:#172B4D
 ```
 
-The credential-free demo creates an approved architecture decision citing `requirement.md:42-48`,
-revises that requirement, checks the citation against the current immutable version, and prints:
+## English
 
-```text
-Decision requires review
-requirement.md:42-48 changed after this decision was approved.
-```
+Proofline is a local-first Engineering Decision Memory for evidence-backed ADRs. It preserves source identity, source version and exact cited spans, exports self-contained Decision Evidence Packages, and performs deterministic stale-decision checks without requiring an AI provider.
 
-It writes three inspectable artifacts to `proofline-demo-stale-decision/`:
-
-- `evidence.zip` — the self-contained Decision Evidence Package;
-- `report.html` — a readable, offline HTML view of the decision and exact evidence;
-- `decision-health.json` — a content-free receipt linking the stale finding to both source hashes
-  and the package root.
-
-Verify the package without a database, credentials, model provider, or network:
+Requirements: Python 3.11+, Node.js 20+ and npm.
 
 ```bash
-proofline verify-package proofline-demo-stale-decision/evidence.zip
-```
-
-Then open `proofline-demo-stale-decision/report.html` in any local browser.
-
-## Real demo output
-
-These screenshots come from one credential-free local run of the command above. IDs and hashes are
-run-specific; the review finding and independently verifiable package are the stable behavior.
-
-![Terminal output from a real Proofline stale-decision demo run](docs/assets/stale-decision-terminal.png)
-
-![The generated offline report showing the decision and changed evidence](docs/assets/stale-decision-report.jpg)
-
-## Use case: an ADR with evidence
-
-An ADR says “keep the durable desktop queue in SQLite.” Proofline records not only that choice, but
-the requirement revision and lines that ruled out a network service and required crash recovery.
-When those lines change, reviewers get a precise reason to revisit the ADR instead of a generic
-“document updated” notification.
-
-The check is deterministic: a source can change elsewhere without invalidating the ADR, but the
-approved exact quote must still resolve in the current source version.
-
-## Why Proofline instead of ADR-only, a wiki, or generic RAG?
-
-- **ADR-only:** an ADR records the choice; Proofline also preserves the exact source version and
-  lines that justified it, then flags the decision when that evidence changes.
-- **Wiki or Notion:** a wiki is better for flexible team documentation; Proofline is narrower and
-  keeps approved evidence immutable and independently verifiable instead of relying on mutable
-  pages and links.
-- **Generic RAG:** RAG retrieves likely relevant context at question time; Proofline uses
-  deterministic source identities and exact spans for claims that must remain auditable.
-
-Proofline can complement all three. It is for decisions where recovering the original evidence—and
-knowing when it stopped matching—matters more than broad knowledge capture.
-
-## Quick start
-
-Requirements: Python 3.11+, Node.js 20+, and npm.
-
-```bash
-git clone https://github.com/thangldw/proofline.git
-cd proofline
 make setup
 .venv/bin/proofline demo stale-decision
-```
-
-Launch the experimental local UI with `.venv/bin/proofline launch`. For live frontend development,
-run `make dev-api` and `make dev-web` in separate terminals.
-
-## CI: fail stale decisions without writing
-
-```bash
-PROOFLINE_HOME=/path/to/existing/proofline-state proofline check-decisions
-```
-
-`check-decisions` only reads the initialized database. It exits `0` when every approved exact
-citation resolves in its source's current version, `1` when review is required, and fails closed for
-missing or corrupt provenance. Use `--format json` for machine-readable output. It never ingests,
-migrates, repairs, or updates review state; local SQLite is opened with `mode=ro`.
-
-## Open Decision Evidence Package
-
-DEP v1 is published as an open format with a [JSON Schema, test vectors, and versioning
-policy](spec/decision-evidence-package/README.md). Proofline exports canonical JSON or deterministic
-ZIP and a self-contained HTML projection:
-
-```bash
-proofline export-package ARTIFACT_ID --output evidence.zip --html-report report.html
-proofline verify-package evidence.zip
-proofline explain ARTIFACT_ID
-proofline diff before.zip after.zip
-```
-
-Package verification proves internal integrity and exact lineage. It does not prove who created a
-package or whether the original source was trustworthy; signatures and trust management are not
-implemented.
-
-## Development and measured boundaries
-
-```bash
+.venv/bin/proofline verify-package proofline-demo-stale-decision/evidence.zip
 make test
 make check
-make verify-provenance
-make benchmark-evidence-package
 ```
 
-The committed [reproducible benchmark receipt](docs/benchmarks.md) reports ingest time, package
-build and verify latency, JSON/ZIP size, and peak Python memory for a synthetic local ADR fixture.
-It is regression evidence, not a production capacity claim.
+The current boundary is a single-user local workflow with recoverable data. Hosted sync, shared workspaces, signatures and permission-aware connector fleets are not implemented.
 
-Proofline is experimental pre-alpha for one local user with recoverable test data. Production
-qualification, authenticity/signing, shared workspaces, hosted sync, and permission-aware
-connectors remain outside the implemented boundary. The deeper technical model lives in
-[architecture](docs/architecture.md), [provenance model](docs/provenance-model.md), [evidence package
-contract](docs/evidence-packages.md), and [production readiness](docs/production-readiness.md).
+Current technical references: [architecture](docs/ARCHITECTURE.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.0 release notes](docs/releases/v1.0.0.md).
 
-See the [documentation index](docs/README.md), [roadmap](NEXT_STEPS.md), [support](SUPPORT.md), and
-[security reporting](SECURITY.md). Proofline is released under the [MIT License](LICENSE).
+## Tiếng Việt
+
+Proofline là bộ nhớ quyết định kỹ thuật local-first dành cho ADR có bằng chứng. Hệ thống giữ định danh nguồn, phiên bản nguồn và đúng đoạn trích; xuất Decision Evidence Package độc lập; đồng thời kiểm tra quyết định lỗi thời theo cách xác định mà không cần nhà cung cấp AI.
+
+Yêu cầu: Python 3.11+, Node.js 20+ và npm. Dùng các lệnh ở phần English để cài đặt, chạy demo và kiểm thử. Phạm vi hiện tại là quy trình local cho một người dùng; chưa có đồng bộ hosted, workspace dùng chung, chữ ký hoặc hệ connector phân quyền.
+
+## 日本語
+
+Proofline は、根拠付き ADR のためのローカルファーストな Engineering Decision Memory です。ソース識別子、ソース版、正確な引用範囲を保持し、独立検証可能な Decision Evidence Package を出力します。AI プロバイダーなしで、判断が古くなったかを決定的に検査できます。
+
+必要環境は Python 3.11 以上、Node.js 20 以上、npm です。セットアップ、デモ、テストには English セクションのコマンドを使用してください。現在は単一ユーザーのローカル利用が対象で、ホスト同期、共有ワークスペース、署名、権限対応コネクター群は未実装です。
+
+Released under the [MIT License](LICENSE).
