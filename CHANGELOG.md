@@ -6,19 +6,19 @@
 
 - Added a dependency-free verifier for Decision Evidence Packages to the public ChatGPT and Codex plugin bundle.
 - Added a synthetic package fixture, public-directory metadata, and automated bundle conformance tests.
-- Submitted the skills-only plugin to OpenAI and received approval; public directory publication remains a separate publisher action.
+- Submitted the skills-only plugin to OpenAI, received approval, and published version 1.0.1 to the public Plugins Directory.
 
 ### Tiếng Việt
 
 - Bổ sung bộ xác minh Decision Evidence Package không cần dependency cho bundle plugin ChatGPT và Codex công khai.
 - Bổ sung fixture tổng hợp, metadata cho public directory và kiểm thử tương thích bundle tự động.
-- Đã gửi plugin dạng skills-only lên OpenAI và được duyệt; xuất bản công khai vẫn là thao tác riêng của publisher.
+- Đã gửi plugin dạng skills-only lên OpenAI, được duyệt và xuất bản phiên bản 1.0.1 lên Plugins Directory công khai.
 
 ### 日本語
 
 - 公開 ChatGPT / Codex プラグイン bundle に、外部依存のない Decision Evidence Package 検証器を追加しました。
 - 合成 fixture、公開 directory metadata、bundle 適合テストを追加しました。
-- skills-only プラグインは OpenAI の承認済みで、公開 directory への掲載は別途 publisher 操作が必要です。
+- skills-only プラグインは OpenAI の承認を受け、バージョン 1.0.1 を公開 Plugins Directory に掲載しました。
 
 ## [1.0.0] - 2026-07-26
 
