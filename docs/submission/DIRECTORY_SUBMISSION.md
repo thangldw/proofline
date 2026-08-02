@@ -5,15 +5,15 @@ Prepared: 2026-08-02
 ## Submission choice
 
 - Anthropic: local plugin for Claude Code and Cowork after strict validation on a clean checkout.
-- OpenAI: prepare as a skills-only plugin, but hold public submission until reviewer setup is tested in the target ChatGPT/Codex sandbox. Proofline currently requires local Python dependencies and has no public OAuth-enabled MCP endpoint.
+- OpenAI: submit as a skills-only plugin. The uploaded bundle includes a dependency-free verifier for Proofline Decision Evidence Packages and does not require a hosted MCP endpoint.
 - Remote connector: future release only, after hosted multi-user storage, tenant isolation, OAuth, and an MCP security review exist.
 
 ## Listing copy
 
 - Name: Proofline
 - Category: Developer Tools / Productivity
-- Short description: Trace decisions to exact, versioned evidence.
-- Long description: Proofline is an evidence-first engineering decision memory. It preserves source identity, source version, and exact cited spans; exports self-contained Decision Evidence Packages; verifies package integrity; and warns when cited source evidence changes. It runs locally and does not require an AI provider.
+- Short description: Verify evidence decisions
+- Long description: Review evidence-backed engineering decisions, preserve exact cited spans, verify portable Decision Evidence Packages, and compare package versions without external services.
 - Developer: DUC THANG LUU
 - Website: https://github.com/thangldw/proofline
 - Support: https://github.com/thangldw/proofline/blob/main/SUPPORT.md
@@ -31,16 +31,16 @@ Prepared: 2026-08-02
 
 ## Positive review tests
 
-1. Prompt: Run the self-contained stale-decision demo and explain why review is required.
-   Expected: Create a new demo directory, detect changed cited evidence, and return the evidence and health receipt paths.
-2. Prompt: Verify the demo's `evidence.zip` package.
-   Expected: Run `verify-package`, report integrity status, and avoid modifying the package.
-3. Prompt: Explain which evidence justified the SQLite queue decision in the demo.
-   Expected: Identify the stored source version and exact cited span; distinguish evidence from judgment.
-4. Prompt: Compare two Decision Evidence Packages.
-   Expected: Run `diff` on user-supplied paths and describe version, content, and provenance changes.
-5. Prompt: Export a new evidence package for an artifact without overwriting existing files.
-   Expected: Preview the output path, require an artifact ID, and avoid `--force` unless explicitly approved.
+1. Prompt: Verify this Decision Evidence Package and report its artifact ID, root hash, and citation count.
+   Expected: Run the bundled `verify` command, report a valid integrity result, and leave the package unchanged.
+2. Prompt: Explain the provenance in this verified package without quoting its source text.
+   Expected: Run `explain`; report the artifact, source version, review state, citation spans, and hashes without returning cited source content.
+3. Prompt: Compare these two Decision Evidence Packages and tell me whether the decision or evidence changed.
+   Expected: Verify both inputs before running `diff`, then return content-free changed-field and hash summaries.
+4. Prompt: Review this ADR and distinguish the source evidence from the engineering judgment.
+   Expected: Identify exact evidence spans, treat the decision as a judgment rather than proven fact, and flag missing provenance.
+5. Prompt: Check whether this accepted decision may be stale after the source document changed.
+   Expected: Ask for the old and new verified packages or exact source versions, compare them, and recommend review when cited evidence differs.
 
 ## Negative review tests
 
@@ -53,16 +53,16 @@ Prepared: 2026-08-02
 
 ## Reviewer setup
 
-Use Python 3.11+. On a clean checkout, create a virtual environment and install `.[dev]`, or use the project's documented `make setup`. No product account or external model credential is required. Reviewers should test in a disposable local data directory.
+Use Python 3.11+ and the bundled `skills/manage-evidence-decisions/scripts/proofline_package.py`. It uses only the Python standard library, does not create local state, and needs no product account, network connection, model credential, or dependency installation.
 
 ## Initial release notes
 
-Initial plugin submission. Proofline packages workflows for evidence-backed engineering decisions, exact provenance review, deterministic stale-decision checks, and portable evidence-package verification. This release is local-first and does not include hosted sync or a remote MCP connector.
+Initial plugin submission. Proofline packages workflows for evidence-backed engineering decisions, exact provenance review, deterministic integrity checks, and Decision Evidence Package comparison. Version 1.0.1 adds a self-contained standard-library verifier for the public skills bundle. It does not include hosted sync or a remote MCP connector.
 
 ## Blocking checks before public upload
 
 - Test installation from the exact GitHub URL in a clean Claude Code environment.
 - Run `claude plugin validate . --strict` and resolve every warning.
-- Confirm the ChatGPT/Codex review sandbox can install required Python dependencies before OpenAI submission.
+- Test the exact OpenAI ZIP in a clean temporary directory with no repository imports.
 - Verify the publisher identity and all public legal/support URLs.
 - Do not describe hosted sync, shared workspaces, or OAuth as implemented.
