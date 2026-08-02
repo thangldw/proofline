@@ -1,6 +1,6 @@
 {
   "name": "proofline",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Evidence-first engineering decision memory with deterministic stale-decision checks.",
   "author": {
     "name": "Thang Luu",
@@ -13,8 +13,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Proofline",
-    "shortDescription": "Trace decisions to exact, versioned evidence",
-    "longDescription": "Create and review evidence-backed engineering decisions, preserve exact cited spans, verify portable evidence packages, and detect when cited source evidence has changed.",
+    "shortDescription": "Verify evidence decisions",
+    "longDescription": "Review evidence-backed engineering decisions, preserve exact cited spans, verify portable Decision Evidence Packages, and compare package versions without external services.",
     "developerName": "DUC THANG LUU",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
@@ -26,7 +26,8 @@
       "Check whether the evidence behind this decision changed.",
       "Verify and explain this Decision Evidence Package."
     ],
-    "logo": "./apps/desktop/src-tauri/icons/128x128.png",
-    "screenshots": ["./docs/assets/stale-decision-terminal.png"]
+    "brandColor": "#102A43",
+    "composerIcon": "./assets/plugin-icon.png",
+    "logo": "./assets/plugin-icon.png"
   }
 }
