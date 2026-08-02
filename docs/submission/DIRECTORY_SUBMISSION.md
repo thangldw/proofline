@@ -14,7 +14,7 @@ Prepared: 2026-08-02
 - Category: Developer Tools / Productivity
 - Short description: Trace decisions to exact, versioned evidence.
 - Long description: Proofline is an evidence-first engineering decision memory. It preserves source identity, source version, and exact cited spans; exports self-contained Decision Evidence Packages; verifies package integrity; and warns when cited source evidence changes. It runs locally and does not require an AI provider.
-- Developer: Thang Luu
+- Developer: DUC THANG LUU
 - Website: https://github.com/thangldw/proofline
 - Support: https://github.com/thangldw/proofline/blob/main/SUPPORT.md
 - Privacy: https://github.com/thangldw/proofline/blob/main/PRIVACY.md
