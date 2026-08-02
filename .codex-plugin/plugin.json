@@ -15,7 +15,7 @@
     "displayName": "Proofline",
     "shortDescription": "Trace decisions to exact, versioned evidence",
     "longDescription": "Create and review evidence-backed engineering decisions, preserve exact cited spans, verify portable evidence packages, and detect when cited source evidence has changed.",
-    "developerName": "Thang Luu",
+    "developerName": "DUC THANG LUU",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/thangldw/proofline",
