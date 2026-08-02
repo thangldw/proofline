@@ -8,7 +8,8 @@ Prepared: 2026-08-02
 - Submission ID: `appsub_6a6efdf2d6188191be8c8493bd738576`
 - Version: `1.0.1`
 - Review status: **Approved** on 2026-08-02
-- Publication status: **Awaiting publisher action**; approval does not publish the listing automatically.
+- Publication status: **Published** on 2026-08-02
+- Directory URL: https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa
 
 ## Submission choice
 
