@@ -2,6 +2,14 @@
 
 Prepared: 2026-08-02
 
+## Current status
+
+- OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
+- Submission ID: `appsub_6a6efdf2d6188191be8c8493bd738576`
+- Version: `1.0.1`
+- Review status: **Approved** on 2026-08-02
+- Publication status: **Awaiting publisher action**; approval does not publish the listing automatically.
+
 ## Submission choice
 
 - Anthropic: local plugin for Claude Code and Cowork after strict validation on a clean checkout.
@@ -59,10 +67,10 @@ Use Python 3.11+ and the bundled `skills/manage-evidence-decisions/scripts/proof
 
 Initial plugin submission. Proofline packages workflows for evidence-backed engineering decisions, exact provenance review, deterministic integrity checks, and Decision Evidence Package comparison. Version 1.0.1 adds a self-contained standard-library verifier for the public skills bundle. It does not include hosted sync or a remote MCP connector.
 
-## Blocking checks before public upload
+## Verified submission checks
 
-- Test installation from the exact GitHub URL in a clean Claude Code environment.
-- Run `claude plugin validate . --strict` and resolve every warning.
-- Test the exact OpenAI ZIP in a clean temporary directory with no repository imports.
-- Verify the publisher identity and all public legal/support URLs.
-- Do not describe hosted sync, shared workspaces, or OAuth as implemented.
+- The exact OpenAI ZIP was extracted and executed in a clean temporary directory with no repository imports.
+- The bundled verifier passed the canonical valid fixture and all mutation vectors.
+- The repository test suite passed 379 Python tests and 56 web tests before submission.
+- OpenAI accepted the verified publisher identity and public legal/support URLs.
+- The listing does not describe hosted sync, shared workspaces, or OAuth as implemented.

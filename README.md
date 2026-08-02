@@ -37,9 +37,9 @@ make check
 
 The current boundary is a single-user local workflow with recoverable data. Hosted sync, shared workspaces, signatures and permission-aware connector fleets are not implemented.
 
-Current technical references: [architecture](docs/ARCHITECTURE.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.0 release notes](docs/releases/v1.0.0.md).
+Current technical references: [architecture](docs/architecture.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.0 release notes](docs/releases/v1.0.0.md).
 
-The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. It does not claim hosted sync or a remote MCP connector. See the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md), [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
+The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. OpenAI approved the skills-only plugin at version 1.0.1; public directory publication is tracked separately from approval. It does not claim hosted sync or a remote MCP connector. See the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md), [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
 
 ## Tiếng Việt
 
