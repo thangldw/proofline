@@ -1,0 +1,20 @@
+{
+  "name": "proofline",
+  "version": "1.0.0",
+  "description": "Evidence-first engineering decision memory with deterministic stale-decision checks.",
+  "author": {
+    "name": "Thang Luu",
+    "url": "https://github.com/thangldw"
+  },
+  "homepage": "https://github.com/thangldw/proofline",
+  "license": "MIT",
+  "keywords": ["engineering-decisions", "adr", "evidence", "provenance"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Proofline",
+    "shortDescription": "Trace decisions to exact, versioned evidence",
+    "longDescription": "Create and review evidence-backed engineering decisions, preserve exact cited spans, verify portable evidence packages, and detect when cited source evidence has changed.",
+    "developerName": "Thang Luu",
+    "websiteURL": "https://github.com/thangldw/proofline"
+  }
+}
