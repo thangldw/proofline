@@ -39,6 +39,8 @@ The current boundary is a single-user local workflow with recoverable data. Host
 
 Current technical references: [architecture](docs/ARCHITECTURE.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.0 release notes](docs/releases/v1.0.0.md).
 
+The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. It does not claim hosted sync or a remote MCP connector. See the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md), [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
+
 ## Tiếng Việt
 
 Proofline là bộ nhớ quyết định kỹ thuật local-first dành cho ADR có bằng chứng. Hệ thống giữ định danh nguồn, phiên bản nguồn và đúng đoạn trích; xuất Decision Evidence Package độc lập; đồng thời kiểm tra quyết định lỗi thời theo cách xác định mà không cần nhà cung cấp AI.

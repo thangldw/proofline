@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Evidence Decisions"
+  short_description: "Create and verify evidence-backed decisions"
+  default_prompt: "Use $manage-evidence-decisions to document this decision with exact evidence and check whether it is stale."
