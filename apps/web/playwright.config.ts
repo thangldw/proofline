@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const apiPort = 8765;
-const webPort = 4173;
+const apiPort = Number(process.env.PROOFLINE_E2E_API_PORT ?? 8765);
+const webPort = Number(process.env.PROOFLINE_E2E_WEB_PORT ?? 4173);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const virtualenvPython = resolve(repositoryRoot, ".venv/bin/python");
 const python = existsSync(virtualenvPython) ? JSON.stringify(virtualenvPython) : "python";
