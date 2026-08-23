@@ -20,9 +20,11 @@ TRILINGUAL = "## English\nEnglish.\n\n## Tiếng Việt\nTiếng Việt.\n\n## �
 DIAGRAM = (
     "<!doctype html><html><head><style>svg{display:block}</style></head><body>"
     '<section lang="en"><svg role="img"><title>Title</title>'
-    "<desc>Description</desc></svg></section>"
-    '<section lang="vi"><svg role="img"><title>Tiêu đề</title><desc>Mô tả</desc></svg></section>'
-    '<section lang="ja"><svg role="img"><title>タイトル</title><desc>説明</desc></svg></section>'
+    '<desc id="en-desc">Description</desc></svg></section>'
+    '<section lang="vi"><svg role="img"><title>Tiêu đề</title>'
+    '<desc id="vi-desc">Mô tả</desc></svg></section>'
+    '<section lang="ja"><svg role="img"><title>タイトル</title>'
+    '<desc id="ja-desc">説明</desc></svg></section>'
     "</body></html>"
 )
 
@@ -105,3 +107,7 @@ def test_checker_rejects_external_diagram_dependency(documentation_tree: Path) -
     assert f"{REQUIRED_DIAGRAMS[0]}: external or active content is forbidden" in (
         check_documentation(documentation_tree)
     )
+
+
+def test_repository_documentation_contract() -> None:
+    assert check_documentation(ROOT) == []

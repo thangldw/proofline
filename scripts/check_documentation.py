@@ -60,6 +60,8 @@ FORBIDDEN_PATHS = (
 LANGUAGE_HEADING = re.compile(r"^#{1,6} (English|Tiếng Việt|日本語)\s*$", re.MULTILINE)
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*]\(([^)]+)\)")
 MERMAID_FENCE = re.compile(r"^\s*```mermaid\s*$", re.MULTILINE | re.IGNORECASE)
+SVG_TITLE_TAG = re.compile(r"<title(?:\s[^>]*)?>", re.IGNORECASE)
+SVG_DESC_TAG = re.compile(r"<desc(?:\s[^>]*)?>", re.IGNORECASE)
 IGNORED_PARTS = {".git", ".venv", ".worktrees", "node_modules"}
 RASTER_SUFFIXES = {".gif", ".jpeg", ".jpg", ".png"}
 
@@ -176,7 +178,7 @@ def check_diagrams(root: Path) -> list[str]:
             errors.append(f"{relative}: external or active content is forbidden")
         if "<style" not in lower or text.count('<svg role="img"') != 3:
             errors.append(f"{relative}: expected embedded CSS and three accessible SVG figures")
-        if text.count("<title>") < 3 or text.count("<desc>") < 3:
+        if len(SVG_TITLE_TAG.findall(text)) < 3 or len(SVG_DESC_TAG.findall(text)) < 3:
             errors.append(f"{relative}: every SVG requires title and description")
         positions = [text.find(section) for section in language_sections]
         if any(position < 0 for position in positions) or positions != sorted(positions):
