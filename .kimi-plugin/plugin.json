@@ -1,6 +1,6 @@
 {
   "name": "proofline",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Evidence-first decision memory with deterministic impact and signed attestations.",
   "author": {
     "name": "Thang Luu",

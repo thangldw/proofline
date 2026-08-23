@@ -17,7 +17,7 @@ Smoke fixture: `python3 SCRIPT verify references/fixtures/valid-minimal.json`. I
 
 The public plugin does not mutate a Proofline database or export from one. For ingest, stale scans, receipt export, or package export, direct the user to the [full local application](https://github.com/thangldw/proofline) and obtain approval before installation or local writes.
 
-The bundled verifier does not verify Ed25519. With installed Proofline 2.0.0, verify the exact subjects against a user-selected trusted public key:
+The bundled verifier does not verify Ed25519. With installed Proofline 2.0.1, verify the exact subjects against a user-selected trusted public key:
 
 ```bash
 proofline verify-attestation ATTESTATION \
@@ -52,7 +52,7 @@ Smoke fixture: `python3 SCRIPT verify references/fixtures/valid-minimal.json`. F
 
 Public plugin không mutate Proofline database hoặc export từ database. Với ingest, stale scan, receipt export hoặc package export, hướng người dùng tới [full local application](https://github.com/thangldw/proofline) và lấy approval trước installation hoặc local write.
 
-Bundled verifier không verify Ed25519. Với Proofline 2.0.0 đã cài, verify exact subject với trusted public key do người dùng chọn:
+Bundled verifier không verify Ed25519. Với Proofline 2.0.1 đã cài, verify exact subject với trusted public key do người dùng chọn:
 
 ```bash
 proofline verify-attestation ATTESTATION \
@@ -87,7 +87,7 @@ Smoke fixture：`python3 SCRIPT verify references/fixtures/valid-minimal.json`�
 
 Public plugin は Proofline database を変更せず、database から export しません。Ingest、stale scan、receipt/package export には user を [full local application](https://github.com/thangldw/proofline) へ案内し、installation/local write 前に approval を得ます。
 
-Bundled verifier は Ed25519 を検証しません。Installed Proofline 2.0.0 で、exact subject を user-selected trusted public key に対して verify します。
+Bundled verifier は Ed25519 を検証しません。Installed Proofline 2.0.1 で、exact subject を user-selected trusted public key に対して verify します。
 
 ```bash
 proofline verify-attestation ATTESTATION \
