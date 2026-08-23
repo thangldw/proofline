@@ -21,6 +21,8 @@ const apiMock = vi.hoisted(() => ({
   overview: vi.fn(),
   decisionHealthOverview: vi.fn(),
   decisionReviews: vi.fn(),
+  decisionImpacts: vi.fn(),
+  decisionImpactSummary: vi.fn(),
   decisionReview: vi.fn(),
   refreshDecisionReviews: vi.fn(),
   updateDecisionReview: vi.fn(),
@@ -67,6 +69,29 @@ const review: DecisionReview = {
   opened_at: "2026-08-23T00:00:00Z",
   updated_at: "2026-08-23T00:00:00Z",
   closed_at: null,
+};
+
+const impact = {
+  root_review_id: "review-1",
+  root_review_fingerprint: "a".repeat(64),
+  root_decision_id: "decision-1",
+  root_decision_title: "Queue storage",
+  impacted_decision_id: "decision-3",
+  impacted_decision_title: "Worker topology",
+  depth: 2,
+  decision_path: ["decision-1", "decision-2", "decision-3"],
+  relation_path: ["relation-1", "relation-2"],
+  relation_kinds: ["based_on", "implements"] as const,
+  evaluated_at: "2026-08-23T12:00:00Z",
+  fingerprint: "e".repeat(64),
+};
+
+const impactSummary = {
+  root_review_count: 1,
+  impacted_decision_count: 1,
+  finding_count: 1,
+  max_depth: 2,
+  evaluated_at: "2026-08-23T12:00:00Z",
 };
 
 const detail: DecisionReviewDetail = {
@@ -124,6 +149,8 @@ describe("DecisionHealthView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.decisionReviews.mockResolvedValue([review]);
+    apiMock.decisionImpacts.mockResolvedValue([impact]);
+    apiMock.decisionImpactSummary.mockResolvedValue(impactSummary);
     apiMock.decisionReview.mockResolvedValue(detail);
     apiMock.refreshDecisionReviews.mockResolvedValue({
       opened: 0,
@@ -144,6 +171,10 @@ describe("DecisionHealthView", () => {
 
     expect(screen.getByText("Healthy accepted").previousSibling).toHaveTextContent("3");
     expect(screen.getByText("Review required").previousSibling).toHaveTextContent("1");
+    expect(await screen.findByText("Transitively impacted")).toBeInTheDocument();
+    expect(screen.getByText("Transitively impacted").previousSibling).toHaveTextContent("1");
+    expect(screen.getByText("Queue storage → Worker topology")).toBeInTheDocument();
+    expect(screen.getByText("decision-1 → decision-2 → decision-3")).toBeInTheDocument();
     expect(apiMock.decisionReview).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: "Open review review-1" }));
 
@@ -253,6 +284,32 @@ describe("DecisionHealthView", () => {
       />,
     );
     expect(await screen.findByRole("alert")).toHaveTextContent("review_state_conflict");
+  });
+
+  it("renders transitive impact empty and isolated error states", async () => {
+    apiMock.decisionImpacts.mockResolvedValue([]);
+    apiMock.decisionImpactSummary.mockResolvedValue({
+      ...impactSummary,
+      root_review_count: 0,
+      impacted_decision_count: 0,
+      finding_count: 0,
+      max_depth: 0,
+    });
+    renderView();
+    expect(await screen.findByText("No transitive impacts.")).toBeInTheDocument();
+
+    cleanup();
+    apiMock.decisionImpacts.mockRejectedValue(new Error("impact_graph_unavailable"));
+    render(
+      <DecisionHealthView
+        overview={overview}
+        workspaceId="workspace-2"
+        onOverviewChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByRole("alert", { name: "Transitive impact error" })).toHaveTextContent(
+      "impact_graph_unavailable",
+    );
   });
 
   it("makes Decision Health the default view with the active-review badge", async () => {

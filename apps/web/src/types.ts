@@ -26,6 +26,29 @@ export type DecisionHealthOverview = {
   waived: number;
 };
 
+export type DecisionImpact = {
+  root_review_id: string;
+  root_review_fingerprint: string;
+  root_decision_id: string;
+  root_decision_title: string;
+  impacted_decision_id: string;
+  impacted_decision_title: string;
+  depth: number;
+  decision_path: string[];
+  relation_path: string[];
+  relation_kinds: Array<"based_on" | "implements">;
+  evaluated_at: string;
+  fingerprint: string;
+};
+
+export type DecisionImpactSummary = {
+  root_review_count: number;
+  impacted_decision_count: number;
+  finding_count: number;
+  max_depth: number;
+  evaluated_at: string;
+};
+
 export type DecisionReview = {
   id: string;
   workspace_id: string;
