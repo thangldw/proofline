@@ -10,6 +10,7 @@ from proofline.decision_health import DecisionHealthError, check_decision_health
 from proofline.evidence_packages import EvidencePackageError
 from proofline.ingestion import ingest_source
 from proofline.models import Decision, Evidence, SourceVersion
+from proofline.review_receipts import load_and_verify_review_receipt
 from proofline.schemas import SourceCreate
 from proofline.stale_decision_demo import run_stale_decision_demo
 from sqlalchemy import func, select
@@ -205,12 +206,19 @@ def test_stale_decision_demo_creates_offline_package_html_and_receipt(tmp_path):
     assert result["verification"]["valid"] is True
     assert result["finding"].locator == "requirement.md:42-48"
     assert (output / "evidence.zip").is_file()
+    assert (output / "decision-review.json").is_file()
     html = (output / "report.html").read_text(encoding="utf-8")
     assert "Decision requires review" in html
     assert "requirement.md:42-48 changed" in html
     assert "proofline verify-package evidence.zip" in html
     receipt = json.loads((output / "decision-health.json").read_text(encoding="utf-8"))
     assert receipt["package_root"] == result["verification"]["root_hash"]
+    review_receipt = json.loads((output / "decision-review.json").read_text(encoding="utf-8"))
+    assert review_receipt["dep_root_hash"] == result["verification"]["root_hash"]
+    _document, review_verification = load_and_verify_review_receipt(output / "decision-review.json")
+    assert review_verification["valid"] is True
+    assert result["review"].state == "open"
+    assert result["decision_status"] == "accepted"
 
     with pytest.raises(EvidencePackageError, match="output_exists"):
         run_stale_decision_demo(output)
@@ -224,3 +232,11 @@ def test_stale_decision_demo_creates_offline_package_html_and_receipt(tmp_path):
     with pytest.raises(EvidencePackageError, match="output_directory_not_demo"):
         run_stale_decision_demo(unrelated, force=True)
     assert (unrelated / "keep.txt").read_text(encoding="utf-8") == "user data"
+
+
+def test_stale_decision_demo_cli_reports_accepted_review_state(tmp_path, capsys):
+    main(["demo", "stale-decision", "--output-dir", str(tmp_path / "demo")])
+
+    output = capsys.readouterr().out
+    assert "Accepted · review required" in output
+    assert "decision-review.json" in output

@@ -71,12 +71,14 @@ Use frozen dataclasses and content-free values:
 ```python
 AnchorState = Literal["current", "unchanged", "moved", "ambiguous", "changed", "deleted"]
 
+
 @dataclass(frozen=True)
 class EvidenceAnchor:
     version: str
     section_path: tuple[str, ...]
     prefix_sha256: str
     suffix_sha256: str
+
 
 @dataclass(frozen=True)
 class AnchorCandidate:
@@ -86,6 +88,7 @@ class AnchorCandidate:
     end_line: int
     section_path: tuple[str, ...]
     similarity: float
+
 
 @dataclass(frozen=True)
 class AnchorResolution:
@@ -225,7 +228,11 @@ assert evidence["anchor_version"] == "markdown-context-v1"
 assert evidence["binding_state"] == "active"
 assert evidence["prefix_sha256"] == hashlib.sha256(b"").hexdigest()
 assert review_columns >= {
-    "finding_fingerprint", "anchor_state", "policy_hash", "state", "resolution"
+    "finding_fingerprint",
+    "anchor_state",
+    "policy_hash",
+    "state",
+    "resolution",
 }
 ```
 

@@ -658,9 +658,11 @@ def main(argv: list[str] | None = None) -> None:
         print()
         print("Decision requires review")
         print(f"{finding.locator} changed after this decision was approved.")
+        print("Accepted · review required")
         print()
         print(f"Offline package: {result['package']}")
         print(f"Readable report: {result['report']}")
+        print(f"Review receipt: {result['review_receipt']}")
         print(f"Verification: valid · root {result['verification']['root_hash']}")
 
 

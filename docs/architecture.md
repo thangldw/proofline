@@ -21,6 +21,8 @@ flowchart LR
 
 `apps/api/proofline/` owns ingestion, immutable source versions, exact spans, decision health and package verification. `apps/web/` is the local React client. `apps/desktop/` embeds the local service in a Tauri shell. Provider-specific AI remains optional and behind interfaces; provenance and verification do not depend on it.
 
+`Decision.status` records the governed historical outcome. `DecisionReview.state` records current evidence health and never silently mutates that outcome. Evidence bindings form immutable chains: re-anchoring supersedes an old citation and creates a new active citation while retaining the old payload. Decision Evidence Package v1 remains historical; a separate review receipt binds current health to its root hash.
+
 ## Tiếng Việt
 
 `apps/api/proofline/` quản lý ingest, phiên bản nguồn bất biến, exact span, decision health và xác minh package. `apps/web/` là client React local; `apps/desktop/` đóng gói service local bằng Tauri. AI provider chỉ là tùy chọn và không tham gia vào contract provenance/xác minh.

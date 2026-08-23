@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-08-23T07:10:12.283744+00:00",
+  "database_bytes": 57896960,
+  "decision_count": 10000,
+  "environment": {
+    "implementation": "cpython",
+    "platform": "macOS-26.6.1-arm64-arm-64bit-Mach-O",
+    "python": "3.14.6"
+  },
+  "fixture": "synthetic-generated-local-sqlite",
+  "peak_python_memory_bytes": 105692737,
+  "qualification": "synthetic local SQLite benchmark; excludes connectors, auth, hosted sync, network, and team production capacity",
+  "refresh_latency_ms": 6731.872500036843,
+  "review_count": 10000,
+  "schema": "proofline-decision-review-refresh-benchmark-v1",
+  "verify_latency_ms": 1645.5393329961225
+}

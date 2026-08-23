@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance benchmark-retrieval benchmark-provenance benchmark-evidence-package benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance verify-package-conformance benchmark-retrieval benchmark-provenance benchmark-evidence-package benchmark-decision-reviews benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -39,6 +39,12 @@ verify-provenance:
 	.venv/bin/python scripts/provenance_conformance.py \
 		--output evals/provenance/conformance-v1.json --force
 
+verify-package-conformance:
+	.venv/bin/python skills/manage-evidence-decisions/scripts/proofline_package.py verify \
+		spec/decision-evidence-package/v1/test-vectors/valid-minimal.json
+	.venv/bin/python skills/manage-evidence-decisions/scripts/proofline_package.py verify-review \
+		spec/decision-review-receipt/v1/test-vectors/valid-minimal.json
+
 simulate-pilot:
 	@.venv/bin/python scripts/simulate_pilot.py \
 		--dataset evals/pilot-simulation/engineering-context-v1.json
@@ -63,6 +69,10 @@ benchmark-evidence-package:
 	.venv/bin/python scripts/benchmark_evidence_package.py \
 		--iterations 100 \
 		--output evals/benchmarks/decision-evidence-package-v1.json --force
+
+benchmark-decision-reviews:
+	.venv/bin/python scripts/benchmark_decision_reviews.py --decisions 10000 \
+		--output evals/benchmarks/decision-review-refresh-10000-v1.json --force
 
 check:
 	.venv/bin/ruff check .

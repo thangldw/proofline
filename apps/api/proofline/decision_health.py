@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import asdict, dataclass
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .anchors import EvidenceAnchor, build_evidence_anchor, resolve_evidence_anchor
 from .models import Decision, Source, SourceVersion
@@ -59,24 +59,48 @@ def check_decision_health(
     to invalidate a decision: the cited quote must be absent from the current immutable version.
     """
 
-    decisions = session.scalars(
-        select(Decision).where(Decision.status.in_(("active", "accepted"))).order_by(Decision.id)
-    ).all()
+    statement = (
+        select(Decision)
+        .options(selectinload(Decision.evidence))
+        .where(Decision.status.in_(("active", "accepted")))
+        .order_by(Decision.id)
+    )
+    if workspace_id is not None or source_ids is not None:
+        statement = statement.join(Source, Source.id == Decision.source_id)
+        if workspace_id is not None:
+            statement = statement.where(Source.workspace_id == workspace_id)
+        if source_ids is not None:
+            statement = statement.where(Source.id.in_(source_ids))
+    decisions = list(session.scalars(statement).all())
+    sources = {
+        source.id: source
+        for source in session.scalars(
+            select(Source).where(Source.id.in_({item.source_id for item in decisions}))
+        ).all()
+    }
+    version_ids = {item.source_version_id for item in decisions}
+    version_ids.update(
+        source.current_version_id
+        for source in sources.values()
+        if source.current_version_id is not None
+    )
+    versions = {
+        version.id: version
+        for version in session.scalars(
+            select(SourceVersion).where(SourceVersion.id.in_(version_ids))
+        ).all()
+    }
     findings: list[DecisionHealthFinding] = []
     for decision in decisions:
-        source = session.get(Source, decision.source_id)
-        cited_version = session.get(SourceVersion, decision.source_version_id)
+        source = sources.get(decision.source_id)
+        cited_version = versions.get(decision.source_version_id)
         if source is None or cited_version is None:
             raise DecisionHealthError("decision_source_missing")
-        if workspace_id is not None and source.workspace_id != workspace_id:
-            continue
-        if source_ids is not None and source.id not in source_ids:
-            continue
         if source.content_hash != hashlib.sha256(f"source:{source.id}".encode()).hexdigest():
             raise DecisionHealthError("source_identity_invalid")
         if source.current_version_id is None:
             raise DecisionHealthError("current_source_version_missing")
-        current_version = session.get(SourceVersion, source.current_version_id)
+        current_version = versions.get(source.current_version_id)
         if current_version is None:
             raise DecisionHealthError("current_source_version_missing")
         if any(

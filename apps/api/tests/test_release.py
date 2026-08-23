@@ -75,3 +75,30 @@ def test_ci_skip_check_rejects_an_ordinary_commit_message():
     )
     assert completed.returncode == 1
     assert "must contain a GitHub CI skip instruction" in completed.stderr
+
+
+def test_ci_workflow_runs_release_critical_commands():
+    root = repository_root()
+    workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+
+    for command in (
+        "npm ci",
+        "make test",
+        "make check",
+        "npm audit --omit=dev --audit-level=high",
+        "proofline verify-package",
+        "proofline verify-review-receipt",
+        "proofline check-decisions --format sarif",
+    ):
+        assert command in workflow
+    assert "verify-package-conformance:" in makefile
+
+
+def test_nanoid_security_override_is_locked_to_patched_compatible_version():
+    root = repository_root()
+    package = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))
+
+    assert package["overrides"]["nanoid"] == "3.3.18"
+    assert lock["packages"]["node_modules/nanoid"]["version"] == "3.3.18"
