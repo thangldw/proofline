@@ -66,6 +66,14 @@ def _root_with_review(session) -> tuple[Decision, DecisionReview, str]:
     return root, review, source.workspace_id
 
 
+def _resolve_review(review: DecisionReview) -> None:
+    resolved_at = max(review.opened_at, review.updated_at) + timedelta(microseconds=1)
+    review.state = "resolved"
+    review.resolution = "source_restored"
+    review.closed_at = resolved_at
+    review.updated_at = resolved_at
+
+
 def _relation(
     session,
     relation_id: str,
@@ -187,10 +195,7 @@ def test_impact_disappears_when_review_closes_and_is_workspace_scoped(session):
         )
         == []
     )
-    review.state = "resolved"
-    review.resolution = "source_restored"
-    review.closed_at = AS_OF
-    review.updated_at = AS_OF
+    _resolve_review(review)
     session.commit()
     assert compute_decision_impacts(session, workspace_id=workspace_id, as_of=AS_OF) == []
 
@@ -279,10 +284,7 @@ def test_check_impacts_cli_json_sarif_and_exit_codes(session, monkeypatch, tmp_p
         select(DecisionReview).where(DecisionReview.workspace_id == workspace_id)
     )
     assert review is not None
-    review.state = "resolved"
-    review.resolution = "source_restored"
-    review.closed_at = AS_OF
-    review.updated_at = AS_OF
+    _resolve_review(review)
     session.commit()
 
     main(["check-impacts", "--format", "sarif", "--as-of", AS_OF.isoformat()])
