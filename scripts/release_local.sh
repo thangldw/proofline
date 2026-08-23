@@ -90,13 +90,14 @@ platform_slug=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
 .venv/bin/python scripts/platform_release_receipt.py \
   --proofline "$smoke_dir/venv/bin/proofline" \
   --python "$smoke_dir/venv/bin/python" \
-  --artifact "$release_dir/proofline-$installed_version-py3-none-any.whl" \
+  --artifact "$release_dir/proofline_evidence-$installed_version-py3-none-any.whl" \
   --expected-version "$installed_version" \
   --qualify-os-keyring \
   --output "$release_dir/proofline-platform-$tag-$platform_slug.json" >/dev/null
+release_assets=("$release_dir"/proofline_evidence-* "$release_dir"/proofline-*)
 (
   cd "$release_dir"
-  shasum -a 256 proofline-* > SHA256SUMS
+  shasum -a 256 proofline_evidence-* proofline-* > SHA256SUMS
 )
 
 .venv/bin/python scripts/publish_pypi.py \
@@ -111,7 +112,7 @@ fi
 
 release_args=(
   "$tag"
-  "$release_dir"/proofline-*
+  "${release_assets[@]}"
   "$release_dir/SHA256SUMS"
   --verify-tag
   --title "Proofline $tag"

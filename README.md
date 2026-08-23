@@ -32,6 +32,13 @@ Explicit `based_on` and `implements` relations produce cycle-safe transitive imp
 Requirements: Python 3.11+, Node.js 20+ and npm.
 
 ```bash
+python -m pip install proofline-evidence
+proofline demo stale-decision
+```
+
+For repository development:
+
+```bash
 make setup
 .venv/bin/proofline demo stale-decision
 .venv/bin/proofline verify-package proofline-demo-stale-decision/evidence.zip

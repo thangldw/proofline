@@ -72,8 +72,12 @@ try {
   & $SmokePython -m pip install --quiet $Wheel.FullName
   & $Python scripts/platform_release_receipt.py --proofline $SmokeProofline --python $SmokePython --artifact $Wheel.FullName --expected-version $Tag.TrimStart("v") --qualify-os-keyring --output (Join-Path $ReleaseDir "proofline-platform-$Tag-windows-x64.json")
 
+  $ReleaseAssets = @(
+    Get-ChildItem "$ReleaseDir\proofline_evidence-*"
+    Get-ChildItem "$ReleaseDir\proofline-*"
+  )
   $ChecksumPath = Join-Path $ReleaseDir "SHA256SUMS"
-  Get-ChildItem "$ReleaseDir\proofline-*" | ForEach-Object {
+  $ReleaseAssets | ForEach-Object {
     $Hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
     "$Hash  $($_.Name)"
   } | Set-Content -Encoding ascii $ChecksumPath
@@ -82,7 +86,7 @@ try {
 
   git tag -a $Tag -m "Proofline $Tag"
   git push origin $Tag
-  $Assets = @(Get-ChildItem "$ReleaseDir\proofline-*").FullName + $ChecksumPath
+  $Assets = @($ReleaseAssets.FullName) + $ChecksumPath
   $ReleaseArgs = @($Tag) + $Assets + @(
     "--verify-tag",
     "--title", "Proofline $Tag",

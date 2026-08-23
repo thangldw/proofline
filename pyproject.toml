@@ -1,5 +1,5 @@
 [project]
-name = "proofline"
+name = "proofline-evidence"
 version = "2.0.0"
 description = "Evidence-first engineering decision memory"
 readme = "README.md"
