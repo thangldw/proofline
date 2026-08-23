@@ -99,3 +99,9 @@ def test_plugin_documents_signed_attestation_boundary_without_private_keys() -> 
     assert "Proofline 2.0.0" in combined
     assert "bundled verifier does not verify Ed25519" in combined
     assert "BEGIN PRIVATE KEY" not in combined
+
+
+def test_openai_plugin_manifest_has_at_most_three_default_prompts() -> None:
+    manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+
+    assert len(manifest["interface"]["defaultPrompt"]) <= 3
