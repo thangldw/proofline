@@ -1,0 +1,7 @@
+version = 1
+
+[decision_health]
+fail_on = ["moved", "ambiguous", "changed", "deleted"]
+acknowledged_is_blocking = true
+allow_waiver = true
+max_open_age_days = 14
