@@ -11,21 +11,29 @@ def test_public_docs_are_current_trilingual_and_release_scoped():
     contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
     evidence_packages = (ROOT / "docs/evidence-packages.md").read_text(encoding="utf-8")
 
-    assert "Proofline shows which immutable evidence justified an engineering decision" in readme
+    assert "binds decisions to immutable source versions and exact citation spans" in readme
     for language in ("English", "Tiếng Việt", "日本語"):
         assert language in readme
         assert language in release_notes
-    assert "```mermaid" in readme
+    assert "```mermaid" not in readme
     assert "v2.0.0" in release_notes
     assert "make test" in contributing
-    assert "[evidence package formats](docs/evidence-packages.md)" in readme
-    assert "Accepted · review required" in readme
+    for target in (
+        "docs/getting-started.md",
+        "docs/architecture.md",
+        "docs/evidence-packages.md",
+        "docs/submission/openai-plugin.md",
+    ):
+        assert target in readme
+    assert "PyPI distribution is `proofline-evidence`" in readme
+    assert "CLI and Python package are `proofline`" in readme
     assert "integrity, not authenticity" in evidence_packages
     assert "proofline-decision-review-receipt-v1" in evidence_packages
     assert "proofline-signed-attestation-v1" in evidence_packages
     assert "trusted public key" in evidence_packages
     assert "transitive impact" in readme.lower()
     assert "single-user" in evidence_packages
+    assert "v2.0.0" in readme
 
 
 def test_default_decision_policy_and_ci_contract_are_committed():
