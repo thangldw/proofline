@@ -84,7 +84,7 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline seed
       - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline check-decisions --format sarif --output artifacts/decision-health.sarif
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: decision-health-sarif
           path: artifacts/decision-health.sarif
@@ -101,7 +101,7 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline seed
       - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline check-impacts --format sarif --output artifacts/decision-impact.sarif
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: decision-impact-sarif
           path: artifacts/decision-impact.sarif

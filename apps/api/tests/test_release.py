@@ -156,6 +156,8 @@ def test_trusted_publisher_workflow_separates_build_publish_and_public_verificat
     assert "proofline_evidence-2.0.0-py3-none-any.whl" in workflow
     assert "proofline_evidence-2.0.0.tar.gz" in workflow
     assert "--verify-only" in workflow
+    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c" in workflow
     assert workflow.index("actions/upload-artifact@") < workflow.index(
         "pypa/gh-action-pypi-publish@"
     )
