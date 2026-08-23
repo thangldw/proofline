@@ -200,6 +200,7 @@ def main(argv: list[str] | None = None) -> None:
                 "twine",
                 "upload",
                 "--non-interactive",
+                "--skip-existing",
                 *(str(path) for path in pending),
             ]
         )
