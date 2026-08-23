@@ -291,7 +291,8 @@ def _index_version(session: Session, source: Source, version: SourceVersion, con
         session.add(decision)
         session.flush()
         session.add(
-            Evidence(
+            Evidence.anchored(
+                source_content=content,
                 decision_id=decision.id,
                 source_id=source.id,
                 source_version_id=version.id,

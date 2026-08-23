@@ -375,7 +375,8 @@ def _import_verified(
 
         for item in payload["evidence"]:
             session.add(
-                Evidence(
+                Evidence.anchored(
+                    source_content=versions[item["source_version_id"]].content,
                     id=item["id"],
                     decision_id=item["memory_id"],
                     source_id=item["source_id"],

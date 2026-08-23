@@ -73,7 +73,8 @@ def _create_approved_decision(session, source) -> Decision:
     session.add(decision)
     session.flush()
     session.add(
-        Evidence(
+        Evidence.anchored(
+            source_content=version.content,
             decision_id=decision.id,
             source_id=source.id,
             source_version_id=version.id,

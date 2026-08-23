@@ -198,7 +198,8 @@ def extract_memory_candidates(
         for evidence_id in dict.fromkeys(candidate.evidence_ids):
             chunk = chunk_by_id[evidence_id]
             session.add(
-                Evidence(
+                Evidence.anchored(
+                    source_content=version.content,
                     decision_id=decision.id,
                     source_id=source.id,
                     source_version_id=version.id,
