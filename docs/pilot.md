@@ -33,9 +33,10 @@ sanitized identifiers and keep the directory outside the repository.
   --output /absolute/private/pilot-analysis.json
 ```
 
-The freezer writes `manifest.json` atomically with mode `0600`, an explicit dataset version, and a
-SHA-256 digest for every input. It refuses overwrite unless `--force` is explicit. The analyzer
-recomputes all hashes before calculating aggregates and fails if the frozen inputs changed.
+The freezer writes `manifest.json` atomically with mode `0600` on POSIX hosts, an explicit dataset
+version, and a SHA-256 digest for every input. It refuses overwrite unless `--force` is explicit.
+The analyzer recomputes all hashes before calculating aggregates and fails if the frozen inputs
+changed.
 
 The analysis remains `aggregate_analysis_unsigned` with `awaiting_owner_signoff`. Dataset owners
 must review the private records, consent scope, exclusions, citation adjudication, and platform or
@@ -79,9 +80,9 @@ và giữ directory ngoài repository.
   --output /absolute/private/pilot-analysis.json
 ```
 
-Freezer ghi atomic `manifest.json` với mode `0600`, dataset version explicit và SHA-256 cho từng
-input. Nó không overwrite nếu thiếu `--force`. Analyzer tính lại toàn bộ hash trước khi tính
-aggregate và fail nếu frozen input đã thay đổi.
+Freezer ghi atomic `manifest.json` với mode `0600` trên POSIX host, dataset version explicit và
+SHA-256 cho từng input. Nó không overwrite nếu thiếu `--force`. Analyzer tính lại toàn bộ hash
+trước khi tính aggregate và fail nếu frozen input đã thay đổi.
 
 Analysis vẫn mang trạng thái `aggregate_analysis_unsigned` và `awaiting_owner_signoff`. Dataset
 owner phải review private record, consent scope, exclusion, citation adjudication và platform hoặc
@@ -125,9 +126,10 @@ Consent 済みで sanitized な identifier のみを使用し、directory は re
   --output /absolute/private/pilot-analysis.json
 ```
 
-Freezer は mode `0600` の `manifest.json` を atomic に書き込み、explicit dataset version と
-各 input の SHA-256 digest を記録します。`--force` がない overwrite は拒否します。
-Analyzer は aggregate 計算前に全 hash を再計算し、frozen input の変更時には失敗します。
+Freezer は POSIX host で mode `0600` の `manifest.json` を atomic に書き込み、explicit
+dataset version と各 input の SHA-256 digest を記録します。`--force` がない overwrite は
+拒否します。Analyzer は aggregate 計算前に全 hash を再計算し、frozen input の変更時には
+失敗します。
 
 Analysis の状態は `aggregate_analysis_unsigned` と `awaiting_owner_signoff` のままです。
 Aggregate を pilot evidence として扱う前に、dataset owner が private record、consent scope、
