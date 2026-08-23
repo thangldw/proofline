@@ -37,10 +37,11 @@ Each evidence record gains a deterministic context anchor:
 Existing evidence is backfilled from its immutable cited `SourceVersion`. These fields describe
 context; they never replace `source_version_id`, offsets, lines, quote, or quote hash.
 
-Evidence also gains binding lifecycle metadata: `binding_state` (`active` or `superseded`),
-`superseded_at`, and `superseded_by_id`. Citation payload fields remain immutable. Existing evidence
-defaults to `active`; decision reads and package export use active evidence unless a history view is
-explicitly requested.
+Evidence also gains binding lifecycle metadata: `binding_root_id`, `binding_state` (`active` or
+`superseded`), `superseded_at`, and `superseded_by_id`. `binding_root_id` identifies one citation
+slot across re-anchors and is backfilled to the evidence row's own ID. Citation payload fields
+remain immutable. Existing evidence defaults to `active`; decision reads and package export use
+active evidence unless a history view is explicitly requested.
 
 The pure resolver compares one citation with the current immutable source version and returns one
 of these states:
@@ -82,9 +83,10 @@ audited.
 
 Successful source, folder, and Git ingestion refresh affected decisions after the new immutable
 source version and chunks are committed. If review refresh fails, ingestion remains committed but
-the ingestion job remains `completed` with stage `review_refresh_failed`, a content-free error code,
-and `retryable=true`; the UI reports degraded decision health. This avoids rolling back valid
-provenance while making the secondary failure visible and retryable.
+the ingestion job becomes `failed` with stage `review_refresh`, a content-free error code, and
+`retryable=true`; the UI reports degraded decision health. Retrying this stage refreshes reviews
+without replaying source ingestion. This avoids rolling back valid provenance while making the
+secondary failure visible and retryable.
 
 The existing `check_decision_health()` and `proofline check-decisions` remain read-only. A separate
 `refresh_decision_reviews()` service and `proofline refresh-reviews` command persist ledger state.
