@@ -112,6 +112,13 @@ def test_release_toolchain_pins_non_vulnerable_pip_floor():
     assert "pip>=26.2,<27" in project["project"]["optional-dependencies"]["dev"]
 
 
+def test_pypi_distribution_uses_available_name_without_renaming_runtime():
+    project = tomllib.loads((repository_root() / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert project["project"]["name"] == "proofline-evidence"
+    assert project["project"]["scripts"]["proofline"] == "proofline.runtime:main"
+
+
 def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
     root = repository_root()
     local = (root / "scripts/release_local.sh").read_text(encoding="utf-8")
@@ -134,6 +141,24 @@ def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
     assert "verify_attestation_vector.py" in windows
     assert 'if ($Tag -like "v0.*" -or $Tag.Contains("-"))' in windows
     assert "gh release create @ReleaseArgs" in windows
+
+
+def test_trusted_publisher_workflow_separates_build_publish_and_public_verification():
+    workflow = (repository_root() / ".github/workflows/publish-pypi.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "workflow_dispatch:" in workflow
+    assert "environment:" in workflow
+    assert "name: pypi" in workflow
+    assert "id-token: write" in workflow
+    assert "pypa/gh-action-pypi-publish@" in workflow
+    assert "proofline_evidence-2.0.0-py3-none-any.whl" in workflow
+    assert "proofline_evidence-2.0.0.tar.gz" in workflow
+    assert "--verify-only" in workflow
+    assert workflow.index("actions/upload-artifact@") < workflow.index(
+        "pypa/gh-action-pypi-publish@"
+    )
 
 
 def test_release_check_covers_public_plugin_version_surfaces():
@@ -189,13 +214,13 @@ def test_python_release_archives_use_fail_closed_content_selection():
 def test_release_artifact_verifier_rejects_private_key_bytes(tmp_path, archive_kind):
     marker = b"-----BEGIN PRIVATE KEY-----\nPRIVATE RELEASE MARKER\n"
     if archive_kind == "wheel":
-        archive = tmp_path / "proofline-2.0.0-py3-none-any.whl"
+        archive = tmp_path / "proofline_evidence-2.0.0-py3-none-any.whl"
         with zipfile.ZipFile(archive, "w") as handle:
             handle.writestr("proofline/local-key.bin", marker)
     else:
-        archive = tmp_path / "proofline-2.0.0.tar.gz"
+        archive = tmp_path / "proofline_evidence-2.0.0.tar.gz"
         with tarfile.open(archive, "w:gz") as handle:
-            info = tarfile.TarInfo("proofline-2.0.0/local-key.bin")
+            info = tarfile.TarInfo("proofline_evidence-2.0.0/local-key.bin")
             info.size = len(marker)
             handle.addfile(info, io.BytesIO(marker))
 

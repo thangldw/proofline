@@ -16,7 +16,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-PYPI_JSON = "https://pypi.org/pypi/proofline/{version}/json"
+DISTRIBUTION_NAME = "proofline-evidence"
+ARTIFACT_PREFIX = "proofline_evidence"
+PYPI_JSON = f"https://pypi.org/pypi/{DISTRIBUTION_NAME}/{{version}}/json"
 
 
 class PublicReleaseIncomplete(ValueError):
@@ -25,8 +27,8 @@ class PublicReleaseIncomplete(ValueError):
 
 def release_artifacts(dist_dir: Path, version: str) -> tuple[Path, Path]:
     artifacts = (
-        dist_dir / f"proofline-{version}-py3-none-any.whl",
-        dist_dir / f"proofline-{version}.tar.gz",
+        dist_dir / f"{ARTIFACT_PREFIX}-{version}-py3-none-any.whl",
+        dist_dir / f"{ARTIFACT_PREFIX}-{version}.tar.gz",
     )
     if not all(path.is_file() for path in artifacts):
         raise ValueError("exact_release_artifacts_missing")
@@ -159,7 +161,7 @@ def qualify_public_install(version: str) -> None:
                 "--no-cache-dir",
                 "--index-url",
                 "https://pypi.org/simple",
-                f"proofline=={version}",
+                f"{DISTRIBUTION_NAME}=={version}",
             ],
             cwd=root,
             env=env,
@@ -185,25 +187,27 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", required=True)
     parser.add_argument("--dist-dir", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args(argv)
 
     artifacts = release_artifacts(args.dist_dir.resolve(), args.version)
     _run([sys.executable, "-m", "twine", "check", *(str(path) for path in artifacts)])
-    pending = artifacts_to_upload(
-        _fetch_public_release_if_present(args.version), args.version, artifacts
-    )
-    if pending:
-        _run(
-            [
-                sys.executable,
-                "-m",
-                "twine",
-                "upload",
-                "--non-interactive",
-                "--skip-existing",
-                *(str(path) for path in pending),
-            ]
+    if not args.verify_only:
+        pending = artifacts_to_upload(
+            _fetch_public_release_if_present(args.version), args.version, artifacts
         )
+        if pending:
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "twine",
+                    "upload",
+                    "--non-interactive",
+                    "--skip-existing",
+                    *(str(path) for path in pending),
+                ]
+            )
     wait_for_public_release(args.version, artifacts, args.timeout_seconds)
     qualify_public_install(args.version)
     print(

@@ -1,0 +1,68 @@
+name: Publish PyPI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-proofline-evidence-2.0.0
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - run: python -m pip install 'build>=1.2,<2' 'twine>=7,<8'
+      - run: python -m build --outdir dist
+      - run: python scripts/verify_release_artifacts.py dist/*.whl dist/*.tar.gz
+      - run: python -m twine check dist/*
+      - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0-py3-none-any.whl --expected-version 2.0.0
+      - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0.tar.gz --expected-version 2.0.0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: proofline-evidence-2.0.0-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/proofline-evidence
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: proofline-evidence-2.0.0-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  verify-public-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: proofline-evidence-2.0.0-dist
+          path: dist
+      - run: python -m pip install 'twine>=7,<8'
+      - run: python scripts/publish_pypi.py --version 2.0.0 --dist-dir dist --timeout-seconds 300 --verify-only
