@@ -7,15 +7,15 @@ Observation date: 2026-08-24
 ### Repository facts
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Update submission ID: `appsub_6a8ab28cfc44819197f0057d5f274cc4`
+- Update submission ID: `appsub_6a8b260a08788191a9117758dd99b29f`
 - Repository/plugin manifest version: `2.0.1`
 - Directory URL: `https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Bundle type: skills-only, local, no authentication, no hosted MCP endpoint.
-- Submitted ZIP SHA-256 recorded for the 2.0.0 review: `5d3abb3412b2eff44dc05eed30641cd4884441a54958898ff72441526216287f`.
+- Submitted ZIP SHA-256 for 2.0.1: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
 
 ### External state
 
-Authenticated portal observation on 2026-08-24: 2.0.0 was approved and available to publish; public version 1.0.1 remained published. Repository version 2.0.1 had not yet been submitted. Treat approval/publication as external state, not a repository guarantee.
+Authenticated portal observation on 2026-08-24: submission `appsub_6a8b260a08788191a9117758dd99b29f` passed scanning and review, and version 2.0.1 was published to the Plugins Directory. Treat approval/publication as external state, not a repository guarantee.
 
 ### Reviewer workflow
 
@@ -38,15 +38,15 @@ Proofline reviews evidence-backed engineering decisions, preserves exact cited s
 ### Repository fact
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Update submission ID: `appsub_6a8ab28cfc44819197f0057d5f274cc4`
+- Update submission ID: `appsub_6a8b260a08788191a9117758dd99b29f`
 - Version repository/plugin manifest: `2.0.1`
 - Directory URL: `https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Loại bundle: skills-only, local, không authentication, không hosted MCP endpoint.
-- Submitted ZIP SHA-256 đã ghi cho review 2.0.0: `5d3abb3412b2eff44dc05eed30641cd4884441a54958898ff72441526216287f`.
+- Submitted ZIP SHA-256 của 2.0.1: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
 
 ### External state
 
-Quan sát portal authenticated ngày 2026-08-24: 2.0.0 đã approved và có thể publish; public version 1.0.1 vẫn published. Repository version 2.0.1 chưa được submit. Xem approval/publication là external state, không phải guarantee của repository.
+Quan sát portal authenticated ngày 2026-08-24: submission `appsub_6a8b260a08788191a9117758dd99b29f` đã pass scanning và review; version 2.0.1 đã được publish lên Plugins Directory. Xem approval/publication là external state, không phải guarantee của repository.
 
 ### Reviewer workflow
 
@@ -69,15 +69,15 @@ Proofline review engineering decision có evidence, giữ exact cited span, veri
 ### Repository fact
 
 - OpenAI plugin ID：`plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Update submission ID：`appsub_6a8ab28cfc44819197f0057d5f274cc4`
+- Update submission ID：`appsub_6a8b260a08788191a9117758dd99b29f`
 - Repository/plugin manifest version：`2.0.1`
 - Directory URL：`https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Bundle type：skills-only、local、authentication なし、hosted MCP endpoint なし。
-- 2.0.0 review 用に記録された submitted ZIP SHA-256：`5d3abb3412b2eff44dc05eed30641cd4884441a54958898ff72441526216287f`。
+- 2.0.1 submitted ZIP SHA-256：`67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`。
 
 ### External state
 
-2026-08-24 の authenticated portal observation では、2.0.0 は approved で publish 可能、public version は 1.0.1 のままでした。Repository version 2.0.1 は未 submit でした。Approval/publication は external state であり repository guarantee ではありません。
+2026-08-24 の authenticated portal observation では、submission `appsub_6a8b260a08788191a9117758dd99b29f` は scanning と review に合格し、version 2.0.1 が Plugins Directory に publish されました。Approval/publication は external state であり repository guarantee ではありません。
 
 ### Reviewer workflow
 

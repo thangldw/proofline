@@ -25,7 +25,7 @@ Plugin submission is a separate external workflow. Rebuild and inspect the skill
 
 ### Current release
 
-As verified on 2026-08-24, PyPI reported `proofline-evidence` 2.0.0 and GitHub reported release `v2.0.0` published at 2026-08-23T12:20:45Z. This document does not authorize republishing those immutable artifacts.
+As verified on 2026-08-24, PyPI reported `proofline-evidence` 2.0.1, GitHub reported release `v2.0.1` published at 2026-08-23T16:54:02Z, and the OpenAI Plugins Directory reported Proofline 2.0.1 as published. These immutable artifacts resolve to release commit `05fd080915da56944666189c424dbce2ea81de7d`.
 
 ## Tiếng Việt
 
@@ -52,7 +52,7 @@ Plugin submission là external workflow riêng. Rebuild và inspect skills-only 
 
 ### Release hiện tại
 
-Theo verification ngày 2026-08-24, PyPI báo `proofline-evidence` 2.0.0 và GitHub báo release `v2.0.0` publish lúc 2026-08-23T12:20:45Z. Tài liệu này không cho phép republish các immutable artifact đó.
+Theo verification ngày 2026-08-24, PyPI báo `proofline-evidence` 2.0.1, GitHub báo release `v2.0.1` publish lúc 2026-08-23T16:54:02Z và OpenAI Plugins Directory báo Proofline 2.0.1 đã published. Các immutable artifact này resolve tới release commit `05fd080915da56944666189c424dbce2ea81de7d`.
 
 ## 日本語
 
@@ -79,4 +79,4 @@ Plugin submission は別の external workflow です。Skills-only bundle を再
 
 ### Current release
 
-2026-08-24 の verification では、PyPI は `proofline-evidence` 2.0.0、GitHub は 2026-08-23T12:20:45Z 公開の `v2.0.0` release を報告しました。この document は immutable artifact の再 publish を許可しません。
+2026-08-24 の verification では、PyPI は `proofline-evidence` 2.0.1、GitHub は 2026-08-23T16:54:02Z 公開の `v2.0.1` release、OpenAI Plugins Directory は Proofline 2.0.1 の published status を報告しました。これらの immutable artifact は release commit `05fd080915da56944666189c424dbce2ea81de7d` に対応します。
