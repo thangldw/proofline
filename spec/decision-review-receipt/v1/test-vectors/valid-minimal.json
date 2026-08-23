@@ -1,0 +1,21 @@
+{
+  "anchor_state": "changed",
+  "cited_content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "cited_source_version_id": "00000000-0000-0000-0000-000000000104",
+  "closed_at": null,
+  "current_content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "current_source_version_id": "00000000-0000-0000-0000-000000000105",
+  "decision_id": "00000000-0000-0000-0000-000000000102",
+  "dep_root_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "evidence_id": "00000000-0000-0000-0000-000000000103",
+  "finding_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "opened_at": "2026-08-23T00:00:00+00:00",
+  "policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "receipt_hash": "87c31a70a9f3f8ccfb8690eb687ab1e884d2c0eb71f421f5d2e38c2103dd4ac7",
+  "resolution": null,
+  "review_id": "00000000-0000-0000-0000-000000000101",
+  "schema": "proofline-decision-review-receipt-v1",
+  "state": "open",
+  "updated_at": "2026-08-23T00:00:00+00:00",
+  "workspace_id": "00000000-0000-0000-0000-000000000001"
+}

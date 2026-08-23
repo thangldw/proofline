@@ -19,6 +19,7 @@ REQUIRED_CORE_TABLES = {
     "chunk_search",
     "decisions",
     "evidence",
+    "decision_reviews",
     "audit_events",
     "model_runs",
     "chunk_embeddings",

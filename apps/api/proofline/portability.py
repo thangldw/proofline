@@ -15,6 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import __version__
+from .anchors import build_evidence_anchor
+from .decision_reviews import review_fingerprint
 from .ingestion import chunk_markdown
 from .models import (
     DEFAULT_WORKSPACE_ID,
@@ -22,6 +24,7 @@ from .models import (
     AuditEvent,
     Chunk,
     Decision,
+    DecisionReview,
     Evidence,
     IngestionJob,
     ModelRun,
@@ -35,7 +38,8 @@ from .models import (
     Workspace,
 )
 
-PORTABLE_EXPORT_SCHEMA = "proofline-portable-export-v2"
+PORTABLE_EXPORT_SCHEMA = "proofline-portable-export-v3"
+PORTABLE_EXPORT_V2_SCHEMA = "proofline-portable-export-v2"
 LEGACY_PORTABLE_EXPORT_SCHEMA = "proofline-portable-export-v1"
 TERMINAL_INGESTION_STATES = {"succeeded", "failed", "dead_letter"}
 SOURCE_KINDS = {"markdown", "text", "note", "git_file", "git_commit"}
@@ -66,6 +70,10 @@ STUDIO_KINDS = {
     "data_table",
 }
 INGESTION_STAGES = {"accepted", "indexing", "ready", "parse", "failed"}
+ANCHOR_STATES = {"moved", "ambiguous", "changed", "deleted"}
+BINDING_STATES = {"active", "superseded"}
+DECISION_REVIEW_STATES = {"open", "acknowledged", "resolved", "waived", "superseded"}
+TERMINAL_REVIEW_STATES = {"resolved", "waived", "superseded"}
 MAX_CONTENT_LENGTH = 5_000_000
 MAX_COUNTER = 2**63 - 1
 MAX_EXPORT_BYTES = 256 * 1024 * 1024
@@ -284,7 +292,45 @@ ITEM_KEYS = {
         "end_line",
     },
 }
-LEGACY_ITEM_KEYS = {key: set(ITEM_KEYS[key]) for key in LEGACY_PAYLOAD_KEYS}
+V2_PAYLOAD_KEYS = set(PAYLOAD_KEYS)
+V2_ITEM_KEYS = {key: set(value) for key, value in ITEM_KEYS.items()}
+PAYLOAD_KEYS.add("decision_reviews")
+ITEM_KEYS["evidence"].update(
+    {
+        "anchor_version",
+        "section_path",
+        "prefix_sha256",
+        "suffix_sha256",
+        "binding_root_id",
+        "binding_state",
+        "superseded_at",
+        "superseded_by_id",
+    }
+)
+ITEM_KEYS["decision_reviews"] = {
+    "id",
+    "workspace_id",
+    "decision_id",
+    "evidence_id",
+    "cited_source_version_id",
+    "current_source_version_id",
+    "finding_fingerprint",
+    "anchor_state",
+    "severity",
+    "policy_hash",
+    "candidate_start_offset",
+    "candidate_end_offset",
+    "candidate_start_line",
+    "candidate_end_line",
+    "state",
+    "resolution",
+    "actor",
+    "note",
+    "opened_at",
+    "updated_at",
+    "closed_at",
+}
+LEGACY_ITEM_KEYS = {key: set(V2_ITEM_KEYS[key]) for key in LEGACY_PAYLOAD_KEYS}
 LEGACY_ITEM_KEYS["sources"].remove("workspace_id")
 LEGACY_ITEM_KEYS["audit_events"].remove("workspace_id")
 
@@ -320,18 +366,27 @@ def payload_sha256(payload: dict[str, Any]) -> str:
 
 
 def normalize_portable_export(document: Any) -> Any:
-    """Upgrade a verified v1 shape in memory without mutating the caller's document."""
+    """Upgrade verified v1/v2 shapes in memory without mutating caller data."""
     if not isinstance(document, dict):
         return document
     manifest = document.get("manifest")
     payload = document.get("payload")
-    if not isinstance(manifest, dict) or manifest.get("schema") != LEGACY_PORTABLE_EXPORT_SCHEMA:
+    if not isinstance(manifest, dict):
         return document
+    schema = manifest.get("schema")
+    if schema == PORTABLE_EXPORT_SCHEMA:
+        return document
+    if schema not in {LEGACY_PORTABLE_EXPORT_SCHEMA, PORTABLE_EXPORT_V2_SCHEMA}:
+        return document
+    expected_keys = (
+        LEGACY_PAYLOAD_KEYS if schema == LEGACY_PORTABLE_EXPORT_SCHEMA else V2_PAYLOAD_KEYS
+    )
+    expected_items = LEGACY_ITEM_KEYS if schema == LEGACY_PORTABLE_EXPORT_SCHEMA else V2_ITEM_KEYS
     if (
         set(document) != {"manifest", "payload"}
         or set(manifest) != MANIFEST_KEYS
         or not isinstance(payload, dict)
-        or set(payload) != LEGACY_PAYLOAD_KEYS
+        or set(payload) != expected_keys
     ):
         raise PortabilityError("unexpected_fields")
     expected_hash = manifest.get("payload_sha256")
@@ -339,51 +394,75 @@ def normalize_portable_export(document: Any) -> Any:
         raise PortabilityError("payload_hash_mismatch")
     if any(
         not isinstance(items, list)
-        or any(not isinstance(item, dict) or set(item) != LEGACY_ITEM_KEYS[key] for item in items)
+        or any(not isinstance(item, dict) or set(item) != expected_items[key] for item in items)
         for key, items in payload.items()
     ):
         raise PortabilityError("unexpected_fields")
+    original_counts = manifest.get("counts")
+    if not isinstance(original_counts, dict) or original_counts != {
+        key: len(payload[key]) for key in sorted(expected_keys)
+    }:
+        raise PortabilityError("count_mismatch")
 
     upgraded = copy.deepcopy(document)
     upgraded_payload = upgraded["payload"]
-    upgraded_payload["workspaces"] = [
-        {
-            "id": DEFAULT_WORKSPACE_ID,
-            "slug": "local",
-            "title": "Local workspace",
-            "created_at": manifest["created_at"],
-        }
-    ]
-    for source in upgraded_payload["sources"]:
-        source["workspace_id"] = DEFAULT_WORKSPACE_ID
-    for event in upgraded_payload["audit_events"]:
-        event["workspace_id"] = DEFAULT_WORKSPACE_ID
-
-    chunks: list[dict[str, Any]] = []
-    for version in upgraded_payload["source_versions"]:
-        for ordinal, span in enumerate(chunk_markdown(version["content"])):
-            chunk_id = str(
-                uuid.uuid5(
-                    uuid.NAMESPACE_URL,
-                    f"proofline:portable-v1-chunk:{version['id']}:{ordinal}",
+    if schema == LEGACY_PORTABLE_EXPORT_SCHEMA:
+        upgraded_payload["workspaces"] = [
+            {
+                "id": DEFAULT_WORKSPACE_ID,
+                "slug": "local",
+                "title": "Local workspace",
+                "created_at": manifest["created_at"],
+            }
+        ]
+        for source in upgraded_payload["sources"]:
+            source["workspace_id"] = DEFAULT_WORKSPACE_ID
+        for event in upgraded_payload["audit_events"]:
+            event["workspace_id"] = DEFAULT_WORKSPACE_ID
+        chunks: list[dict[str, Any]] = []
+        for version in upgraded_payload["source_versions"]:
+            for ordinal, span in enumerate(chunk_markdown(version["content"])):
+                chunks.append(
+                    {
+                        "id": str(
+                            uuid.uuid5(
+                                uuid.NAMESPACE_URL,
+                                f"proofline:portable-v1-chunk:{version['id']}:{ordinal}",
+                            )
+                        ),
+                        "source_id": version["source_id"],
+                        "source_version_id": version["id"],
+                        "ordinal": ordinal,
+                        "content": span.text,
+                        "start_offset": span.start_offset,
+                        "end_offset": span.end_offset,
+                        "start_line": span.start_line,
+                        "end_line": span.end_line,
+                    }
                 )
-            )
-            chunks.append(
-                {
-                    "id": chunk_id,
-                    "source_id": version["source_id"],
-                    "source_version_id": version["id"],
-                    "ordinal": ordinal,
-                    "content": span.text,
-                    "start_offset": span.start_offset,
-                    "end_offset": span.end_offset,
-                    "start_line": span.start_line,
-                    "end_line": span.end_line,
-                }
-            )
-    upgraded_payload["chunks"] = sorted(chunks, key=lambda item: item["id"])
-    for key in PAYLOAD_KEYS - LEGACY_PAYLOAD_KEYS - {"workspaces", "chunks"}:
-        upgraded_payload[key] = []
+        upgraded_payload["chunks"] = sorted(chunks, key=lambda item: item["id"])
+        for key in V2_PAYLOAD_KEYS - LEGACY_PAYLOAD_KEYS - {"workspaces", "chunks"}:
+            upgraded_payload[key] = []
+
+    versions = {item["id"]: item for item in upgraded_payload["source_versions"]}
+    for item in upgraded_payload["evidence"]:
+        version = versions.get(item["source_version_id"])
+        if version is None:
+            raise PortabilityError("invalid_evidence_reference")
+        anchor = build_evidence_anchor(version["content"], item["start_offset"], item["end_offset"])
+        item.update(
+            {
+                "anchor_version": anchor.version,
+                "section_path": list(anchor.section_path),
+                "prefix_sha256": anchor.prefix_sha256,
+                "suffix_sha256": anchor.suffix_sha256,
+                "binding_root_id": item["id"],
+                "binding_state": "active",
+                "superseded_at": None,
+                "superseded_by_id": None,
+            }
+        )
+    upgraded_payload["decision_reviews"] = []
     upgraded["manifest"]["schema"] = PORTABLE_EXPORT_SCHEMA
     upgraded["manifest"]["payload_sha256"] = payload_sha256(upgraded_payload)
     upgraded["manifest"]["counts"] = {
@@ -411,16 +490,21 @@ def build_portable_export(
     chunks = list(session.scalars(select(Chunk).order_by(Chunk.id)).all())
     memories = list(session.scalars(select(Decision).order_by(Decision.id)).all())
     evidence = list(session.scalars(select(Evidence).order_by(Evidence.id)).all())
+    decision_reviews = list(
+        session.scalars(select(DecisionReview).order_by(DecisionReview.id)).all()
+    )
     model_runs = list(session.scalars(select(ModelRun).order_by(ModelRun.id)).all())
     known_source_ids = {source.id for source in sources}
     known_memory_ids = {memory.id for memory in memories}
     known_proposal_ids = set(session.scalars(select(ActionProposal.id)).all())
+    known_review_ids = {review.id for review in decision_reviews}
     audit_events = [
         event
         for event in session.scalars(select(AuditEvent).order_by(AuditEvent.id)).all()
         if (event.object_type == "source" and event.object_id in known_source_ids)
         or (event.object_type in {"memory", "decision"} and event.object_id in known_memory_ids)
         or (event.object_type == "action_proposal" and event.object_id in known_proposal_ids)
+        or (event.object_type == "decision_review" and event.object_id in known_review_ids)
     ]
     ingestion_jobs = list(
         session.scalars(
@@ -528,8 +612,42 @@ def build_portable_export(
                 "end_offset": item.end_offset,
                 "start_line": item.start_line,
                 "end_line": item.end_line,
+                "anchor_version": item.anchor_version,
+                "section_path": item.section_path,
+                "prefix_sha256": item.prefix_sha256,
+                "suffix_sha256": item.suffix_sha256,
+                "binding_root_id": item.binding_root_id,
+                "binding_state": item.binding_state,
+                "superseded_at": _iso(item.superseded_at),
+                "superseded_by_id": item.superseded_by_id,
             }
             for item in evidence
+        ],
+        "decision_reviews": [
+            {
+                "id": item.id,
+                "workspace_id": item.workspace_id,
+                "decision_id": item.decision_id,
+                "evidence_id": item.evidence_id,
+                "cited_source_version_id": item.cited_source_version_id,
+                "current_source_version_id": item.current_source_version_id,
+                "finding_fingerprint": item.finding_fingerprint,
+                "anchor_state": item.anchor_state,
+                "severity": item.severity,
+                "policy_hash": item.policy_hash,
+                "candidate_start_offset": item.candidate_start_offset,
+                "candidate_end_offset": item.candidate_end_offset,
+                "candidate_start_line": item.candidate_start_line,
+                "candidate_end_line": item.candidate_end_line,
+                "state": item.state,
+                "resolution": item.resolution,
+                "actor": item.actor,
+                "note": item.note,
+                "opened_at": _iso(item.opened_at),
+                "updated_at": _iso(item.updated_at),
+                "closed_at": _iso(item.closed_at),
+            }
+            for item in decision_reviews
         ],
         "model_runs": [
             {
@@ -941,6 +1059,63 @@ def _validate_scalar_fields(
             _require_integer(item[field], "invalid_evidence_span", maximum=MAX_CONTENT_LENGTH)
         for field in ("start_line", "end_line"):
             _require_integer(item[field], "invalid_evidence_line", minimum=1)
+        _require_string(item["anchor_version"], "invalid_evidence_anchor", max_length=40)
+        if not isinstance(item["section_path"], list) or not all(
+            isinstance(value, str) and len(value) <= 300 for value in item["section_path"]
+        ):
+            raise PortabilityError("invalid_evidence_anchor")
+        _require_hash(item["prefix_sha256"], "invalid_evidence_anchor")
+        _require_hash(item["suffix_sha256"], "invalid_evidence_anchor")
+        _require_id(item["binding_root_id"], "invalid_evidence_binding")
+        _require_enum(item["binding_state"], BINDING_STATES, "invalid_evidence_binding")
+        _require_datetime(item["superseded_at"], "invalid_evidence_binding", nullable=True)
+        _require_id(item["superseded_by_id"], "invalid_evidence_binding", nullable=True)
+
+    for review in arrays["decision_reviews"]:
+        for field in (
+            "workspace_id",
+            "decision_id",
+            "evidence_id",
+            "cited_source_version_id",
+            "current_source_version_id",
+        ):
+            _require_id(review[field], "invalid_decision_review_reference")
+        _require_hash(review["finding_fingerprint"], "invalid_decision_review_fingerprint")
+        _require_enum(review["anchor_state"], ANCHOR_STATES, "invalid_decision_review_state")
+        _require_enum(review["severity"], {"warning", "error"}, "invalid_decision_review_state")
+        _require_hash(review["policy_hash"], "invalid_decision_review_policy")
+        for field in ("candidate_start_offset", "candidate_end_offset"):
+            _require_integer(
+                review[field],
+                "invalid_decision_review_candidate",
+                maximum=MAX_CONTENT_LENGTH,
+                nullable=True,
+            )
+        for field in ("candidate_start_line", "candidate_end_line"):
+            _require_integer(
+                review[field],
+                "invalid_decision_review_candidate",
+                minimum=1,
+                nullable=True,
+            )
+        _require_enum(review["state"], DECISION_REVIEW_STATES, "invalid_decision_review_state")
+        _require_string(
+            review["resolution"],
+            "invalid_decision_review_resolution",
+            max_length=40,
+            nullable=True,
+        )
+        _require_string(review["actor"], "invalid_decision_review_actor", max_length=100)
+        _require_string(
+            review["note"],
+            "invalid_decision_review_note",
+            max_length=2_000,
+            nullable=True,
+            allow_empty=True,
+        )
+        _require_datetime(review["opened_at"], "invalid_decision_review_datetime")
+        _require_datetime(review["updated_at"], "invalid_decision_review_datetime")
+        _require_datetime(review["closed_at"], "invalid_decision_review_datetime", nullable=True)
 
     for run in arrays["model_runs"]:
         _require_string(run["provider_id"], "invalid_model_metadata", max_length=100)
@@ -975,7 +1150,7 @@ def _validate_scalar_fields(
         _require_string(event["action"], "invalid_audit_field", max_length=80)
         _require_enum(
             event["object_type"],
-            {"source", "memory", "decision", "action_proposal"},
+            {"source", "memory", "decision", "action_proposal", "decision_review"},
             "invalid_audit_reference",
         )
         _require_id(event["object_id"], "invalid_audit_reference")
@@ -1120,6 +1295,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
     chunks = _by_id(arrays["chunks"], "invalid_chunk_id")
     memories = _by_id(arrays["memories"], "invalid_memory_id")
     evidence = _by_id(arrays["evidence"], "invalid_evidence_id")
+    decision_reviews = _by_id(arrays["decision_reviews"], "invalid_decision_review_id")
     model_runs = _by_id(arrays["model_runs"], "invalid_model_run_id")
     _by_id(arrays["audit_events"], "invalid_audit_id")
     _by_id(arrays["ingestion_jobs"], "invalid_job_id")
@@ -1238,10 +1414,12 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         version = versions.get(item.get("source_version_id"))
         if not memory or not version or item.get("source_id") not in sources:
             raise PortabilityError("invalid_evidence_reference")
-        if (
-            memory.get("source_id") != item.get("source_id")
-            or memory.get("source_version_id") != item.get("source_version_id")
-            or version.get("source_id") != item.get("source_id")
+        if memory.get("source_id") != item.get("source_id") or version.get("source_id") != item.get(
+            "source_id"
+        ):
+            raise PortabilityError("invalid_evidence_reference")
+        if item["binding_state"] == "active" and memory.get("source_version_id") != item.get(
+            "source_version_id"
         ):
             raise PortabilityError("invalid_evidence_reference")
         start = item.get("start_offset")
@@ -1271,15 +1449,129 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             or item.get("end_line") != expected_end_line
         ):
             raise PortabilityError("evidence_line_mismatch")
+        anchor = build_evidence_anchor(content, start, end)
+        if (
+            item["anchor_version"] != anchor.version
+            or item["section_path"] != list(anchor.section_path)
+            or item["prefix_sha256"] != anchor.prefix_sha256
+            or item["suffix_sha256"] != anchor.suffix_sha256
+        ):
+            raise PortabilityError("evidence_anchor_mismatch")
+
+    active_bindings: dict[tuple[str, str], int] = {}
+    for item in evidence.values():
+        root = evidence.get(item["binding_root_id"])
+        if root is None or root["memory_id"] != item["memory_id"]:
+            raise PortabilityError("invalid_evidence_binding")
+        key = (item["memory_id"], item["binding_root_id"])
+        if item["binding_state"] == "active":
+            if item["superseded_at"] is not None or item["superseded_by_id"] is not None:
+                raise PortabilityError("invalid_evidence_binding")
+            active_bindings[key] = active_bindings.get(key, 0) + 1
+        else:
+            replacement = evidence.get(item["superseded_by_id"])
+            if (
+                item["superseded_at"] is None
+                or replacement is None
+                or replacement["memory_id"] != item["memory_id"]
+                or replacement["binding_root_id"] != item["binding_root_id"]
+                or replacement["id"] == item["id"]
+            ):
+                raise PortabilityError("invalid_evidence_binding")
+    roots = {(item["memory_id"], item["binding_root_id"]) for item in evidence.values()}
+    if any(active_bindings.get(key) != 1 for key in roots):
+        raise PortabilityError("invalid_evidence_binding")
+    for evidence_id in evidence:
+        visited: set[str] = set()
+        cursor: str | None = evidence_id
+        while cursor is not None:
+            if cursor in visited:
+                raise PortabilityError("invalid_evidence_binding")
+            visited.add(cursor)
+            cursor = evidence[cursor]["superseded_by_id"]
 
     evidence_counts = {memory_id: 0 for memory_id in memories}
     for item in evidence.values():
-        evidence_counts[item["memory_id"]] += 1
+        if item["binding_state"] == "active":
+            evidence_counts[item["memory_id"]] += 1
     for memory in memories.values():
         if evidence_counts[memory["id"]] < 1:
             raise PortabilityError("memory_without_evidence")
         if memory.get("extraction_method") == "model" and memory.get("model_run_id") is None:
             raise PortabilityError("invalid_memory_model_reference")
+
+    fingerprints: set[str] = set()
+    for review in decision_reviews.values():
+        decision = memories.get(review["decision_id"])
+        cited_evidence = evidence.get(review["evidence_id"])
+        cited_version = versions.get(review["cited_source_version_id"])
+        current_version = versions.get(review["current_source_version_id"])
+        if (
+            review["workspace_id"] not in workspaces
+            or decision is None
+            or cited_evidence is None
+            or cited_version is None
+            or current_version is None
+            or sources[decision["source_id"]]["workspace_id"] != review["workspace_id"]
+            or cited_evidence["memory_id"] != decision["id"]
+            or cited_evidence["source_version_id"] != cited_version["id"]
+            or cited_version["source_id"] != decision["source_id"]
+            or current_version["source_id"] != decision["source_id"]
+        ):
+            raise PortabilityError("invalid_decision_review_reference")
+        expected_fingerprint = review_fingerprint(
+            decision_id=review["decision_id"],
+            evidence_id=review["evidence_id"],
+            cited_source_version_id=review["cited_source_version_id"],
+            current_source_version_id=review["current_source_version_id"],
+            anchor_state=review["anchor_state"],
+        )
+        if (
+            review["finding_fingerprint"] != expected_fingerprint
+            or expected_fingerprint in fingerprints
+        ):
+            raise PortabilityError("invalid_decision_review_fingerprint")
+        fingerprints.add(expected_fingerprint)
+        opened = datetime.fromisoformat(review["opened_at"])
+        updated = datetime.fromisoformat(review["updated_at"])
+        closed = (
+            datetime.fromisoformat(review["closed_at"]) if review["closed_at"] is not None else None
+        )
+        terminal = review["state"] in TERMINAL_REVIEW_STATES
+        if (
+            opened > updated
+            or (
+                terminal
+                and (
+                    closed is None
+                    or not review["resolution"]
+                    or opened > closed
+                    or closed > updated
+                )
+            )
+            or (not terminal and (closed is not None or review["resolution"] is not None))
+        ):
+            raise PortabilityError("invalid_decision_review_state")
+        candidate = (
+            review["candidate_start_offset"],
+            review["candidate_end_offset"],
+            review["candidate_start_line"],
+            review["candidate_end_line"],
+        )
+        if any(value is None for value in candidate):
+            if any(value is not None for value in candidate):
+                raise PortabilityError("invalid_decision_review_candidate")
+        else:
+            start, end, start_line, end_line = candidate
+            content = current_version["content"]
+            if (
+                start < 0
+                or end <= start
+                or end > len(content)
+                or start_line != content.count("\n", 0, start) + 1
+                or end_line != content.count("\n", 0, end - 1) + 1
+            ):
+                raise PortabilityError("invalid_decision_review_candidate")
 
     for event in arrays["audit_events"]:
         if not isinstance(event.get("before"), dict) or not isinstance(event.get("after"), dict):
@@ -1294,6 +1586,8 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             valid = object_id in memories
         elif object_type == "action_proposal":
             valid = object_id in proposals
+        elif object_type == "decision_review":
+            valid = object_id in decision_reviews
         else:
             valid = False
         if not valid:

@@ -4,10 +4,13 @@ import hashlib
 import json
 import math
 from collections import defaultdict
+from datetime import datetime
 
 from sqlalchemy import Connection, Engine, text
 
+from .anchors import build_evidence_anchor
 from .backup import REQUIRED_CORE_TABLES
+from .decision_reviews import review_fingerprint
 from .migrations import MIGRATIONS
 
 
@@ -63,7 +66,10 @@ def _verify_sources_and_versions(connection: Connection) -> tuple[dict, dict]:
     sources = {
         row["id"]: row
         for row in connection.execute(
-            text("SELECT id, content, content_hash, current_version_id FROM sources ORDER BY id")
+            text(
+                "SELECT id, workspace_id, content, content_hash, current_version_id "
+                "FROM sources ORDER BY id"
+            )
         ).mappings()
     }
     versions = {
@@ -143,7 +149,9 @@ def _verify_chunks(connection: Connection, versions: dict) -> dict:
     return chunks
 
 
-def _verify_memories_and_evidence(connection: Connection, sources: dict, versions: dict) -> None:
+def _verify_memories_and_evidence(
+    connection: Connection, sources: dict, versions: dict
+) -> tuple[dict, dict]:
     model_runs = {
         row["id"]: row["parent_run_id"]
         for row in connection.execute(
@@ -179,20 +187,28 @@ def _verify_memories_and_evidence(connection: Connection, sources: dict, version
             _fail("memory_model_run_missing")
 
     evidence_counts: dict[str, int] = defaultdict(int)
-    evidence_rows = connection.execute(
-        text(
-            "SELECT id, decision_id, source_id, source_version_id, quote, quote_hash, "
-            "start_offset, end_offset, start_line, end_line FROM evidence ORDER BY id"
-        )
-    ).mappings()
-    for evidence in evidence_rows:
+    evidence_rows = {
+        row["id"]: row
+        for row in connection.execute(
+            text(
+                "SELECT id, decision_id, source_id, source_version_id, quote, quote_hash, "
+                "start_offset, end_offset, start_line, end_line, anchor_version, "
+                "section_path, prefix_sha256, suffix_sha256, binding_root_id, "
+                "binding_state, superseded_at, superseded_by_id FROM evidence ORDER BY id"
+            )
+        ).mappings()
+    }
+    active_bindings: dict[tuple[str, str], int] = defaultdict(int)
+    for evidence in evidence_rows.values():
         version = versions.get(evidence["source_version_id"])
         if evidence["decision_id"] not in memories:
             _fail("evidence_memory_missing")
         memory = memories[evidence["decision_id"]]
+        if evidence["source_id"] != memory["source_id"]:
+            _fail("evidence_memory_ownership_invalid")
         if (
-            evidence["source_id"] != memory["source_id"]
-            or evidence["source_version_id"] != memory["source_version_id"]
+            evidence["binding_state"] == "active"
+            and evidence["source_version_id"] != memory["source_version_id"]
         ):
             _fail("evidence_memory_ownership_invalid")
         if (
@@ -208,9 +224,203 @@ def _verify_memories_and_evidence(connection: Connection, sources: dict, version
             _fail("evidence_quote_mismatch")
         if evidence["quote_hash"] != _hash(quote):
             _fail("evidence_quote_hash_mismatch")
-        evidence_counts[evidence["decision_id"]] += 1
+        try:
+            section_path = json.loads(evidence["section_path"])
+        except (TypeError, json.JSONDecodeError):
+            _fail("evidence_anchor_invalid")
+        anchor = build_evidence_anchor(
+            version["content"], evidence["start_offset"], evidence["end_offset"]
+        )
+        if (
+            evidence["anchor_version"] != anchor.version
+            or section_path != list(anchor.section_path)
+            or evidence["prefix_sha256"] != anchor.prefix_sha256
+            or evidence["suffix_sha256"] != anchor.suffix_sha256
+        ):
+            _fail("evidence_anchor_mismatch")
+        root = evidence_rows.get(evidence["binding_root_id"])
+        if root is None or root["decision_id"] != evidence["decision_id"]:
+            _fail("evidence_binding_invalid")
+        binding_key = (evidence["decision_id"], evidence["binding_root_id"])
+        if evidence["binding_state"] == "active":
+            if evidence["superseded_at"] is not None or evidence["superseded_by_id"] is not None:
+                _fail("evidence_binding_invalid")
+            active_bindings[binding_key] += 1
+            evidence_counts[evidence["decision_id"]] += 1
+        elif evidence["binding_state"] == "superseded":
+            replacement = evidence_rows.get(evidence["superseded_by_id"])
+            if (
+                evidence["superseded_at"] is None
+                or replacement is None
+                or replacement["decision_id"] != evidence["decision_id"]
+                or replacement["binding_root_id"] != evidence["binding_root_id"]
+                or replacement["id"] == evidence["id"]
+            ):
+                _fail("evidence_binding_invalid")
+        else:
+            _fail("evidence_binding_invalid")
+    roots = {
+        (evidence["decision_id"], evidence["binding_root_id"])
+        for evidence in evidence_rows.values()
+    }
+    if any(active_bindings[key] != 1 for key in roots):
+        _fail("evidence_binding_invalid")
+    for evidence_id in evidence_rows:
+        visited: set[str] = set()
+        cursor: str | None = evidence_id
+        while cursor is not None:
+            if cursor in visited:
+                _fail("evidence_binding_cycle")
+            visited.add(cursor)
+            cursor = evidence_rows[cursor]["superseded_by_id"]
     if any(evidence_counts[memory_id] == 0 for memory_id in memories):
         _fail("memory_evidence_missing")
+    return memories, evidence_rows
+
+
+def _parse_database_datetime(value: str | None, *, nullable: bool = False) -> datetime | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, str):
+        _fail("decision_review_datetime_invalid")
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        _fail("decision_review_datetime_invalid")
+
+
+def _verify_decision_reviews(
+    connection: Connection,
+    sources: dict,
+    versions: dict,
+    memories: dict,
+    evidence_rows: dict,
+) -> dict:
+    reviews = {
+        row["id"]: row
+        for row in connection.execute(
+            text(
+                "SELECT id, workspace_id, decision_id, evidence_id, "
+                "cited_source_version_id, current_source_version_id, finding_fingerprint, "
+                "anchor_state, severity, policy_hash, candidate_start_offset, "
+                "candidate_end_offset, candidate_start_line, candidate_end_line, state, "
+                "resolution, actor, note, opened_at, updated_at, closed_at "
+                "FROM decision_reviews ORDER BY id"
+            )
+        ).mappings()
+    }
+    fingerprints: set[str] = set()
+    terminal_states = {"resolved", "waived", "superseded"}
+    allowed_states = {"open", "acknowledged", *terminal_states}
+    for review in reviews.values():
+        memory = memories.get(review["decision_id"])
+        evidence = evidence_rows.get(review["evidence_id"])
+        cited = versions.get(review["cited_source_version_id"])
+        current = versions.get(review["current_source_version_id"])
+        if (
+            memory is None
+            or evidence is None
+            or cited is None
+            or current is None
+            or sources[memory["source_id"]]["workspace_id"] != review["workspace_id"]
+            or evidence["decision_id"] != memory["id"]
+            or evidence["source_version_id"] != cited["id"]
+            or cited["source_id"] != memory["source_id"]
+            or current["source_id"] != memory["source_id"]
+        ):
+            _fail("decision_review_ownership_invalid")
+        if (
+            review["anchor_state"] not in {"moved", "ambiguous", "changed", "deleted"}
+            or review["state"] not in allowed_states
+            or review["severity"] not in {"warning", "error"}
+        ):
+            _fail("decision_review_state_invalid")
+        expected = review_fingerprint(
+            decision_id=review["decision_id"],
+            evidence_id=review["evidence_id"],
+            cited_source_version_id=review["cited_source_version_id"],
+            current_source_version_id=review["current_source_version_id"],
+            anchor_state=review["anchor_state"],
+        )
+        if review["finding_fingerprint"] != expected or expected in fingerprints:
+            _fail("decision_review_fingerprint_invalid")
+        fingerprints.add(expected)
+        if (
+            not isinstance(review["policy_hash"], str)
+            or len(review["policy_hash"]) != 64
+            or any(value not in "0123456789abcdef" for value in review["policy_hash"])
+        ):
+            _fail("decision_review_policy_invalid")
+        opened = _parse_database_datetime(review["opened_at"])
+        updated = _parse_database_datetime(review["updated_at"])
+        closed = _parse_database_datetime(review["closed_at"], nullable=True)
+        terminal = review["state"] in terminal_states
+        if (
+            opened > updated
+            or (
+                terminal
+                and (
+                    closed is None
+                    or not review["resolution"]
+                    or opened > closed
+                    or closed > updated
+                )
+            )
+            or (not terminal and (closed is not None or review["resolution"] is not None))
+        ):
+            _fail("decision_review_state_invalid")
+        candidate = (
+            review["candidate_start_offset"],
+            review["candidate_end_offset"],
+            review["candidate_start_line"],
+            review["candidate_end_line"],
+        )
+        if any(value is None for value in candidate):
+            if any(value is not None for value in candidate):
+                _fail("decision_review_candidate_invalid")
+        else:
+            start, end, start_line, end_line = candidate
+            content = current["content"]
+            if (
+                not isinstance(start, int)
+                or not isinstance(end, int)
+                or start < 0
+                or end <= start
+                or end > len(content)
+                or start_line != _line_number(content, start)
+                or end_line != _line_number(content, end - 1)
+            ):
+                _fail("decision_review_candidate_invalid")
+    return reviews
+
+
+def _verify_audit_references(
+    connection: Connection, sources: dict, memories: dict, reviews: dict
+) -> None:
+    proposals = {
+        row["id"]: row["workspace_id"]
+        for row in connection.execute(
+            text("SELECT id, workspace_id FROM action_proposals ORDER BY id")
+        ).mappings()
+    }
+    for event in connection.execute(
+        text("SELECT workspace_id, object_type, object_id FROM audit_events ORDER BY id")
+    ).mappings():
+        if event["object_type"] == "source":
+            target = sources.get(event["object_id"])
+            workspace_id = target["workspace_id"] if target else None
+        elif event["object_type"] in {"memory", "decision"}:
+            memory = memories.get(event["object_id"])
+            workspace_id = sources[memory["source_id"]]["workspace_id"] if memory else None
+        elif event["object_type"] == "decision_review":
+            review = reviews.get(event["object_id"])
+            workspace_id = review["workspace_id"] if review else None
+        elif event["object_type"] == "action_proposal":
+            workspace_id = proposals.get(event["object_id"])
+        else:
+            _fail("audit_reference_invalid")
+        if workspace_id != event["workspace_id"]:
+            _fail("audit_reference_invalid")
 
 
 def _verify_embeddings(connection: Connection, chunks: dict) -> tuple[int, int]:
@@ -293,7 +503,11 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
             _verify_sqlite_structure(connection)
             sources, versions = _verify_sources_and_versions(connection)
             chunks = _verify_chunks(connection, versions)
-            _verify_memories_and_evidence(connection, sources, versions)
+            memories, evidence_rows = _verify_memories_and_evidence(connection, sources, versions)
+            decision_reviews = _verify_decision_reviews(
+                connection, sources, versions, memories, evidence_rows
+            )
+            _verify_audit_references(connection, sources, memories, decision_reviews)
             embedding_count, vector_index_count = _verify_embeddings(connection, chunks)
             _verify_fts(connection, chunks)
             counts = {
@@ -302,6 +516,7 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
                 "chunks": len(chunks),
                 "memories": connection.execute(text("SELECT count(*) FROM decisions")).scalar_one(),
                 "evidence": connection.execute(text("SELECT count(*) FROM evidence")).scalar_one(),
+                "decision_reviews": len(decision_reviews),
                 "embeddings": embedding_count,
                 "vector_index_rows": vector_index_count,
             }

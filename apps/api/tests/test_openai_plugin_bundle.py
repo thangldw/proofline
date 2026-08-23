@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "skills/manage-evidence-decisions/scripts/proofline_package.py"
 VECTORS = ROOT / "spec/decision-evidence-package/v1/test-vectors"
+REVIEW_VECTORS = ROOT / "spec/decision-review-receipt/v1/test-vectors"
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -64,3 +65,23 @@ def test_explanation_does_not_return_source_or_quote_content() -> None:
     result = json.loads(completed.stdout)
     assert "content" not in result["source"]
     assert all("quote" not in citation for citation in result["citations"])
+
+
+def test_bundled_verifier_checks_review_receipt_vector() -> None:
+    completed = run("verify-review", str(REVIEW_VECTORS / "valid-minimal.json"))
+    assert completed.returncode == 0
+    assert json.loads(completed.stdout) == json.loads(
+        (REVIEW_VECTORS / "expected.json").read_text()
+    )
+
+
+def test_bundled_review_verifier_preserves_mutation_codes(tmp_path: Path) -> None:
+    original = json.loads((REVIEW_VECTORS / "valid-minimal.json").read_text())
+    for mutation in json.loads((REVIEW_VECTORS / "mutations.json").read_text()):
+        candidate = copy.deepcopy(original)
+        replace_pointer(candidate, mutation["pointer"], mutation["value"])
+        path = tmp_path / f"review-{mutation['name']}.json"
+        path.write_text(json.dumps(candidate), encoding="utf-8")
+        completed = run("verify-review", str(path))
+        assert completed.returncode == 2
+        assert json.loads(completed.stderr)["error"] == mutation["expected_error"]

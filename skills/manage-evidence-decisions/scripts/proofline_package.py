@@ -10,15 +10,39 @@ import json
 import math
 import stat
 import sys
+import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 SCHEMA = "proofline-decision-evidence-package-v1"
+REVIEW_RECEIPT_SCHEMA = "proofline-decision-review-receipt-v1"
 MAX_PACKAGE_BYTES = 32 * 1024 * 1024
 MAX_ARCHIVE_BYTES = MAX_PACKAGE_BYTES + 64 * 1024
+MAX_REVIEW_RECEIPT_BYTES = 1024 * 1024
 HASH_CHARS = frozenset("0123456789abcdef")
+REVIEW_RECEIPT_KEYS = {
+    "schema",
+    "review_id",
+    "workspace_id",
+    "decision_id",
+    "evidence_id",
+    "finding_fingerprint",
+    "cited_source_version_id",
+    "cited_content_sha256",
+    "current_source_version_id",
+    "current_content_sha256",
+    "anchor_state",
+    "policy_sha256",
+    "state",
+    "resolution",
+    "opened_at",
+    "updated_at",
+    "closed_at",
+    "dep_root_hash",
+    "receipt_hash",
+}
 
 
 class PackageError(RuntimeError):
@@ -77,6 +101,85 @@ def require_datetime(value: Any, code: str, *, nullable: bool = False) -> None:
         fail(code)
     if parsed.tzinfo is None:
         fail(code)
+
+
+def verify_review(document: Any) -> dict[str, Any]:
+    receipt = require_object(document, REVIEW_RECEIPT_KEYS, "receipt_shape_invalid")
+    if receipt["schema"] != REVIEW_RECEIPT_SCHEMA:
+        fail("schema_unsupported")
+    for key, code in (
+        ("review_id", "review_id_invalid"),
+        ("workspace_id", "workspace_id_invalid"),
+        ("decision_id", "decision_id_invalid"),
+        ("evidence_id", "evidence_id_invalid"),
+        ("cited_source_version_id", "source_version_id_invalid"),
+        ("current_source_version_id", "source_version_id_invalid"),
+    ):
+        require_text(receipt[key], code)
+        try:
+            parsed = uuid.UUID(receipt[key])
+        except ValueError:
+            fail(code)
+        if str(parsed) != receipt[key]:
+            fail(code)
+    for key, code in (
+        ("finding_fingerprint", "fingerprint_invalid"),
+        ("cited_content_sha256", "content_hash_invalid"),
+        ("current_content_sha256", "content_hash_invalid"),
+        ("policy_sha256", "policy_hash_invalid"),
+        ("dep_root_hash", "dep_root_hash_invalid"),
+        ("receipt_hash", "receipt_hash_invalid"),
+    ):
+        require_hash(receipt[key], code)
+    if receipt["anchor_state"] not in {"moved", "ambiguous", "changed", "deleted"}:
+        fail("anchor_state_invalid")
+    state = receipt["state"]
+    if state not in {"open", "acknowledged", "resolved", "waived", "superseded"}:
+        fail("review_state_invalid")
+    terminal = state in {"resolved", "waived", "superseded"}
+    resolution = receipt["resolution"]
+    if terminal:
+        if not isinstance(resolution, str) or not resolution.strip():
+            fail("resolution_invalid")
+    elif resolution is not None:
+        fail("resolution_invalid")
+    for key in ("opened_at", "updated_at"):
+        require_datetime(receipt[key], "timestamp_invalid")
+    require_datetime(receipt["closed_at"], "timestamp_invalid", nullable=True)
+    opened = datetime.fromisoformat(receipt["opened_at"])
+    updated = datetime.fromisoformat(receipt["updated_at"])
+    closed = (
+        datetime.fromisoformat(receipt["closed_at"]) if receipt["closed_at"] is not None else None
+    )
+    if opened > updated or (terminal and (closed is None or opened > closed or closed > updated)):
+        fail("timestamp_invalid")
+    if not terminal and closed is not None:
+        fail("timestamp_invalid")
+    body = {key: value for key, value in receipt.items() if key != "receipt_hash"}
+    expected = hashlib.sha256(b"proofline/review-receipt/v1\0" + canonical_bytes(body)).hexdigest()
+    if receipt["receipt_hash"] != expected:
+        fail("receipt_hash_mismatch")
+    return {
+        "valid": True,
+        "schema": REVIEW_RECEIPT_SCHEMA,
+        "review_id": receipt["review_id"],
+        "receipt_hash": receipt["receipt_hash"],
+        "dep_root_hash": receipt["dep_root_hash"],
+    }
+
+
+def load_review(path: Path) -> dict[str, Any]:
+    try:
+        data = path.read_bytes()
+        if len(data) > MAX_REVIEW_RECEIPT_BYTES:
+            fail("receipt_too_large")
+        document = json.loads(data, object_pairs_hook=unique_object)
+    except PackageError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        fail("receipt_unreadable")
+    verify_review(document)
+    return document
 
 
 def line_number(content: str, offset: int) -> int:
@@ -487,7 +590,7 @@ def difference(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("verify", "explain"):
+    for name in ("verify", "explain", "verify-review"):
         item = commands.add_parser(name)
         item.add_argument("path", type=Path)
     item = commands.add_parser("diff")
@@ -499,6 +602,8 @@ def main() -> int:
             result = verify(load(args.path))
         elif args.command == "explain":
             result = explanation(load(args.path))
+        elif args.command == "verify-review":
+            result = verify_review(load_review(args.path))
         else:
             result = difference(load(args.before), load(args.after))
     except PackageError as exc:
