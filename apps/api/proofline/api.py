@@ -1968,3 +1968,8 @@ def review_action_proposal(
     session.commit()
     session.refresh(proposal)
     return proposal
+
+
+from .decision_review_api import router as decision_review_router  # noqa: E402
+
+router.include_router(decision_review_router)
