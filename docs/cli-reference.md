@@ -27,6 +27,15 @@ proofline check-decisions --policy proofline.toml --format sarif
 proofline check-impacts --format sarif
 ```
 
+`check-decisions --format json` emits only identifiers, hashes, spans, anchor state, and
+counts. A policy-blocking finding still writes the JSON document and exits with status 1:
+
+```json
+{"blocking_count":1,"finding_count":1,"findings":[{"candidate_end_line":null,"candidate_end_offset":null,"candidate_start_line":null,"candidate_start_offset":null,"cited_content_sha256":"<sha256>","cited_source_version_id":"<version-id>","current_content_sha256":"<sha256>","current_source_version_id":"<version-id>","decision_id":"<decision-id>","end_line":48,"end_offset":512,"evidence_id":"<evidence-id>","quote_sha256":"<sha256>","reason":"changed","source_id":"<source-id>","start_line":42,"start_offset":384}],"policy_sha256":"<sha256>","valid":false}
+```
+
+Decision titles, source titles, source URIs, and source text are excluded from this JSON contract.
+
 `verify-package`, `verify-review-receipt`, `verify-attestation`, `verify-backup`, and `verify-integrity` fail closed. Safe errors identify the failed contract without returning confidential source text.
 
 ## Tiếng Việt
@@ -56,6 +65,15 @@ proofline check-decisions --policy proofline.toml --format sarif
 proofline check-impacts --format sarif
 ```
 
+`check-decisions --format json` chỉ xuất identifier, hash, span, anchor state và count.
+Khi finding bị policy chặn, command vẫn ghi JSON document và trả exit status 1:
+
+```json
+{"blocking_count":1,"finding_count":1,"findings":[{"candidate_end_line":null,"candidate_end_offset":null,"candidate_start_line":null,"candidate_start_offset":null,"cited_content_sha256":"<sha256>","cited_source_version_id":"<version-id>","current_content_sha256":"<sha256>","current_source_version_id":"<version-id>","decision_id":"<decision-id>","end_line":48,"end_offset":512,"evidence_id":"<evidence-id>","quote_sha256":"<sha256>","reason":"changed","source_id":"<source-id>","start_line":42,"start_offset":384}],"policy_sha256":"<sha256>","valid":false}
+```
+
+Contract JSON này loại bỏ decision title, source title, source URI và source text.
+
 `verify-package`, `verify-review-receipt`, `verify-attestation`, `verify-backup` và `verify-integrity` fail closed. Safe error chỉ ra contract bị fail mà không trả confidential source text.
 
 ## 日本語
@@ -84,5 +102,14 @@ proofline verify-attestation envelope.json --public-key trusted.pem --package ev
 proofline check-decisions --policy proofline.toml --format sarif
 proofline check-impacts --format sarif
 ```
+
+`check-decisions --format json` は identifier、hash、span、anchor state、count のみを出力します。
+Policy-blocking finding がある場合も JSON document を出力し、exit status 1 を返します：
+
+```json
+{"blocking_count":1,"finding_count":1,"findings":[{"candidate_end_line":null,"candidate_end_offset":null,"candidate_start_line":null,"candidate_start_offset":null,"cited_content_sha256":"<sha256>","cited_source_version_id":"<version-id>","current_content_sha256":"<sha256>","current_source_version_id":"<version-id>","decision_id":"<decision-id>","end_line":48,"end_offset":512,"evidence_id":"<evidence-id>","quote_sha256":"<sha256>","reason":"changed","source_id":"<source-id>","start_line":42,"start_offset":384}],"policy_sha256":"<sha256>","valid":false}
+```
+
+Decision title、source title、source URI、source text はこの JSON contract に含まれません。
 
 `verify-package`、`verify-review-receipt`、`verify-attestation`、`verify-backup`、`verify-integrity` は fail closed します。Safe error は confidential source text を返さず、失敗 contract を示します。

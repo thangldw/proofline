@@ -734,7 +734,7 @@ def main(argv: list[str] | None = None) -> None:
                 "finding_count": len(findings),
                 "blocking_count": len(blocking),
                 "policy_sha256": policy_sha256(policy),
-                "findings": [finding.model_dump() for finding in findings],
+                "findings": [finding.content_free_model_dump() for finding in findings],
             }
         else:
             document = None

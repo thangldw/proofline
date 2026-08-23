@@ -22,6 +22,32 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def macos_release_qualification(
+    *,
+    release_grade: bool,
+    signature_kind: str,
+    codesign_valid: bool,
+    gatekeeper_valid: bool,
+    stapled_app: bool,
+    stapled_dmg: bool,
+) -> str:
+    if not release_grade:
+        return "experimental_macos_package_not_release_qualified"
+    if not (
+        signature_kind == "developer_id_or_other"
+        and codesign_valid
+        and gatekeeper_valid
+        and stapled_app
+        and stapled_dmg
+    ):
+        raise RuntimeError("macos_release_qualification_failed")
+    return "release_grade_macos_signed_notarized"
+
+
+def _command_valid(command: list[str]) -> bool:
+    return subprocess.run(command, check=False, capture_output=True, text=True).returncode == 0
+
+
 def wait_for_json(path: Path, process: subprocess.Popen[str]) -> dict[str, object]:
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -97,6 +123,7 @@ def main() -> None:
     parser.add_argument("--dmg", type=Path, required=True)
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--release-grade", action="store_true")
     args = parser.parse_args()
     info_path = args.app / "Contents" / "Info.plist"
     sidecar = args.app / "Contents" / "MacOS" / "proofline-sidecar"
@@ -113,12 +140,35 @@ def main() -> None:
         text=True,
     ).stderr
     signature_kind = "adhoc" if "Signature=adhoc" in signature else "developer_id_or_other"
+    native_validation = {
+        "codesign_valid": _command_valid(
+            ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(args.app)]
+        ),
+        "gatekeeper_valid": False,
+        "stapled_app": False,
+        "stapled_dmg": False,
+    }
+    if args.release_grade:
+        native_validation.update(
+            {
+                "gatekeeper_valid": _command_valid(
+                    ["spctl", "--assess", "--type", "execute", "--verbose=4", str(args.app)]
+                ),
+                "stapled_app": _command_valid(["xcrun", "stapler", "validate", str(args.app)]),
+                "stapled_dmg": _command_valid(["xcrun", "stapler", "validate", str(args.dmg)]),
+            }
+        )
+    qualification = macos_release_qualification(
+        release_grade=args.release_grade,
+        signature_kind=signature_kind,
+        **native_validation,
+    )
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
     receipt = {
         "schema": "proofline.desktop-release-receipt.v1",
-        "qualification": "experimental_macos_package_not_notarized",
+        "qualification": qualification,
         "observed_at": datetime.now(UTC).isoformat(),
         "proofline_revision": revision,
         "environment": {
@@ -130,17 +180,20 @@ def main() -> None:
             "version": info.get("CFBundleShortVersionString"),
             "signature": signature_kind,
         },
+        "native_validation": native_validation,
         "artifact": {
             "name": args.dmg.name,
             "sha256": sha256_file(args.dmg),
         },
         "observations": smoke_sidecar(sidecar, args.expected_version),
-        "does_not_prove": [
-            "Apple notarization or trusted distribution signing",
-            "native webview interaction or uninstall behavior",
-            "Windows packaging or lifecycle behavior",
-            "production readiness",
-        ],
+        "does_not_prove": (
+            ([] if args.release_grade else ["Apple notarization or trusted distribution signing"])
+            + [
+                "native webview interaction or uninstall behavior",
+                "Windows packaging or lifecycle behavior",
+                "production readiness",
+            ]
+        ),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")

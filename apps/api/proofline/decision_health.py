@@ -42,6 +42,12 @@ class DecisionHealthFinding:
     def model_dump(self) -> dict[str, str | int | None]:
         return asdict(self)
 
+    def content_free_model_dump(self) -> dict[str, str | int | None]:
+        document = self.model_dump()
+        for key in ("decision_title", "source_uri", "source_title"):
+            document.pop(key)
+        return document
+
     @property
     def locator(self) -> str:
         return f"{self.source_title}:{self.start_line}-{self.end_line}"
