@@ -11,12 +11,14 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from .decision_reviews import review_fingerprint
 from .models import (
     ActionProposal,
     AuditEvent,
     Chunk,
     ChunkEmbedding,
     Decision,
+    DecisionReview,
     Evidence,
     ImportReceipt,
     IngestionJob,
@@ -47,6 +49,7 @@ DOMAIN_MODELS = (
     ChunkEmbedding,
     Decision,
     Evidence,
+    DecisionReview,
     ModelRun,
     AuditEvent,
     IngestionJob,
@@ -67,6 +70,7 @@ ID_COLLECTIONS = {
     "chunks": "chunk",
     "memories": "memory",
     "evidence": "evidence",
+    "decision_reviews": "decision_review",
     "model_runs": "model_run",
     "audit_events": "audit_event",
     "ingestion_jobs": "ingestion_job",
@@ -238,6 +242,24 @@ def _remap_document(document: dict[str, Any], plan: dict[str, Any]) -> dict[str,
         item["memory_id"] = maps["memory"][item["memory_id"]]
         item["source_id"] = maps["source"][item["source_id"]]
         item["source_version_id"] = maps["source_version"][item["source_version_id"]]
+        item["binding_root_id"] = maps["evidence"][item["binding_root_id"]]
+        if item["superseded_by_id"] is not None:
+            item["superseded_by_id"] = maps["evidence"][item["superseded_by_id"]]
+    for item in payload["decision_reviews"]:
+        item["workspace_id"] = maps["workspace"][item["workspace_id"]]
+        item["decision_id"] = maps["memory"][item["decision_id"]]
+        item["evidence_id"] = maps["evidence"][item["evidence_id"]]
+        item["cited_source_version_id"] = maps["source_version"][item["cited_source_version_id"]]
+        item["current_source_version_id"] = maps["source_version"][
+            item["current_source_version_id"]
+        ]
+        item["finding_fingerprint"] = review_fingerprint(
+            decision_id=item["decision_id"],
+            evidence_id=item["evidence_id"],
+            cited_source_version_id=item["cited_source_version_id"],
+            current_source_version_id=item["current_source_version_id"],
+            anchor_state=item["anchor_state"],
+        )
     for item in payload["chunks"]:
         item["source_id"] = maps["source"][item["source_id"]]
         item["source_version_id"] = maps["source_version"][item["source_version_id"]]
@@ -373,22 +395,62 @@ def _import_verified(
             )
         session.flush()
 
+        imported_evidence: dict[str, Evidence] = {}
         for item in payload["evidence"]:
+            value = Evidence(
+                id=item["id"],
+                decision_id=item["memory_id"],
+                source_id=item["source_id"],
+                source_version_id=item["source_version_id"],
+                quote=item["quote"],
+                quote_hash=item["quote_hash"],
+                start_offset=item["start_offset"],
+                end_offset=item["end_offset"],
+                start_line=item["start_line"],
+                end_line=item["end_line"],
+                anchor_version=item["anchor_version"],
+                section_path=item["section_path"],
+                prefix_sha256=item["prefix_sha256"],
+                suffix_sha256=item["suffix_sha256"],
+                binding_root_id=item["binding_root_id"],
+                binding_state=item["binding_state"],
+                superseded_at=_datetime(item["superseded_at"]),
+                superseded_by_id=None,
+            )
+            session.add(value)
+            imported_evidence[value.id] = value
+        session.flush()
+        for item in payload["evidence"]:
+            imported_evidence[item["id"]].superseded_by_id = item["superseded_by_id"]
+        session.flush()
+
+        for item in payload["decision_reviews"]:
             session.add(
-                Evidence.anchored(
-                    source_content=versions[item["source_version_id"]].content,
+                DecisionReview(
                     id=item["id"],
-                    decision_id=item["memory_id"],
-                    source_id=item["source_id"],
-                    source_version_id=item["source_version_id"],
-                    quote=item["quote"],
-                    quote_hash=item["quote_hash"],
-                    start_offset=item["start_offset"],
-                    end_offset=item["end_offset"],
-                    start_line=item["start_line"],
-                    end_line=item["end_line"],
+                    workspace_id=item["workspace_id"],
+                    decision_id=item["decision_id"],
+                    evidence_id=item["evidence_id"],
+                    cited_source_version_id=item["cited_source_version_id"],
+                    current_source_version_id=item["current_source_version_id"],
+                    finding_fingerprint=item["finding_fingerprint"],
+                    anchor_state=item["anchor_state"],
+                    severity=item["severity"],
+                    policy_hash=item["policy_hash"],
+                    candidate_start_offset=item["candidate_start_offset"],
+                    candidate_end_offset=item["candidate_end_offset"],
+                    candidate_start_line=item["candidate_start_line"],
+                    candidate_end_line=item["candidate_end_line"],
+                    state=item["state"],
+                    resolution=item["resolution"],
+                    actor=item["actor"],
+                    note=item["note"],
+                    opened_at=_datetime(item["opened_at"]),
+                    updated_at=_datetime(item["updated_at"]),
+                    closed_at=_datetime(item["closed_at"]),
                 )
             )
+        session.flush()
 
         for item in payload["ingestion_jobs"]:
             session.add(

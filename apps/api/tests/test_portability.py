@@ -8,11 +8,20 @@ import proofline.cli as cli_module
 import proofline.portability as portability_module
 import pytest
 from proofline.cli import main
+from proofline.decision_reviews import refresh_decision_reviews
 from proofline.ingestion import ingest_source
-from proofline.models import AuditEvent, Decision, IngestionJob, IngestionJobInput, ModelRun
+from proofline.models import (
+    AuditEvent,
+    Decision,
+    DecisionReview,
+    IngestionJob,
+    IngestionJobInput,
+    ModelRun,
+)
 from proofline.portability import (
     LEGACY_PORTABLE_EXPORT_SCHEMA,
     PORTABLE_EXPORT_SCHEMA,
+    PORTABLE_EXPORT_V2_SCHEMA,
     PortabilityError,
     atomic_write_export,
     build_portable_export,
@@ -200,6 +209,18 @@ def test_schema_v1_exports_upgrade_without_losing_core_provenance(session):
         "ingestion_jobs",
     }
     legacy["payload"] = {key: legacy["payload"][key] for key in legacy_keys}
+    for item in legacy["payload"]["evidence"]:
+        for field in (
+            "anchor_version",
+            "section_path",
+            "prefix_sha256",
+            "suffix_sha256",
+            "binding_root_id",
+            "binding_state",
+            "superseded_at",
+            "superseded_by_id",
+        ):
+            item.pop(field)
     for source in legacy["payload"]["sources"]:
         source.pop("workspace_id")
     for event in legacy["payload"]["audit_events"]:
@@ -214,6 +235,102 @@ def test_schema_v1_exports_upgrade_without_losing_core_provenance(session):
     assert counts == normalized["manifest"]["counts"]
     assert normalized["payload"]["chunks"]
     assert normalized["payload"]["study_cards"] == []
+
+
+def test_schema_v2_exports_backfill_active_evidence_bindings(session):
+    rich_export_fixture(session)
+    current = build_portable_export(session)
+    legacy = copy.deepcopy(current)
+    legacy["payload"].pop("decision_reviews")
+    for item in legacy["payload"]["evidence"]:
+        for field in (
+            "anchor_version",
+            "section_path",
+            "prefix_sha256",
+            "suffix_sha256",
+            "binding_root_id",
+            "binding_state",
+            "superseded_at",
+            "superseded_by_id",
+        ):
+            item.pop(field)
+    legacy["manifest"]["schema"] = PORTABLE_EXPORT_V2_SCHEMA
+    legacy["manifest"]["counts"] = {
+        key: len(value) for key, value in sorted(legacy["payload"].items())
+    }
+    legacy["manifest"]["payload_sha256"] = payload_sha256(legacy["payload"])
+
+    normalized = normalize_portable_export(legacy)
+
+    assert verify_portable_export(legacy) == normalized["manifest"]["counts"]
+    assert normalized["manifest"]["schema"] == PORTABLE_EXPORT_SCHEMA
+    assert normalized["payload"]["decision_reviews"] == []
+    assert all(item["binding_state"] == "active" for item in normalized["payload"]["evidence"])
+    assert all(item["binding_root_id"] == item["id"] for item in normalized["payload"]["evidence"])
+
+
+def test_v3_export_binds_decision_reviews_and_anchor_metadata(session):
+    expected = rich_export_fixture(session)
+    source = ingest_source(
+        session,
+        SourceCreate(
+            title="Queue ADR changed again",
+            uri="file:///queue.md",
+            content="Decision: Use PostgreSQL for shared queue state.",
+        ),
+    )[0]
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    session.commit()
+
+    document = build_portable_export(session)
+    review = next(
+        item
+        for item in document["payload"]["decision_reviews"]
+        if item["decision_id"] == expected["memory_id"]
+    )
+    cited = next(
+        item for item in document["payload"]["evidence"] if item["id"] == review["evidence_id"]
+    )
+
+    assert review["state"] == "open"
+    assert review["cited_source_version_id"] == cited["source_version_id"]
+    assert cited["anchor_version"] == "markdown-context-v1"
+    assert cited["binding_state"] == "active"
+    assert verify_portable_export(document) == document["manifest"]["counts"]
+
+
+def test_v3_verifier_rejects_rehashed_anchor_and_review_tampering(session):
+    expected = rich_export_fixture(session)
+    source = ingest_source(
+        session,
+        SourceCreate(
+            title="Queue ADR changed again",
+            uri="file:///queue.md",
+            content="Decision: Use PostgreSQL for shared queue state.",
+        ),
+    )[0]
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    session.commit()
+    original = build_portable_export(session)
+
+    anchor_tampered = copy.deepcopy(original)
+    anchor_tampered["payload"]["evidence"][0]["prefix_sha256"] = "0" * 64
+    anchor_tampered["manifest"]["payload_sha256"] = payload_sha256(anchor_tampered["payload"])
+    with pytest.raises(PortabilityError, match="evidence_anchor_mismatch"):
+        verify_portable_export(anchor_tampered)
+
+    review_tampered = copy.deepcopy(original)
+    review = next(
+        item
+        for item in review_tampered["payload"]["decision_reviews"]
+        if item["decision_id"] == expected["memory_id"]
+    )
+    review["finding_fingerprint"] = "0" * 64
+    review_tampered["manifest"]["payload_sha256"] = payload_sha256(review_tampered["payload"])
+    with pytest.raises(PortabilityError, match="invalid_decision_review_fingerprint"):
+        verify_portable_export(review_tampered)
+
+    assert session.scalar(select(DecisionReview).where(DecisionReview.id == review["id"]))
 
 
 def test_verifier_detects_hash_and_rehashed_provenance_tampering(session):

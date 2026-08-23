@@ -16,10 +16,12 @@ from proofline.backup import (
     verify_sqlite_backup,
 )
 from proofline.cli import main
+from proofline.decision_reviews import refresh_decision_reviews
 from proofline.ingestion import ingest_source
 from proofline.models import (
     AuditEvent,
     Decision,
+    DecisionReview,
     ImportReceipt,
     IngestionJob,
     IngestionJobInput,
@@ -179,6 +181,43 @@ def test_backup_recovery_exercise_preserves_exact_evidence_and_hashes(session, t
             ).fetchone()[0]
             == 2
         )
+
+
+def test_backup_preserves_decision_review_ledger_and_anchor_metadata(session, tmp_path):
+    source, _created = ingest_source(
+        session,
+        SourceCreate(
+            title="Review ADR",
+            uri="file:///review.md",
+            content="Decision: Use SQLite for local state.",
+        ),
+    )
+    decision = session.scalar(select(Decision).where(Decision.source_id == source.id))
+    decision.status = "accepted"
+    session.commit()
+    ingest_source(
+        session,
+        SourceCreate(
+            title="Review ADR revised",
+            uri=source.uri,
+            content="Decision: Use PostgreSQL for shared state.",
+        ),
+    )
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    session.commit()
+    review = session.scalar(select(DecisionReview).where(DecisionReview.decision_id == decision.id))
+    assert review is not None
+    output = tmp_path / "review-backup.db"
+
+    create_sqlite_backup(session.get_bind(), output)
+
+    with read_only(output) as recovered:
+        assert recovered.execute("SELECT COUNT(*) FROM decision_reviews").fetchone()[0] == 1
+        row = recovered.execute(
+            "SELECT anchor_version, binding_root_id, binding_state FROM evidence WHERE id = ?",
+            (review.evidence_id,),
+        ).fetchone()
+        assert row == ("markdown-context-v1", review.evidence_id, "active")
 
 
 def test_restore_backup_preserves_rollback_and_can_reverse_the_restore(session, tmp_path):

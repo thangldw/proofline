@@ -47,7 +47,7 @@ from .evidence_packages import (
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
-from .models import Workspace
+from .models import DecisionReview, SourceVersion, Workspace
 from .portability import (
     PortabilityError,
     atomic_write_export,
@@ -65,6 +65,11 @@ from .real_model_evaluation import (
     run_real_model_comparison,
     write_comparison_receipt,
     write_preflight_receipt,
+)
+from .review_receipts import (
+    ReviewReceiptError,
+    build_review_receipt,
+    load_and_verify_review_receipt,
 )
 from .sarif import build_decision_health_sarif
 from .schemas import SourceCreate
@@ -229,6 +234,18 @@ def main(argv: list[str] | None = None) -> None:
         "verify-package", help="Verify a Decision Evidence Package without database access"
     )
     verify_package.add_argument("path", type=Path)
+    review_receipt = subcommands.add_parser(
+        "export-review-receipt",
+        help="Bind one decision review to a verified evidence package",
+    )
+    review_receipt.add_argument("review_id")
+    review_receipt.add_argument("--package", type=Path, required=True)
+    review_receipt.add_argument("--output", type=Path, required=True)
+    verify_review_receipt = subcommands.add_parser(
+        "verify-review-receipt",
+        help="Verify a decision review receipt without database access",
+    )
+    verify_review_receipt.add_argument("path", type=Path)
     explain = subcommands.add_parser(
         "explain", help="Explain one memory artifact and its exact provenance"
     )
@@ -440,6 +457,46 @@ def main(argv: list[str] | None = None) -> None:
             _document, report = load_and_verify_package(args.path)
         except EvidencePackageError as exc:
             raise SystemExit(f"package verification failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
+    elif args.command == "export-review-receipt":
+        initialize_database()
+        try:
+            _package, package_report = load_and_verify_package(args.package)
+            with SessionLocal() as session:
+                review = session.get(DecisionReview, args.review_id)
+                if review is None:
+                    raise ReviewReceiptError("review_not_found")
+                if package_report["artifact_id"] != review.decision_id:
+                    raise ReviewReceiptError("package_artifact_mismatch")
+                cited = session.get(SourceVersion, review.cited_source_version_id)
+                current = session.get(SourceVersion, review.current_source_version_id)
+                if cited is None or current is None:
+                    raise ReviewReceiptError("source_version_not_found")
+                document = build_review_receipt(
+                    review,
+                    package_report["root_hash"],
+                    cited_content_sha256=cited.content_hash,
+                    current_content_sha256=current.content_hash,
+                )
+            atomic_write_export(args.output, document)
+        except (EvidencePackageError, PortabilityError, ReviewReceiptError) as exc:
+            raise SystemExit(f"review receipt export failed: {exc.code}") from exc
+        print(
+            json.dumps(
+                {
+                    "schema": document["schema"],
+                    "review_id": document["review_id"],
+                    "receipt_hash": document["receipt_hash"],
+                    "dep_root_hash": document["dep_root_hash"],
+                },
+                sort_keys=True,
+            )
+        )
+    elif args.command == "verify-review-receipt":
+        try:
+            _document, report = load_and_verify_review_receipt(args.path)
+        except ReviewReceiptError as exc:
+            raise SystemExit(f"review receipt verification failed: {exc.code}") from exc
         print(json.dumps(report, sort_keys=True))
     elif args.command == "explain":
         initialize_database()

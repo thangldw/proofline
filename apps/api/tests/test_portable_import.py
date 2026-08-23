@@ -7,6 +7,7 @@ import proofline.portable_import as import_module
 import pytest
 from proofline.cli import main
 from proofline.database import initialize_database, make_engine
+from proofline.decision_reviews import reanchor_review, refresh_decision_reviews
 from proofline.ingestion import (
     IngestionRetryConflict,
     delete_source,
@@ -21,6 +22,7 @@ from proofline.models import (
     Chunk,
     ChunkEmbedding,
     Decision,
+    DecisionReview,
     Evidence,
     ImportReceipt,
     IngestionJob,
@@ -164,6 +166,84 @@ def test_import_round_trip_preserves_provenance_and_rebuilds_only_indexes(sessio
         assert target.scalar(select(func.count()).select_from(SourceVersion)) == 0
         assert target.scalar(select(func.count()).select_from(Evidence)) == 0
         assert target.scalar(select(func.count()).select_from(Chunk)) == 0
+    engine.dispose()
+
+
+def test_import_round_trip_preserves_decision_reviews_and_anchor_lifecycle(session, tmp_path):
+    _document, source_id, _old_version_id, memory_id = _rich_document(session)
+    source = ingest_source(
+        session,
+        SourceCreate(
+            title="Queue ADR changed again",
+            uri="file:///queue.md",
+            content="Decision: Use PostgreSQL for shared queue state.",
+        ),
+    )[0]
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    session.commit()
+    document = build_portable_export(session)
+    expected_review = session.scalar(
+        select(DecisionReview).where(DecisionReview.decision_id == memory_id)
+    )
+    assert expected_review is not None
+
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target, target.begin():
+        import_portable_export(target, document)
+
+    with factory() as target:
+        imported = target.get(DecisionReview, expected_review.id)
+        assert imported is not None
+        assert imported.finding_fingerprint == expected_review.finding_fingerprint
+        evidence = target.get(Evidence, imported.evidence_id)
+        assert evidence.binding_root_id == evidence.id
+        assert evidence.binding_state == "active"
+        assert build_portable_export(target)["payload"] == document["payload"]
+    assert verify_live_database(engine)["valid"] is True
+    engine.dispose()
+
+
+def test_import_round_trip_preserves_superseded_evidence_chain(session, tmp_path):
+    _document, _source_id, _old_version_id, memory_id = _rich_document(session)
+    content = "Decision: Use PostgreSQL for shared queue state."
+    source = ingest_source(
+        session,
+        SourceCreate(
+            title="Queue ADR changed again",
+            uri="file:///queue.md",
+            content=content,
+        ),
+    )[0]
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    review = session.scalar(select(DecisionReview).where(DecisionReview.decision_id == memory_id))
+    assert review is not None
+    reanchor_review(
+        session,
+        review.id,
+        workspace_id=source.workspace_id,
+        expected_current_source_version_id=source.current_version_id,
+        start_offset=0,
+        end_offset=len(content),
+        actor="local_user",
+        reason="Validated replacement evidence",
+    )
+    session.commit()
+    document = build_portable_export(session)
+    chain = [item for item in document["payload"]["evidence"] if item["memory_id"] == memory_id]
+    assert {item["binding_state"] for item in chain} == {"active", "superseded"}
+
+    engine, factory = _target_factory(tmp_path)
+    with factory() as target, target.begin():
+        import_portable_export(target, document)
+
+    with factory() as target:
+        imported = list(target.scalars(select(Evidence).where(Evidence.decision_id == memory_id)))
+        old = next(item for item in imported if item.binding_state == "superseded")
+        active = next(item for item in imported if item.binding_state == "active")
+        assert old.superseded_by_id == active.id
+        assert old.binding_root_id == active.binding_root_id == old.id
+        assert target.get(DecisionReview, review.id).state == "resolved"
+    assert verify_live_database(engine)["valid"] is True
     engine.dispose()
 
 

@@ -1,0 +1,12 @@
+[
+  {"name": "fingerprint", "pointer": "/finding_fingerprint", "value": "0000000000000000000000000000000000000000000000000000000000000000", "expected_error": "receipt_hash_mismatch"},
+  {"name": "cited-content", "pointer": "/cited_content_sha256", "value": "0000000000000000000000000000000000000000000000000000000000000000", "expected_error": "receipt_hash_mismatch"},
+  {"name": "current-content", "pointer": "/current_content_sha256", "value": "0000000000000000000000000000000000000000000000000000000000000000", "expected_error": "receipt_hash_mismatch"},
+  {"name": "current-version", "pointer": "/current_source_version_id", "value": "00000000-0000-0000-0000-000000000106", "expected_error": "receipt_hash_mismatch"},
+  {"name": "anchor-state", "pointer": "/anchor_state", "value": "unknown", "expected_error": "anchor_state_invalid"},
+  {"name": "policy-hash", "pointer": "/policy_sha256", "value": "short", "expected_error": "policy_hash_invalid"},
+  {"name": "state", "pointer": "/state", "value": "unknown", "expected_error": "review_state_invalid"},
+  {"name": "opened-at", "pointer": "/opened_at", "value": "not-a-time", "expected_error": "timestamp_invalid"},
+  {"name": "dep-root", "pointer": "/dep_root_hash", "value": "short", "expected_error": "dep_root_hash_invalid"},
+  {"name": "receipt-hash", "pointer": "/receipt_hash", "value": "0000000000000000000000000000000000000000000000000000000000000000", "expected_error": "receipt_hash_mismatch"}
+]

@@ -2,12 +2,14 @@ import json
 
 import pytest
 from proofline import cli
+from proofline.decision_reviews import refresh_decision_reviews
 from proofline.embeddings import index_current_embeddings
 from proofline.ingestion import ingest_source
 from proofline.integrity import IntegrityVerificationError, verify_live_database
 from proofline.model_gateway import FakeEmbeddingProvider
+from proofline.models import Decision, DecisionReview
 from proofline.schemas import SourceCreate
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 
 def seeded(session):
@@ -34,6 +36,26 @@ def second_source(session):
     return source
 
 
+def seeded_review(session):
+    source = seeded(session)
+    decision = session.scalar(select(Decision).where(Decision.source_id == source.id))
+    decision.status = "accepted"
+    session.commit()
+    ingest_source(
+        session,
+        SourceCreate(
+            title="Integrity ADR revised",
+            uri=source.uri,
+            content="# Queue\n\nDecision: Use PostgreSQL.\nReason: Shared hosted state.",
+        ),
+    )
+    refresh_decision_reviews(session, workspace_id=source.workspace_id)
+    session.commit()
+    review = session.scalar(select(DecisionReview).where(DecisionReview.decision_id == decision.id))
+    assert review is not None
+    return source, decision, review
+
+
 def test_live_integrity_verifier_accepts_clean_provenance(session):
     seeded(session)
 
@@ -46,6 +68,7 @@ def test_live_integrity_verifier_accepts_clean_provenance(session):
         "chunks": 1,
         "memories": 1,
         "evidence": 1,
+        "decision_reviews": 0,
         "embeddings": 0,
         "vector_index_rows": 0,
     }
@@ -297,3 +320,47 @@ def test_verify_integrity_cli_emits_metadata_only_report(session, monkeypatch, c
     assert report["valid"] is True
     assert report["sources"] == 1
     assert "Integrity ADR" not in json.dumps(report)
+
+
+@pytest.mark.parametrize(
+    ("statement", "expected_code"),
+    [
+        ("UPDATE evidence SET prefix_sha256 = '" + "0" * 64 + "'", "evidence_anchor_mismatch"),
+        (
+            "UPDATE evidence SET binding_root_id = '00000000-0000-0000-0000-000000000000'",
+            "evidence_binding_invalid",
+        ),
+        (
+            "UPDATE decision_reviews SET finding_fingerprint = '" + "0" * 64 + "'",
+            "decision_review_fingerprint_invalid",
+        ),
+        ("UPDATE decision_reviews SET state = 'resolved'", "decision_review_state_invalid"),
+        (
+            "UPDATE audit_events "
+            "SET object_id = '00000000-0000-0000-0000-000000000000' "
+            "WHERE object_type = 'decision_review'",
+            "audit_reference_invalid",
+        ),
+    ],
+)
+def test_live_integrity_verifier_checks_review_ledger_and_binding_metadata(
+    session, statement, expected_code
+):
+    seeded_review(session)
+    session.execute(text(statement))
+    session.commit()
+
+    with pytest.raises(IntegrityVerificationError) as raised:
+        verify_live_database(session.get_bind())
+
+    assert raised.value.code == expected_code
+
+
+def test_live_integrity_verifier_accepts_open_review_without_mutating_decision_status(session):
+    _source, decision, review = seeded_review(session)
+
+    report = verify_live_database(session.get_bind())
+
+    assert report["decision_reviews"] == 1
+    assert review.state == "open"
+    assert decision.status == "accepted"

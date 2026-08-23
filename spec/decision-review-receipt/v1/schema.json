@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proofline.dev/spec/decision-review-receipt/v1/schema.json",
+  "title": "Proofline Decision Review Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "review_id",
+    "workspace_id",
+    "decision_id",
+    "evidence_id",
+    "finding_fingerprint",
+    "cited_source_version_id",
+    "cited_content_sha256",
+    "current_source_version_id",
+    "current_content_sha256",
+    "anchor_state",
+    "policy_sha256",
+    "state",
+    "resolution",
+    "opened_at",
+    "updated_at",
+    "closed_at",
+    "dep_root_hash",
+    "receipt_hash"
+  ],
+  "properties": {
+    "schema": {"const": "proofline-decision-review-receipt-v1"},
+    "review_id": {"$ref": "#/$defs/uuid"},
+    "workspace_id": {"$ref": "#/$defs/uuid"},
+    "decision_id": {"$ref": "#/$defs/uuid"},
+    "evidence_id": {"$ref": "#/$defs/uuid"},
+    "finding_fingerprint": {"$ref": "#/$defs/hash"},
+    "cited_source_version_id": {"$ref": "#/$defs/uuid"},
+    "cited_content_sha256": {"$ref": "#/$defs/hash"},
+    "current_source_version_id": {"$ref": "#/$defs/uuid"},
+    "current_content_sha256": {"$ref": "#/$defs/hash"},
+    "anchor_state": {"enum": ["moved", "ambiguous", "changed", "deleted"]},
+    "policy_sha256": {"$ref": "#/$defs/hash"},
+    "state": {"enum": ["open", "acknowledged", "resolved", "waived", "superseded"]},
+    "resolution": {"type": ["string", "null"]},
+    "opened_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "closed_at": {"type": ["string", "null"], "format": "date-time"},
+    "dep_root_hash": {"$ref": "#/$defs/hash"},
+    "receipt_hash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "uuid": {"type": "string", "format": "uuid"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
