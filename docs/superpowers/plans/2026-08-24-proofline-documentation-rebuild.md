@@ -56,7 +56,10 @@ def test_checker_rejects_wrong_language_order(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text(
         "## Tiếng Việt\nvi\n## English\nen\n## 日本語\nja\n", encoding="utf-8"
     )
-    assert "README.md: language sections must be English, Tiếng Việt, 日本語" in check_documentation(tmp_path)
+    assert (
+        "README.md: language sections must be English, Tiếng Việt, 日本語"
+        in check_documentation(tmp_path)
+    )
 ```
 
 - [ ] **Step 2: Run the new tests and confirm the red state**
