@@ -9,7 +9,9 @@ Use Proofline to preserve source identity, source version, and exact cited spans
 
 ## Runtime
 
-The bundled verifier is self-contained and uses Python 3.11+ standard-library modules only. Resolve its path relative to this `SKILL.md`; do not search for or install a separate Proofline checkout. Run `python3 scripts/proofline_package.py --help` before an unfamiliar operation.
+The bundled verifier is self-contained and uses Python 3.11+ standard-library modules only for Decision Evidence Packages and review receipts. Resolve its path relative to this `SKILL.md`; do not search for or install a separate Proofline checkout. Run `python3 scripts/proofline_package.py --help` before an unfamiliar operation.
+
+Signed Ed25519 attestations require an installed Proofline 2.0.0 runtime. The bundled verifier does not verify Ed25519. Use `proofline verify-attestation` only when the user supplies the exact attestation, package, and a trusted public key; add the review receipt when the envelope binds one. Do not treat a public key embedded beside an untrusted artifact as trusted.
 
 ## Workflow
 
@@ -24,6 +26,7 @@ The bundled verifier is self-contained and uses Python 3.11+ standard-library mo
 
 - Never treat a citation as proof that the engineering decision is correct.
 - Never rewrite cited source content to make a decision appear current.
+- Never request, display, copy, or persist an attestation private key. A valid signature proves key control relative to the trusted public key, not legal identity or trusted time.
 - Do not overwrite ADRs, exports, packages, backups, or reports without explicit approval.
 - Do not enable an external model or embedding provider unless the user explicitly configures and authorizes it.
 - Do not expose source content, local paths, credentials, or evidence packages beyond the user's selected audience. The bundled verifier intentionally reports hashes and span locations rather than quoted source content.

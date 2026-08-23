@@ -12,6 +12,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import __version__
+from .attestations import (
+    AttestationError,
+    atomic_write_attestation,
+    build_signed_attestation,
+    generate_attestation_keypair,
+    load_and_verify_attestation,
+    load_attestation_private_key,
+    load_attestation_public_key,
+    verify_signed_attestation,
+)
 from .backup import (
     BackupError,
     create_sqlite_backup,
@@ -124,6 +134,18 @@ def _parse_impact_as_of(value: str | None) -> datetime:
         _impact_check_failed("as_of_invalid")
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         _impact_check_failed("as_of_timezone_required")
+    return parsed.astimezone(UTC)
+
+
+def _parse_attestation_time(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(UTC)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise AttestationError("issued_at_invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise AttestationError("issued_at_invalid")
     return parsed.astimezone(UTC)
 
 
@@ -265,6 +287,31 @@ def main(argv: list[str] | None = None) -> None:
         help="Verify a decision review receipt without database access",
     )
     verify_review_receipt.add_argument("path", type=Path)
+    generate_attestation_key = subcommands.add_parser(
+        "generate-attestation-key",
+        help="Generate a local Ed25519 keypair for signed evidence attestations",
+    )
+    generate_attestation_key.add_argument("--private-key", type=Path, required=True)
+    generate_attestation_key.add_argument("--public-key", type=Path, required=True)
+    generate_attestation_key.add_argument("--force", action="store_true")
+    attest = subcommands.add_parser(
+        "attest",
+        help="Sign a verified evidence package and optional review receipt",
+    )
+    attest.add_argument("--package", type=Path, required=True)
+    attest.add_argument("--review-receipt", type=Path)
+    attest.add_argument("--private-key", type=Path, required=True)
+    attest.add_argument("--issued-at")
+    attest.add_argument("--output", type=Path, required=True)
+    attest.add_argument("--force", action="store_true")
+    verify_attestation = subcommands.add_parser(
+        "verify-attestation",
+        help="Verify a signed attestation against trusted public key and exact subjects",
+    )
+    verify_attestation.add_argument("path", type=Path)
+    verify_attestation.add_argument("--public-key", type=Path, required=True)
+    verify_attestation.add_argument("--package", type=Path, required=True)
+    verify_attestation.add_argument("--review-receipt", type=Path)
     explain = subcommands.add_parser(
         "explain", help="Explain one memory artifact and its exact provenance"
     )
@@ -523,6 +570,52 @@ def main(argv: list[str] | None = None) -> None:
             _document, report = load_and_verify_review_receipt(args.path)
         except ReviewReceiptError as exc:
             raise SystemExit(f"review receipt verification failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
+    elif args.command == "generate-attestation-key":
+        try:
+            report = generate_attestation_keypair(
+                args.private_key,
+                args.public_key,
+                force=args.force,
+            )
+        except AttestationError as exc:
+            raise SystemExit(f"attestation key generation failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
+    elif args.command == "attest":
+        try:
+            _package, package_report = load_and_verify_package(args.package)
+            review_report = None
+            if args.review_receipt is not None:
+                _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
+            private_key = load_attestation_private_key(args.private_key)
+            document = build_signed_attestation(
+                package_report=package_report,
+                review_report=review_report,
+                private_key=private_key,
+                issued_at=_parse_attestation_time(args.issued_at),
+            )
+            atomic_write_attestation(args.output, document, force=args.force)
+            report = verify_signed_attestation(document, private_key.public_key())
+        except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
+            raise SystemExit(f"attestation failed: {exc.code}") from exc
+        print(json.dumps(report, sort_keys=True))
+    elif args.command == "verify-attestation":
+        try:
+            _package, package_report = load_and_verify_package(args.package)
+            review_report = None
+            if args.review_receipt is not None:
+                _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
+            public_key = load_attestation_public_key(args.public_key)
+            document, report = load_and_verify_attestation(
+                args.path,
+                public_key,
+                package_report=package_report,
+                review_report=review_report,
+            )
+            if document["statement"]["review_receipt"] is not None and review_report is None:
+                raise AttestationError("review_subject_required")
+        except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
+            raise SystemExit(f"attestation verification failed: {exc.code}") from exc
         print(json.dumps(report, sort_keys=True))
     elif args.command == "explain":
         initialize_database()

@@ -5,6 +5,7 @@ import stat
 from datetime import UTC, datetime
 from pathlib import Path
 
+import proofline.cli as cli_module
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from proofline.attestations import (
@@ -18,6 +19,7 @@ from proofline.attestations import (
     load_attestation_public_key,
     verify_signed_attestation,
 )
+from proofline.cli import main
 
 ISSUED_AT = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
 PACKAGE = {
@@ -191,3 +193,100 @@ def test_tracked_ed25519_conformance_vector_matches_implementation():
 
     assert document == _attestation()
     assert report["key_id"] == "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c"
+
+
+def test_attestation_cli_generates_signs_and_verifies_exact_package(tmp_path, capsys):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    output = tmp_path / "attestation.json"
+    package = ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json"
+
+    main(
+        [
+            "generate-attestation-key",
+            "--private-key",
+            str(private_path),
+            "--public-key",
+            str(public_path),
+        ]
+    )
+    key_report = json.loads(capsys.readouterr().out)
+    assert len(key_report["key_id"]) == 64
+    main(
+        [
+            "attest",
+            "--package",
+            str(package),
+            "--private-key",
+            str(private_path),
+            "--issued-at",
+            ISSUED_AT.isoformat(),
+            "--output",
+            str(output),
+        ]
+    )
+    sign_report = json.loads(capsys.readouterr().out)
+    assert (
+        sign_report["package_root_hash"]
+        == "742b23b7338c0b5e66cd78a0a2aab394ad3bf6af8470416f80554305f1787da5"
+    )
+    main(
+        [
+            "verify-attestation",
+            str(output),
+            "--public-key",
+            str(public_path),
+            "--package",
+            str(package),
+        ]
+    )
+    verify_report = json.loads(capsys.readouterr().out)
+    assert verify_report["valid"] is True
+    assert verify_report["key_id"] == key_report["key_id"]
+
+
+def test_attestation_cli_rejects_mismatched_review_receipt(tmp_path):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    generate_attestation_keypair(private_path, public_path)
+    package = ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json"
+    receipt = ROOT / "spec/decision-review-receipt/v1/test-vectors/valid-minimal.json"
+
+    with pytest.raises(SystemExit, match="attestation failed: subject_link_invalid"):
+        main(
+            [
+                "attest",
+                "--package",
+                str(package),
+                "--review-receipt",
+                str(receipt),
+                "--private-key",
+                str(private_path),
+                "--output",
+                str(tmp_path / "invalid.json"),
+            ]
+        )
+
+
+def test_attestation_cli_does_not_initialize_database(tmp_path, monkeypatch):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    generate_attestation_keypair(private_path, public_path)
+    package = ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json"
+
+    monkeypatch.setattr(
+        cli_module,
+        "initialize_database",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("database opened")),
+    )
+    main(
+        [
+            "attest",
+            "--package",
+            str(package),
+            "--private-key",
+            str(private_path),
+            "--output",
+            str(tmp_path / "attestation.json"),
+        ]
+    )

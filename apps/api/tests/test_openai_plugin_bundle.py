@@ -85,3 +85,17 @@ def test_bundled_review_verifier_preserves_mutation_codes(tmp_path: Path) -> Non
         completed = run("verify-review", str(path))
         assert completed.returncode == 2
         assert json.loads(completed.stderr)["error"] == mutation["expected_error"]
+
+
+def test_plugin_documents_signed_attestation_boundary_without_private_keys() -> None:
+    skill = (ROOT / "skills/manage-evidence-decisions/SKILL.md").read_text(encoding="utf-8")
+    commands = (ROOT / "skills/manage-evidence-decisions/references/commands.md").read_text(
+        encoding="utf-8"
+    )
+    combined = f"{skill}\n{commands}"
+
+    assert "proofline verify-attestation" in combined
+    assert "trusted public key" in combined
+    assert "Proofline 2.0.0" in combined
+    assert "bundled verifier does not verify Ed25519" in combined
+    assert "BEGIN PRIVATE KEY" not in combined
