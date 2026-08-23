@@ -24,7 +24,7 @@ test("local evidence-first workflow preserves provenance and renders hostile sou
   await expect(page.getByRole("heading", { name: "Memories", level: 1 })).toBeVisible();
 
   const decision = page.locator(".memory-card").filter({
-    hasText: "Use SQLite for the local job queue",
+    hasText: "Use an embedded queue for offline imports",
   });
   await expect(decision).toBeVisible();
   await decision.getByRole("combobox").selectOption("accepted");
@@ -32,11 +32,13 @@ test("local evidence-first workflow preserves provenance and renders hostile sou
 
   await decision.getByRole("button", { name: /Edit decision:/ }).click();
   const correctionForm = page.getByRole("form", { name: "Edit decision memory" });
-  await correctionForm.getByLabel("Statement").fill("Use SQLite for the durable local job queue");
+  await correctionForm
+    .getByLabel("Statement")
+    .fill("Use an embedded durable queue for offline imports");
   await correctionForm.getByLabel("Rationale").fill("Confirmed during the E2E architecture review.");
   await correctionForm.getByRole("button", { name: "Save correction" }).click();
   const correctedDecision = page.locator(".memory-card").filter({
-    hasText: "Use SQLite for the durable local job queue",
+    hasText: "Use an embedded durable queue for offline imports",
   });
   await expect(correctedDecision).toContainText("Confirmed during the E2E architecture review.");
   await expect(correctedDecision.locator(".status")).toHaveText("accepted");
