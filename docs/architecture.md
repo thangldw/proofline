@@ -1,38 +1,79 @@
-# Proofline architecture / Kiến trúc / アーキテクチャ
-
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"background":"#FFFFFF","fontFamily":"Arial, sans-serif","lineColor":"#667085","primaryTextColor":"#172B4D"}}}%%
-flowchart LR
-    G["Git or local source<br/>Nguồn / ソース"]:::yellow
-    I["Deterministic ingest<br/>Nạp / 取込"]:::blue
-    Q["SQLite + FTS<br/>Local store"]:::purple
-    A["Decision & citations<br/>Quyết định / 判断"]:::pink
-    P["Evidence package<br/>Gói / パッケージ"]:::green
-    G --> I --> Q --> A --> P
-    A -. exact-span check .-> G
-    classDef yellow fill:#FFF4A3,stroke:#C9A227,stroke-width:2px,color:#172B4D
-    classDef blue fill:#D9EAFD,stroke:#4C78A8,stroke-width:2px,color:#172B4D
-    classDef purple fill:#E9DDF7,stroke:#8064A2,stroke-width:2px,color:#172B4D
-    classDef pink fill:#FFE1E6,stroke:#C96A7B,stroke-width:2px,color:#172B4D
-    classDef green fill:#DDF5E3,stroke:#4F9D69,stroke-width:2px,color:#172B4D
-```
+# Architecture
 
 ## English
 
-`apps/api/proofline/` owns ingestion, immutable source versions, exact spans, decision health and package verification. `apps/web/` is the local React client. `apps/desktop/` embeds the local service in a Tauri shell. Provider-specific AI remains optional and behind interfaces; provenance and verification do not depend on it.
+### Boundary
 
-`Decision.status` records the governed historical outcome. `DecisionReview.state` records current evidence health and never silently mutates that outcome. Evidence bindings form immutable chains: re-anchoring supersedes an old citation and creates a new active citation while retaining the old payload. Decision Evidence Package v1 remains historical; a separate review receipt binds current health to its root hash.
+Proofline 2.0.0 is a single-user, local-first application. The authoritative state is local SQLite plus user-controlled files. CLI, local FastAPI, web UI, and desktop shell share the same domain model. There is no hosted control plane, tenant isolation, organization identity, OAuth, or remote MCP.
 
-`decision_impacts.py` derives a read-only graph from unresolved reviews and active explicit `based_on` / `implements` relations. Traversal runs target-to-source, is cycle-safe, and emits one canonical shortest path without changing a decision or review. `attestations.py` signs the canonical package/root and optional receipt identifiers with Ed25519. Verification depends on the supplied trusted public key and local cryptography runtime, never an AI provider or database.
+View the [trilingual system architecture diagram](diagrams/system-architecture.html).
+
+### Deterministic path
+
+1. A file, note, folder scan, or Git import enters through an explicit local action.
+2. Ingest normalizes content and stores an immutable source version with hashes and stable offsets.
+3. SQLite/FTS indexes retrieval units; citations bind source ID, version ID, offsets, lines, quote, and quote hash.
+4. Decisions preserve their historical status and explicit relations. Review refresh compares current sources with stored bindings; impact traversal follows active `based_on` and `implements` edges.
+5. Package, receipt, backup, integrity, and attestation verification use deterministic local code and fail-closed error codes.
+
+SQLite transactions protect mutations. Source replacement creates a new version; it does not mutate the cited historical version. A stale check changes review state, not accepted decision history.
+
+### Optional AI boundary
+
+Generation, embeddings, and reranking are optional provider interfaces. A user must configure and invoke them. Model output is recorded as a model run and must pass grounding/structure validation before becoming a candidate. Providers are not required for ingest, exact-span citation checks, decision health, transitive impact, package verification, receipt verification, backup verification, or signed-attestation verification.
+
+### Trust and failure boundary
+
+Hashes detect mutation. Ed25519 verifies a signature against a supplied trusted public key. Neither establishes source truth, identity, trusted time, authorization, or revocation. Verification operates on explicit inputs, reports stable errors, and does not silently repair evidence.
 
 ## Tiếng Việt
 
-`apps/api/proofline/` quản lý ingest, phiên bản nguồn bất biến, exact span, decision health và xác minh package. `apps/web/` là client React local; `apps/desktop/` đóng gói service local bằng Tauri. AI provider chỉ là tùy chọn và không tham gia vào contract provenance/xác minh.
+### Boundary
 
-Transitive impact chỉ đi qua quan hệ `based_on` / `implements` explicit. Signed attestation xác thực tính toàn vẹn theo trusted public key, không tự xác lập danh tính hoặc trusted timestamp.
+Proofline 2.0.0 là application single-user, local-first. State authoritative là SQLite local cùng file do người dùng kiểm soát. CLI, FastAPI local, web UI và desktop shell dùng chung domain model. Không có hosted control plane, tenant isolation, organization identity, OAuth hoặc remote MCP.
+
+Xem [sơ đồ system architecture ba ngôn ngữ](diagrams/system-architecture.html).
+
+### Deterministic path
+
+1. File, note, folder scan hoặc Git import đi vào qua explicit local action.
+2. Ingest normalize content và lưu phiên bản nguồn bất biến với hash cùng stable offset.
+3. SQLite/FTS index retrieval unit; citation gắn source ID, version ID, offset, line, quote và quote hash.
+4. Decision giữ historical status và explicit relation. Review refresh so sánh source hiện tại với binding đã lưu; impact traversal đi qua edge `based_on` và `implements` đang active.
+5. Package, receipt, backup, integrity và attestation verification dùng deterministic local code cùng fail-closed error code.
+
+SQLite transaction bảo vệ mutation. Thay source tạo version mới; không mutate historical version đã được citation. Stale check thay review state, không thay accepted decision history.
+
+### Optional AI boundary
+
+Generation, embedding và reranking là optional provider interface. Người dùng phải cấu hình và gọi rõ ràng. Model output được ghi thành model run và phải qua grounding/structure validation trước khi thành candidate. Provider không cần thiết cho ingest, exact-span citation check, decision health, transitive impact, package verification, receipt verification, backup verification hoặc signed-attestation verification.
+
+### Trust và failure boundary
+
+Hash phát hiện mutation. Ed25519 verify signature với trusted public key được cung cấp. Không cơ chế nào thiết lập source truth, identity, trusted time, authorization hoặc revocation. Verification xử lý input explicit, báo stable error và không tự repair evidence.
 
 ## 日本語
 
-`apps/api/proofline/` が取込、不変ソース版、正確な引用範囲、判断状態、パッケージ検証を担当します。`apps/web/` はローカル React クライアント、`apps/desktop/` はローカルサービスを組み込む Tauri シェルです。AI プロバイダーは任意で、来歴と検証の契約には依存しません。
+### Boundary
 
-推移的影響は明示的な `based_on` / `implements` 関係だけをたどります。署名 attestation は信頼済み公開鍵に対する整合性を示しますが、identity や信頼時刻を保証しません。
+Proofline 2.0.0 は single-user / local-first application です。Authoritative state は local SQLite と user-controlled file です。CLI、local FastAPI、web UI、desktop shell は同じ domain model を共有します。Hosted control plane、tenant isolation、organization identity、OAuth、remote MCP はありません。
+
+[三言語 system architecture diagram](diagrams/system-architecture.html) を参照してください。
+
+### Deterministic path
+
+1. File、note、folder scan、Git import は明示的な local action から入ります。
+2. Ingest は content を normalize し、hash と stable offset を持つ immutable source version を保存します。
+3. SQLite/FTS は retrieval unit を index し、citation は source ID、version ID、offset、line、quote、quote hash を結び付けます。
+4. Decision は historical status と explicit relation を保持します。Review refresh は現在 source と保存 binding を比較し、impact traversal は active な `based_on` / `implements` edge をたどります。
+5. Package、receipt、backup、integrity、attestation verification は deterministic local code と fail-closed error code を使います。
+
+SQLite transaction が mutation を保護します。Source replacement は新 version を作り、引用済み historical version を変更しません。Stale check が変えるのは review state で、accepted decision history ではありません。
+
+### Optional AI boundary
+
+Generation、embedding、reranking は optional provider interface です。User が明示的に設定・実行する必要があります。Model output は model run として記録され、candidate になる前に grounding/structure validation を通ります。Provider は ingest、exact-span citation check、decision health、transitive impact、package/receipt/backup/signed-attestation verification には不要です。
+
+### Trust と failure boundary
+
+Hash は mutation を検出します。Ed25519 は指定した trusted public key に対して signature を検証します。どちらも source truth、identity、trusted time、authorization、revocation を確立しません。Verification は明示 input を処理し、stable error を返し、evidence を暗黙 repair しません。

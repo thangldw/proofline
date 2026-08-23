@@ -35,7 +35,7 @@ Published scale figures are synthetic regression evidence, not team or hosted-pr
 
 Start with the [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/operations.md), and [v2.0.0 release notes](docs/releases/v2.0.0.md).
 
-Proofline is also packaged as a local skills plugin. The [OpenAI plugin submission record](docs/submission/openai-plugin.md) separates repository facts from externally observed publication state. As observed on 2026-08-24, the public [OpenAI Plugins Directory entry](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) existed; this repository does not claim a hosted connector.
+Proofline is also packaged as a local skills plugin. The [OpenAI plugin submission record](docs/submission/openai-plugin.md) separates repository facts from dated external publication observations. The recorded [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) does not imply that the repository can independently confirm the currently public version; this project does not claim a hosted connector.
 
 See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md), and the [MIT License](LICENSE).
 
@@ -72,7 +72,7 @@ Các số liệu scale đã công bố là bằng chứng hồi quy synthetic, k
 
 Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [định dạng evidence package](docs/evidence-packages.md), [operations](docs/operations.md) và [release note v2.0.0](docs/releases/v2.0.0.md).
 
-Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submission OpenAI plugin](docs/submission/openai-plugin.md) tách repository fact khỏi trạng thái publication quan sát bên ngoài. Theo quan sát ngày 2026-08-24, [entry OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) công khai tồn tại; repository này không claim hosted connector.
+Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submission OpenAI plugin](docs/submission/openai-plugin.md) tách repository fact khỏi quan sát external publication có ngày. [URL OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) đã ghi không có nghĩa repository có thể tự xác nhận version đang public; project này không claim hosted connector.
 
 Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md) và [MIT License](LICENSE).
 
@@ -109,6 +109,6 @@ Demo は使い捨て workspace を作成し、引用済み requirement を変更
 
 [Documentation hub](docs/README.md)、[getting started](docs/getting-started.md)、[architecture](docs/architecture.md)、[decision lifecycle](docs/decision-lifecycle.md)、[evidence package format](docs/evidence-packages.md)、[operations](docs/operations.md)、[v2.0.0 release note](docs/releases/v2.0.0.md) を参照してください。
 
-Proofline は local skills plugin としても packaging されています。[OpenAI plugin submission record](docs/submission/openai-plugin.md) は repository fact と外部で観測した publication state を分離します。2026-08-24 の観測では公開 [OpenAI Plugins Directory entry](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) が存在しましたが、この repository は hosted connector を提供すると主張しません。
+Proofline は local skills plugin としても packaging されています。[OpenAI plugin submission record](docs/submission/openai-plugin.md) は repository fact と日付付き external publication observation を分離します。記録済み [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) は、repository が現在の public version を独立確認できることを意味しません。この project は hosted connector を提供すると主張しません。
 
 [Privacy](PRIVACY.md)、[security](SECURITY.md)、[support](SUPPORT.md)、[terms](TERMS.md)、[contributing](CONTRIBUTING.md)、[MIT License](LICENSE) も参照してください。
