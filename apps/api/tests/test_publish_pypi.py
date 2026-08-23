@@ -105,3 +105,9 @@ def test_public_install_smoke_isolated_from_worktree_and_ambient_python(monkeypa
     assert all(env["PROOFLINE_HOME"] == str(root / "proofline-home") for _c, _d, env in calls)
     demo = next(command for command, _cwd, _env in calls if "stale-decision" in command)
     assert demo[-2:] == ["--output-dir", str(root / "demo")]
+
+
+def test_publish_recovery_tolerates_stale_public_metadata():
+    source = (repository_root / "scripts/publish_pypi.py").read_text(encoding="utf-8")
+
+    assert '"--skip-existing"' in source
