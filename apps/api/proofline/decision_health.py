@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .anchors import build_evidence_anchor, resolve_evidence_anchor
 from .models import Decision, Source, SourceVersion
 
 
@@ -31,7 +32,7 @@ class DecisionHealthFinding:
     quote_sha256: str
     cited_content_sha256: str
     current_content_sha256: str
-    reason: str = "citation_changed"
+    reason: str = "changed"
 
     def model_dump(self) -> dict[str, str | int | None]:
         return asdict(self)
@@ -91,7 +92,17 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
                 raise DecisionHealthError("citation_provenance_invalid")
             if current_version.id == cited_version.id:
                 continue
-            if evidence.quote in current_version.content:
+            cited_anchor = build_evidence_anchor(
+                cited_version.content,
+                evidence.start_offset,
+                evidence.end_offset,
+            )
+            resolution = resolve_evidence_anchor(
+                quote=evidence.quote,
+                cited_anchor=cited_anchor,
+                current_content=current_version.content,
+            )
+            if resolution.state == "unchanged":
                 continue
             findings.append(
                 DecisionHealthFinding(
@@ -109,6 +120,7 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
                     quote_sha256=evidence.quote_hash,
                     cited_content_sha256=cited_version.content_hash,
                     current_content_sha256=current_version.content_hash,
+                    reason=resolution.state,
                 )
             )
     return findings

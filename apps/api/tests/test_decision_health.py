@@ -82,6 +82,23 @@ def test_health_check_allows_unrelated_revision_when_exact_citation_still_resolv
     assert check_decision_health(session) == []
 
 
+def test_health_check_flags_ambiguous_duplicate_quote(session):
+    source, _decision = _approved_decision(session)
+    ingest_source(
+        session,
+        SourceCreate(
+            title="requirement.md",
+            uri=source.uri,
+            content=f"{ORIGINAL}\n\nAppendix copy:\n{ORIGINAL}",
+        ),
+    )
+
+    findings = check_decision_health(session)
+
+    assert len(findings) == 1
+    assert findings[0].reason == "ambiguous"
+
+
 def test_health_check_fails_closed_on_corrupt_citation(session):
     _source, decision = _approved_decision(session)
     decision.evidence[0].quote_hash = "0" * 64
