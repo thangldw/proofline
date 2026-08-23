@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 from proofline.decision_policy import load_decision_policy
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -60,3 +62,33 @@ def test_default_decision_policy_and_ci_contract_are_committed():
     assert "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1" in workflow
     assert "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444" in workflow
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+
+
+def test_ci_can_verify_an_explicit_immutable_ref():
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+
+    source_ref = workflow["on"]["workflow_dispatch"]["inputs"]["source_ref"]
+    assert source_ref["required"] == "false"
+    assert source_ref["type"] == "string"
+
+    expected_ref = "${{ inputs.source_ref || github.sha }}"
+    jobs = workflow["jobs"]
+    assert set(jobs) == {
+        "python-test-and-quality",
+        "web-test-build-egress",
+        "package-conformance",
+        "release-artifacts",
+        "decision-health-sarif",
+        "decision-impact-sarif",
+    }
+    for name, job in jobs.items():
+        checkouts = [
+            step
+            for step in job["steps"]
+            if step.get("uses", "").startswith("actions/checkout@")
+        ]
+        assert len(checkouts) == 1, name
+        assert checkouts[0]["with"]["ref"] == expected_ref, name
