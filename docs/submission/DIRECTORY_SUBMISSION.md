@@ -6,7 +6,9 @@ Prepared: 2026-08-02
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Submission ID: `appsub_6a6efdf2d6188191be8c8493bd738576`
-- Version: `1.0.1`
+- Public version before this update: `1.0.1`
+- Prepared update version: `2.0.0`
+- Update submission status: **Pending submission** as of 2026-08-23
 - Review status: **Approved** on 2026-08-02
 - Publication status: **Published** on 2026-08-02
 - Directory URL: https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa
@@ -67,6 +69,14 @@ Use Python 3.11+ and the bundled `skills/manage-evidence-decisions/scripts/proof
 ## Initial release notes
 
 Initial plugin submission. Proofline packages workflows for evidence-backed engineering decisions, exact provenance review, deterministic integrity checks, and Decision Evidence Package comparison. Version 1.0.1 adds a self-contained standard-library verifier for the public skills bundle. It does not include hosted sync or a remote MCP connector.
+
+## Version 2.0.0 update notes
+
+Adds explicit transitive decision-impact review and a signed-attestation workflow. The bundled
+standard-library verifier continues to verify Decision Evidence Packages and review receipts. Full
+Ed25519 verification requires an installed Proofline 2.0.0 runtime plus the exact package, optional
+receipt and an independently trusted public key. The plugin never reads or stores private keys and
+does not claim identity, trusted time, hosted sync or a remote MCP connector.
 
 ## Verified submission checks
 

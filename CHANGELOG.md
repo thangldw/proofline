@@ -1,5 +1,26 @@
 # Proofline changelog / Lịch sử thay đổi / 変更履歴
 
+## [2.0.0] - 2026-08-23
+
+### English
+
+- Added deterministic, cycle-safe transitive impact across explicit `based_on` and `implements` decision relations, with API, CLI, SARIF and web cockpit projections.
+- Added the persistent decision-review ledger, audited review actions, immutable evidence-binding history, portable review receipts and stricter backup/import/integrity verification.
+- Added Ed25519 signed attestations for verified Decision Evidence Packages and optional review receipts, including strict schemas, fixed conformance vectors and explicit trust limitations.
+- Added CI, qualified 10,000-decision review benchmark evidence, full dependency audit gates and updated public plugin workflows.
+
+### Tiếng Việt
+
+- Bổ sung transitive impact xác định, cycle-safe qua quan hệ `based_on` và `implements` explicit; hỗ trợ API, CLI, SARIF và web cockpit.
+- Bổ sung review ledger, thao tác audit, lịch sử evidence binding bất biến, review receipt portable và xác minh backup/import/integrity chặt hơn.
+- Bổ sung signed attestation Ed25519 cho package và review receipt đã xác minh, kèm schema nghiêm ngặt, conformance vector và giới hạn trust rõ ràng.
+
+### 日本語
+
+- 明示的な `based_on` / `implements` 関係に限定した、cycle-safe で決定的な推移的影響を API、CLI、SARIF、web cockpit に追加しました。
+- review ledger、監査済み action、不変 evidence-binding 履歴、portable receipt、強化された backup/import/integrity 検証を追加しました。
+- 検証済み package と任意 receipt を対象とする Ed25519 signed attestation、厳格な schema、固定 vector、trust 制約を追加しました。
+
 ## [1.0.1] - 2026-08-02
 
 ### English
@@ -43,5 +64,6 @@
 - 決定的な引用範囲検査、オフライン検証、fail-closed の整合性を維持しました。
 - 自動 GitHub Actions と過去リリース文書を削除しました。
 
+[2.0.0]: https://github.com/thangldw/proofline/releases/tag/v2.0.0
 [1.0.1]: https://github.com/thangldw/proofline/releases/tag/v1.0.1
 [1.0.0]: https://github.com/thangldw/proofline/releases/tag/v1.0.0

@@ -87,8 +87,11 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
     setSelectedId(null);
     setDetail(null);
     void loadReviews();
+  }, [loadReviews, workspaceId]);
+
+  useEffect(() => {
     void loadImpacts();
-  }, [loadImpacts, loadReviews, workspaceId]);
+  }, [loadImpacts, workspaceId]);
 
   async function openReview(id: string) {
     setSelectedId(id);

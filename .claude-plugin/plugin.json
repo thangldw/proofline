@@ -1,7 +1,7 @@
 {
   "name": "proofline",
-  "version": "1.0.1",
-  "description": "Evidence-first engineering decision memory with deterministic stale-decision checks.",
+  "version": "2.0.0",
+  "description": "Evidence-first decision memory with deterministic impact and signed attestations.",
   "author": {
     "name": "Thang Luu",
     "url": "https://github.com/thangldw"

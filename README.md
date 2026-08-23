@@ -2,7 +2,7 @@
 
 [English](#english) · [Tiếng Việt](#tiếng-việt) · [日本語](#日本語)
 
-Proofline shows which immutable evidence justified an engineering decision and warns when the cited evidence changes.
+Proofline shows which immutable evidence justified an engineering decision, traces explicit downstream impact when that evidence changes, and signs portable evidence attestations.
 
 ```mermaid
 %%{init: {"theme":"base","themeVariables":{"background":"#FFFFFF","fontFamily":"Arial, sans-serif","lineColor":"#667085","primaryTextColor":"#172B4D"}}}%%
@@ -27,6 +27,8 @@ Proofline is a local-first Engineering Decision Memory for evidence-backed ADRs.
 
 Decision status and evidence health are separate: an approved ADR remains historical fact while a stale citation is shown as **Accepted · review required**. Proofline never silently rewrites an accepted decision.
 
+Explicit `based_on` and `implements` relations produce cycle-safe transitive impact paths. Ed25519 attestations bind a verified package and optional review receipt to a trusted public key; signing and verification remain local and AI-provider independent.
+
 Requirements: Python 3.11+, Node.js 20+ and npm.
 
 ```bash
@@ -34,26 +36,27 @@ make setup
 .venv/bin/proofline demo stale-decision
 .venv/bin/proofline verify-package proofline-demo-stale-decision/evidence.zip
 .venv/bin/proofline verify-review-receipt proofline-demo-stale-decision/decision-review.json
+.venv/bin/proofline check-impacts --format sarif
 make test
 make check
 ```
 
-The current boundary is a single-user local workflow with recoverable data. Hosted sync, shared workspaces, signatures and permission-aware connector fleets are not implemented.
+The current boundary is a single-user local workflow with recoverable data. Hosted sync, shared workspaces, organization identity, trusted timestamps, key revocation and permission-aware connector fleets are not implemented.
 
-Current technical references: [architecture](docs/architecture.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.1 release notes](docs/releases/v1.0.1.md).
+Current technical references: [architecture](docs/architecture.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v2.0.0 release notes](docs/releases/v2.0.0.md).
 
-The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. Proofline 1.0.1 is published in the public [OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa). It does not claim hosted sync or a remote MCP connector. See the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md), [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
+The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. Proofline is listed in the public [OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa); the exact submitted/public version is tracked in the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md). It does not claim hosted sync or a remote MCP connector. See the [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
 
 ## Tiếng Việt
 
-Proofline là bộ nhớ quyết định kỹ thuật local-first dành cho ADR có bằng chứng. Hệ thống giữ định danh nguồn, phiên bản nguồn và đúng đoạn trích; xuất Decision Evidence Package độc lập; đồng thời kiểm tra quyết định lỗi thời theo cách xác định mà không cần nhà cung cấp AI.
+Proofline là bộ nhớ quyết định kỹ thuật local-first dành cho ADR có bằng chứng. Hệ thống giữ định danh nguồn, phiên bản nguồn và đúng đoạn trích; phát hiện transitive impact qua quan hệ explicit; xuất package độc lập và ký attestation Ed25519 mà không phụ thuộc nhà cung cấp AI.
 
-Yêu cầu: Python 3.11+, Node.js 20+ và npm. Dùng các lệnh ở phần English để cài đặt, chạy demo và kiểm thử. Phạm vi hiện tại là quy trình local cho một người dùng; chưa có đồng bộ hosted, workspace dùng chung, chữ ký hoặc hệ connector phân quyền.
+Yêu cầu: Python 3.11+, Node.js 20+ và npm. Dùng các lệnh ở phần English để cài đặt, chạy demo và kiểm thử. Phạm vi hiện tại là quy trình local cho một người dùng; chưa có đồng bộ hosted, workspace dùng chung, định danh tổ chức, trusted timestamp hoặc hệ connector phân quyền.
 
 ## 日本語
 
-Proofline は、根拠付き ADR のためのローカルファーストな Engineering Decision Memory です。ソース識別子、ソース版、正確な引用範囲を保持し、独立検証可能な Decision Evidence Package を出力します。AI プロバイダーなしで、判断が古くなったかを決定的に検査できます。
+Proofline は、根拠付き ADR のためのローカルファーストな Engineering Decision Memory です。正確な引用範囲を保持し、明示的な関係による推移的影響を追跡し、AI プロバイダーなしで Ed25519 attestation を署名・検証します。
 
-必要環境は Python 3.11 以上、Node.js 20 以上、npm です。セットアップ、デモ、テストには English セクションのコマンドを使用してください。現在は単一ユーザーのローカル利用が対象で、ホスト同期、共有ワークスペース、署名、権限対応コネクター群は未実装です。
+必要環境は Python 3.11 以上、Node.js 20 以上、npm です。現在は単一ユーザーのローカル利用が対象で、ホスト同期、共有ワークスペース、組織 identity、信頼時刻、権限対応コネクター群は未実装です。
 
 Released under the [MIT License](LICENSE).

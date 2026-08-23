@@ -23,10 +23,16 @@ flowchart LR
 
 `Decision.status` records the governed historical outcome. `DecisionReview.state` records current evidence health and never silently mutates that outcome. Evidence bindings form immutable chains: re-anchoring supersedes an old citation and creates a new active citation while retaining the old payload. Decision Evidence Package v1 remains historical; a separate review receipt binds current health to its root hash.
 
+`decision_impacts.py` derives a read-only graph from unresolved reviews and active explicit `based_on` / `implements` relations. Traversal runs target-to-source, is cycle-safe, and emits one canonical shortest path without changing a decision or review. `attestations.py` signs the canonical package/root and optional receipt identifiers with Ed25519. Verification depends on the supplied trusted public key and local cryptography runtime, never an AI provider or database.
+
 ## Tiếng Việt
 
 `apps/api/proofline/` quản lý ingest, phiên bản nguồn bất biến, exact span, decision health và xác minh package. `apps/web/` là client React local; `apps/desktop/` đóng gói service local bằng Tauri. AI provider chỉ là tùy chọn và không tham gia vào contract provenance/xác minh.
 
+Transitive impact chỉ đi qua quan hệ `based_on` / `implements` explicit. Signed attestation xác thực tính toàn vẹn theo trusted public key, không tự xác lập danh tính hoặc trusted timestamp.
+
 ## 日本語
 
 `apps/api/proofline/` が取込、不変ソース版、正確な引用範囲、判断状態、パッケージ検証を担当します。`apps/web/` はローカル React クライアント、`apps/desktop/` はローカルサービスを組み込む Tauri シェルです。AI プロバイダーは任意で、来歴と検証の契約には依存しません。
+
+推移的影響は明示的な `based_on` / `implements` 関係だけをたどります。署名 attestation は信頼済み公開鍵に対する整合性を示しますが、identity や信頼時刻を保証しません。
