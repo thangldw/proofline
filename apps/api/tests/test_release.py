@@ -112,6 +112,12 @@ def test_release_toolchain_pins_non_vulnerable_pip_floor():
     assert "pip>=26.2,<27" in project["project"]["optional-dependencies"]["dev"]
 
 
+def test_release_toolchain_pins_non_vulnerable_setuptools_floor():
+    project = tomllib.loads((repository_root() / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "setuptools>=83,<85" in project["project"]["optional-dependencies"]["dev"]
+
+
 def test_pypi_distribution_uses_available_name_without_renaming_runtime():
     project = tomllib.loads((repository_root() / "pyproject.toml").read_text(encoding="utf-8"))
 

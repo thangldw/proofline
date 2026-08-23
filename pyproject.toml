@@ -36,6 +36,7 @@ dev = [
   "pyinstaller>=6.21,<7",
   "pytest>=9.1.1,<10",
   "ruff>=0.8,<1",
+  "setuptools>=83,<85",
   "twine>=7,<8",
 ]
 
