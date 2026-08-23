@@ -1,5 +1,10 @@
 import type {
   DecisionTimeline,
+  DecisionHealthOverview,
+  DecisionReview,
+  DecisionReviewDetail,
+  DecisionReviewFilters,
+  DecisionReviewRefreshSummary,
   ActionProposal,
   GroundedAnswer,
   IngestionJob,
@@ -36,7 +41,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Request failed (${response.status})`);
+    const detail = body.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : typeof detail?.code === "string"
+          ? detail.code
+          : `Request failed (${response.status})`;
+    throw new Error(message);
   }
   return response.status === 204 ? (undefined as T) : response.json();
 }
@@ -47,6 +59,61 @@ export const api = {
   },
   workspaces: () => request<Workspace[]>("/api/v1/workspaces"),
   overview: () => request<Overview>("/api/v1/overview"),
+  decisionHealthOverview: () =>
+    request<DecisionHealthOverview>("/api/v1/decision-health/overview"),
+  decisionReviews: (filters: DecisionReviewFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.state) params.set("state", filters.state);
+    if (filters.anchorState) params.set("anchor_state", filters.anchorState);
+    if (filters.severity) params.set("severity", filters.severity);
+    params.set("limit", String(filters.limit ?? 100));
+    return request<DecisionReview[]>(
+      `/api/v1/decision-reviews?${params.toString()}`,
+    );
+  },
+  decisionReview: (id: string) =>
+    request<DecisionReviewDetail>(`/api/v1/decision-reviews/${id}`),
+  refreshDecisionReviews: () =>
+    request<DecisionReviewRefreshSummary>("/api/v1/decision-reviews/refresh", {
+      method: "POST",
+    }),
+  updateDecisionReview: (
+    id: string,
+    payload:
+      | { action: "acknowledge" }
+      | { action: "waive"; reason: string },
+  ) =>
+    request<DecisionReview>(`/api/v1/decision-reviews/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  reanchorDecisionReview: (
+    id: string,
+    payload: {
+      expected_current_source_version_id: string;
+      start_offset: number;
+      end_offset: number;
+      reason: string;
+    },
+  ) =>
+    request<DecisionReview>(`/api/v1/decision-reviews/${id}/reanchor`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  resolveDecisionReview: (
+    id: string,
+    payload:
+      | { action: "obsolete_decision"; reason: string }
+      | {
+          action: "supersede_decision";
+          replacement_decision_id: string;
+          reason: string;
+        },
+  ) =>
+    request<DecisionReview>(`/api/v1/decision-reviews/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   sources: () => request<Source[]>("/api/v1/sources"),
   notes: () => request<Note[]>("/api/v1/notes"),
   studyCards: () => request<StudyCard[]>("/api/v1/study-cards?due_only=true"),

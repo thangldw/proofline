@@ -23,6 +23,7 @@ from .decision_reviews import (
 from .models import AuditEvent, Decision, DecisionReview, Evidence, Source, SourceVersion, utc_now
 from .schemas import (
     DecisionReviewAction,
+    DecisionReviewListItem,
     DecisionReviewOverview,
     DecisionReviewRead,
     DecisionReviewReanchor,
@@ -134,7 +135,7 @@ def decision_health_overview(
     )
 
 
-@router.get("/decision-reviews", response_model=list[DecisionReviewRead])
+@router.get("/decision-reviews", response_model=list[DecisionReviewListItem])
 def list_decision_reviews(
     state: ReviewState | None = None,
     anchor_state: AnchorState | None = None,
@@ -142,8 +143,12 @@ def list_decision_reviews(
     limit: int = Query(default=100, ge=1, le=200),
     workspace_id: str = Depends(resolve_workspace_id),
     session: Session = Depends(get_session),
-) -> list[DecisionReview]:
-    statement = select(DecisionReview).where(DecisionReview.workspace_id == workspace_id)
+) -> list[DecisionReviewListItem]:
+    statement = (
+        select(DecisionReview, Decision.status)
+        .join(Decision, Decision.id == DecisionReview.decision_id)
+        .where(DecisionReview.workspace_id == workspace_id)
+    )
     if state is not None:
         statement = statement.where(DecisionReview.state == state)
     if anchor_state is not None:
@@ -155,7 +160,15 @@ def list_decision_reviews(
         DecisionReview.opened_at,
         DecisionReview.id,
     ).limit(limit)
-    return list(session.scalars(statement).all())
+    return [
+        DecisionReviewListItem.model_validate(
+            {
+                **DecisionReviewRead.model_validate(review).model_dump(),
+                "decision_status": decision_status,
+            }
+        )
+        for review, decision_status in session.execute(statement).all()
+    ]
 
 
 @router.post("/decision-reviews/refresh")
@@ -221,7 +234,10 @@ def get_decision_review(
     ).all()
     policy = DecisionHealthPolicy()
     return {
-        "review": DecisionReviewRead.model_validate(review).model_dump(),
+        "review": {
+            **DecisionReviewRead.model_validate(review).model_dump(),
+            "decision_status": decision.status,
+        },
         "decision": {
             "id": decision.id,
             "title": decision.title,

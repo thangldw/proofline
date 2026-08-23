@@ -84,3 +84,59 @@ test("local evidence-first workflow preserves provenance and renders hostile sou
 
   expect(externalRequests).toEqual([]);
 });
+
+test("decision health opens exact drift evidence without responsive overflow", async ({ page }) => {
+  const uri = "file:///decision-health-e2e.md";
+  const original = "# Queue\n\nDecision: Use SQLite.\nReason: local durability.";
+  const changed = "# Queue\n\nDecision: Use NATS.\nReason: shared workload.";
+  const created = await page.request.post("/api/v1/sources", {
+    data: { title: "Decision Health E2E", uri, content: original },
+  });
+  expect(created.ok()).toBeTruthy();
+  const source = await created.json();
+  const memories = await (await page.request.get("/api/v1/memories")).json();
+  const decision = memories.find(
+    (item: { source_id: string; kind: string }) =>
+      item.source_id === source.id && item.kind === "decision",
+  );
+  expect(decision).toBeTruthy();
+  expect(
+    (
+      await page.request.patch(`/api/v1/memories/${decision.id}`, {
+        data: { status: "accepted" },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  expect(
+    (
+      await page.request.post("/api/v1/sources", {
+        data: { title: "Decision Health E2E", uri, content: changed },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  const reviews = await (
+    await page.request.get("/api/v1/decision-reviews", { params: { state: "open" } })
+  ).json();
+  const review = reviews.find(
+    (item: { decision_id: string }) => item.decision_id === decision.id,
+  );
+  expect(review).toBeTruthy();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Decision Health", level: 1 })).toBeVisible();
+  await expect(page.getByText("Accepted · review required")).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+  await page.getByRole("button", { name: `Open review ${review.id}` }).click();
+  const drawer = page.getByRole("dialog", { name: "Decision review detail" });
+  await expect(drawer.getByText("Decision: Use SQLite.")).toBeVisible();
+  await expect(drawer.getByText("Decision: Use NATS.")).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(drawer).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+});
