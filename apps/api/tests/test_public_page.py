@@ -45,6 +45,9 @@ def test_default_decision_policy_and_ci_contract_are_committed():
     ):
         assert required in workflow
     assert workflow.count("python -m venv .venv") == 5
+    assert workflow.count(".venv/bin/proofline") == 10
+    assert ".venv/bin/python -m build --outdir dist" in workflow
+    assert ".venv/bin/python scripts/verify_release_artifacts.py" in workflow
     assert "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09" in workflow
     assert "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1" in workflow
     assert "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444" in workflow

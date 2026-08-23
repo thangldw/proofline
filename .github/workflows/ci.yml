@@ -52,12 +52,12 @@ jobs:
           python-version: "3.11"
       - run: python -m venv .venv && .venv/bin/python -m pip install -e '.[dev]'
       - run: make verify-package-conformance
-      - run: proofline demo stale-decision --output-dir /tmp/proofline-ci-demo
-      - run: proofline verify-package /tmp/proofline-ci-demo/evidence.zip
-      - run: proofline verify-review-receipt /tmp/proofline-ci-demo/decision-review.json
-      - run: proofline generate-attestation-key --private-key /tmp/proofline-ci-key.pem --public-key /tmp/proofline-ci-key.pub.pem
-      - run: proofline attest --package /tmp/proofline-ci-demo/evidence.zip --review-receipt /tmp/proofline-ci-demo/decision-review.json --private-key /tmp/proofline-ci-key.pem --output /tmp/proofline-ci-attestation.json
-      - run: proofline verify-attestation /tmp/proofline-ci-attestation.json --public-key /tmp/proofline-ci-key.pub.pem --package /tmp/proofline-ci-demo/evidence.zip --review-receipt /tmp/proofline-ci-demo/decision-review.json
+      - run: .venv/bin/proofline demo stale-decision --output-dir /tmp/proofline-ci-demo
+      - run: .venv/bin/proofline verify-package /tmp/proofline-ci-demo/evidence.zip
+      - run: .venv/bin/proofline verify-review-receipt /tmp/proofline-ci-demo/decision-review.json
+      - run: .venv/bin/proofline generate-attestation-key --private-key /tmp/proofline-ci-key.pem --public-key /tmp/proofline-ci-key.pub.pem
+      - run: .venv/bin/proofline attest --package /tmp/proofline-ci-demo/evidence.zip --review-receipt /tmp/proofline-ci-demo/decision-review.json --private-key /tmp/proofline-ci-key.pem --output /tmp/proofline-ci-attestation.json
+      - run: .venv/bin/proofline verify-attestation /tmp/proofline-ci-attestation.json --public-key /tmp/proofline-ci-key.pub.pem --package /tmp/proofline-ci-demo/evidence.zip --review-receipt /tmp/proofline-ci-demo/decision-review.json
 
   release-artifacts:
     runs-on: ubuntu-latest
@@ -68,10 +68,10 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m venv .venv && .venv/bin/python -m pip install -e '.[dev]'
-      - run: python -m build --outdir dist
-      - run: python scripts/verify_release_artifacts.py dist/*.whl dist/*.tar.gz
-      - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0-py3-none-any.whl --expected-version 2.0.0
-      - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0.tar.gz --expected-version 2.0.0
+      - run: .venv/bin/python -m build --outdir dist
+      - run: .venv/bin/python scripts/verify_release_artifacts.py dist/*.whl dist/*.tar.gz
+      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0-py3-none-any.whl --expected-version 2.0.0
+      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0.tar.gz --expected-version 2.0.0
 
   decision-health-sarif:
     runs-on: ubuntu-latest
@@ -82,8 +82,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m venv .venv && .venv/bin/python -m pip install -e '.[dev]'
-      - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline seed
-      - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline check-decisions --format sarif --output artifacts/decision-health.sarif
+      - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" .venv/bin/proofline seed
+      - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" .venv/bin/proofline check-decisions --format sarif --output artifacts/decision-health.sarif
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: decision-health-sarif
@@ -99,8 +99,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m venv .venv && .venv/bin/python -m pip install -e '.[dev]'
-      - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline seed
-      - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" proofline check-impacts --format sarif --output artifacts/decision-impact.sarif
+      - run: mkdir -p artifacts && PROOFLINE_HOME="$RUNNER_TEMP/proofline" .venv/bin/proofline seed
+      - run: PROOFLINE_HOME="$RUNNER_TEMP/proofline" .venv/bin/proofline check-impacts --format sarif --output artifacts/decision-impact.sarif
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: decision-impact-sarif
