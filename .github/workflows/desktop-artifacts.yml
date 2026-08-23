@@ -62,7 +62,7 @@ jobs:
           APPLE_TEAM_ID_PRESENT: ${{ secrets.APPLE_TEAM_ID != '' }}
         run: |
           release_args=()
-          if [[ "${RELEASE_GRADE,,}" == "true" ]]; then release_args+=(--release-grade); fi
+          if [[ "$RELEASE_GRADE" == "true" ]]; then release_args+=(--release-grade); fi
           python scripts/desktop_release_gate.py --platform macos "${release_args[@]}" \
             --credential "apple_certificate=$APPLE_CERTIFICATE_PRESENT" \
             --credential "apple_certificate_password=$APPLE_CERTIFICATE_PASSWORD_PRESENT" \
@@ -147,7 +147,7 @@ jobs:
           dmg_path=$(find apps/desktop/src-tauri/target/release/bundle/dmg -name '*.dmg' -print -quit)
           expected_version=$(python -c "import json; print(json.load(open('apps/desktop/package.json'))['version'])")
           receipt_args=()
-          if [[ "${RELEASE_GRADE,,}" == "true" ]]; then receipt_args+=(--release-grade); fi
+          if [[ "$RELEASE_GRADE" == "true" ]]; then receipt_args+=(--release-grade); fi
           python scripts/desktop_release_receipt.py --app "$app_path" --dmg "$dmg_path" \
             --expected-version "$expected_version" --output artifacts/desktop-receipt.json \
             "${receipt_args[@]}"

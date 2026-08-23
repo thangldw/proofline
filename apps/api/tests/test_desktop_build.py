@@ -6,6 +6,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS = ROOT / "scripts"
+DESKTOP_WORKFLOW = ROOT / ".github/workflows/desktop-artifacts.yml"
 sidecar_destination = runpy.run_path(SCRIPTS / "build_desktop_sidecar.py")["sidecar_destination"]
 macos_release_qualification = runpy.run_path(SCRIPTS / "desktop_release_receipt.py")[
     "macos_release_qualification"
@@ -26,6 +27,12 @@ def test_sidecar_destination_uses_tauri_target_triple_name():
     assert mac.name == "proofline-sidecar-aarch64-apple-darwin"
     assert windows.name == "proofline-sidecar-x86_64-pc-windows-msvc.exe"
     assert mac.parent == ROOT / "apps/desktop/src-tauri/binaries"
+
+
+def test_desktop_workflow_is_compatible_with_macos_system_bash():
+    workflow = DESKTOP_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "${RELEASE_GRADE,,}" not in workflow
 
 
 def test_macos_release_qualification_requires_developer_id_and_native_checks():
