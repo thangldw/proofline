@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from importlib.resources import files
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import __version__
@@ -18,6 +20,12 @@ from .backup import (
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .decision_health import DecisionHealthError, check_decision_health
+from .decision_policy import (
+    DecisionPolicyError,
+    load_decision_policy,
+    policy_sha256,
+)
+from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
@@ -39,6 +47,7 @@ from .evidence_packages import (
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
+from .models import Workspace
 from .portability import (
     PortabilityError,
     atomic_write_export,
@@ -57,6 +66,7 @@ from .real_model_evaluation import (
     write_comparison_receipt,
     write_preflight_receipt,
 )
+from .sarif import build_decision_health_sarif
 from .schemas import SourceCreate
 from .server import run_server
 from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
@@ -86,6 +96,11 @@ def seed_demo() -> None:
             ),
         )
     print(f"{'Indexed' if created else 'Already indexed'}: {source.title} ({source.id})")
+
+
+def _decision_check_failed(code: str) -> None:
+    print(f"decision check failed: {code}", file=sys.stderr)
+    raise SystemExit(2)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -246,7 +261,14 @@ def main(argv: list[str] | None = None) -> None:
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
     )
-    check_decisions.add_argument("--format", choices=("text", "json"), default="text")
+    check_decisions.add_argument("--format", choices=("text", "json", "sarif"), default="text")
+    check_decisions.add_argument("--policy", type=Path)
+    check_decisions.add_argument("--output", type=Path)
+    refresh_reviews = subcommands.add_parser(
+        "refresh-reviews",
+        help="Persist the current deterministic decision review ledger",
+    )
+    refresh_reviews.add_argument("--policy", type=Path)
     demo = subcommands.add_parser("demo", help="Run a self-contained product story")
     demo_commands = demo.add_subparsers(dest="demo_name", required=True)
     stale_demo = demo_commands.add_parser(
@@ -496,31 +518,77 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(report, sort_keys=True))
     elif args.command == "check-decisions":
         try:
+            policy = load_decision_policy(args.policy)
+        except DecisionPolicyError as exc:
+            _decision_check_failed(exc.code)
+        try:
             with SessionLocal() as session:
                 findings = check_decision_health(session)
         except DecisionHealthError as exc:
-            raise SystemExit(f"decision check failed: {exc.code}") from exc
-        except (OSError, SQLAlchemyError) as exc:
-            raise SystemExit("decision check failed: database_unavailable") from exc
-        if args.format == "json":
-            print(
-                json.dumps(
-                    {
-                        "valid": not findings,
-                        "finding_count": len(findings),
-                        "findings": [finding.model_dump() for finding in findings],
-                    },
-                    sort_keys=True,
-                )
-            )
+            _decision_check_failed(exc.code)
+        except (OSError, SQLAlchemyError):
+            _decision_check_failed("database_unavailable")
+        blocking = [finding for finding in findings if finding.reason in policy.fail_on]
+        if args.format == "sarif":
+            document = build_decision_health_sarif(findings, policy)
+        elif args.format == "json":
+            document = {
+                "valid": not blocking,
+                "finding_count": len(findings),
+                "blocking_count": len(blocking),
+                "policy_sha256": policy_sha256(policy),
+                "findings": [finding.model_dump() for finding in findings],
+            }
+        else:
+            document = None
+        if args.output is not None:
+            if document is None:
+                _decision_check_failed("output_format_invalid")
+            try:
+                atomic_write_export(args.output, document)
+            except PortabilityError as exc:
+                _decision_check_failed(exc.code)
+        elif document is not None:
+            print(json.dumps(document, sort_keys=True))
         elif findings:
             for finding in findings:
                 print("Decision requires review")
                 print(f"{finding.locator} changed after this decision was approved.")
         else:
             print("All approved decision citations resolve in current sources.")
-        if findings:
+        if blocking:
             raise SystemExit(1)
+    elif args.command == "refresh-reviews":
+        try:
+            policy = load_decision_policy(args.policy)
+        except DecisionPolicyError as exc:
+            _decision_check_failed(exc.code)
+        try:
+            initialize_database(engine)
+            totals = {
+                key: 0 for key in ("opened", "superseded", "resolved", "updated", "unchanged")
+            }
+            with SessionLocal() as session:
+                workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
+                for workspace_id in workspace_ids:
+                    summary = refresh_decision_reviews(
+                        session,
+                        workspace_id=workspace_id,
+                        policy=policy,
+                    )
+                    for key, value in summary.model_dump().items():
+                        totals[key] += value
+                session.commit()
+        except DecisionReviewError as exc:
+            _decision_check_failed(exc.code)
+        except (OSError, SQLAlchemyError):
+            _decision_check_failed("database_unavailable")
+        print(
+            json.dumps(
+                {"valid": True, "policy_sha256": policy_sha256(policy), **totals},
+                sort_keys=True,
+            )
+        )
     elif args.command == "demo" and args.demo_name == "stale-decision":
         try:
             result = run_stale_decision_demo(args.output_dir, force=args.force)

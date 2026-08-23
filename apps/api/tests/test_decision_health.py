@@ -129,16 +129,19 @@ def test_check_decisions_cli_is_read_only_and_returns_ci_failure(session, monkey
     assert _provenance_counts(session) == before
 
 
-def test_check_decisions_cli_reports_unavailable_database_without_details(monkeypatch):
+def test_check_decisions_cli_reports_unavailable_database_without_details(monkeypatch, capsys):
     def unavailable():
         raise OperationalError("private query", {}, RuntimeError("private database detail"))
 
     monkeypatch.setattr(cli_module, "SessionLocal", unavailable)
 
-    with pytest.raises(SystemExit, match="decision check failed: database_unavailable") as raised:
+    with pytest.raises(SystemExit) as raised:
         main(["check-decisions"])
 
-    assert "private" not in str(raised.value)
+    assert raised.value.code == 2
+    error = capsys.readouterr().err.strip()
+    assert error == "decision check failed: database_unavailable"
+    assert "private" not in error
 
 
 def test_check_decisions_entrypoint_does_not_create_missing_state_directory(tmp_path):
