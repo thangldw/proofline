@@ -4,6 +4,7 @@ import proofline.ingestion as ingestion_module
 import pytest
 from fastapi.testclient import TestClient
 from proofline.database import initialize_database, make_engine
+from proofline.decision_reviews import DecisionReviewError
 from proofline.ingestion import (
     IngestionConflict,
     IngestionExecutionError,
@@ -15,6 +16,7 @@ from proofline.main import create_app
 from proofline.models import (
     Chunk,
     Decision,
+    DecisionReview,
     Evidence,
     IngestionJob,
     IngestionJobInput,
@@ -123,6 +125,55 @@ def test_crash_rolls_back_domain_then_retry_claim_succeeds(client, session, monk
     assert session.scalar(select(func.count()).select_from(SourceVersion)) == 1
     assert session.get(IngestionJobInput, job_id) is None
     assert client.post(f"/api/v1/jobs/{job_id}/retry").status_code == 409
+
+
+def test_review_refresh_failure_keeps_provenance_and_retry_does_not_reingest(session, monkeypatch):
+    original_refresh = ingestion_module.refresh_decision_reviews
+    first_source, _created, _job = run_ingestion_job(
+        session,
+        SourceCreate(
+            title="ADR",
+            uri="file:///review-refresh.md",
+            content="Decision: Use SQLite.\nReason: local durability.",
+        ),
+    )
+    first_decision = session.scalar(
+        select(Decision).where(Decision.source_version_id == first_source.current_version_id)
+    )
+    assert first_decision is not None
+    first_decision.status = "accepted"
+    session.commit()
+
+    def fail_refresh(*_args, **_kwargs):
+        raise DecisionReviewError("decision_review_refresh_failed")
+
+    monkeypatch.setattr(ingestion_module, "refresh_decision_reviews", fail_refresh)
+    with pytest.raises(IngestionExecutionError) as raised:
+        run_ingestion_job(
+            session,
+            SourceCreate(
+                title="ADR changed",
+                uri="file:///review-refresh.md",
+                content="Decision: Use NATS.\nReason: shared workload.",
+            ),
+        )
+
+    failed = session.get(IngestionJob, raised.value.job_id)
+    assert failed is not None
+    assert failed.state == "failed"
+    assert failed.stage == "review_refresh"
+    assert failed.error_code == "decision_review_refresh_failed"
+    assert failed.retryable is True
+    assert session.scalar(select(func.count()).select_from(SourceVersion)) == 2
+
+    monkeypatch.setattr(ingestion_module, "refresh_decision_reviews", original_refresh)
+    completed = retry_ingestion_job(session, failed.id)
+
+    assert completed.state == "succeeded"
+    assert completed.stage == "ready"
+    assert completed.attempts == 2
+    assert session.scalar(select(func.count()).select_from(SourceVersion)) == 2
+    assert session.scalar(select(func.count()).select_from(DecisionReview)) == 1
 
 
 @pytest.mark.parametrize("fault_boundary", ["chunk_parse", "memory_extract"])

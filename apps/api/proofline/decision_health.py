@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .anchors import build_evidence_anchor, resolve_evidence_anchor
+from .anchors import EvidenceAnchor, build_evidence_anchor, resolve_evidence_anchor
 from .models import Decision, Source, SourceVersion
 
 
@@ -20,6 +20,7 @@ class DecisionHealthError(RuntimeError):
 class DecisionHealthFinding:
     decision_id: str
     decision_title: str
+    evidence_id: str
     source_id: str
     source_uri: str | None
     source_title: str
@@ -33,6 +34,10 @@ class DecisionHealthFinding:
     cited_content_sha256: str
     current_content_sha256: str
     reason: str = "changed"
+    candidate_start_offset: int | None = None
+    candidate_end_offset: int | None = None
+    candidate_start_line: int | None = None
+    candidate_end_line: int | None = None
 
     def model_dump(self) -> dict[str, str | int | None]:
         return asdict(self)
@@ -42,7 +47,12 @@ class DecisionHealthFinding:
         return f"{self.source_title}:{self.start_line}-{self.end_line}"
 
 
-def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
+def check_decision_health(
+    session: Session,
+    *,
+    workspace_id: str | None = None,
+    source_ids: set[str] | None = None,
+) -> list[DecisionHealthFinding]:
     """Return approved decisions whose exact evidence no longer resolves in the current source.
 
     This check is intentionally deterministic and read-only. A source revision alone is not enough
@@ -58,6 +68,10 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
         cited_version = session.get(SourceVersion, decision.source_version_id)
         if source is None or cited_version is None:
             raise DecisionHealthError("decision_source_missing")
+        if workspace_id is not None and source.workspace_id != workspace_id:
+            continue
+        if source_ids is not None and source.id not in source_ids:
+            continue
         if source.content_hash != hashlib.sha256(f"source:{source.id}".encode()).hexdigest():
             raise DecisionHealthError("source_identity_invalid")
         if source.current_version_id is None:
@@ -71,9 +85,12 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
             for version in (cited_version, current_version)
         ):
             raise DecisionHealthError("source_version_hash_mismatch")
-        if not decision.evidence:
+        active_evidence = [
+            evidence for evidence in decision.evidence if evidence.binding_state == "active"
+        ]
+        if not active_evidence:
             raise DecisionHealthError("approved_decision_evidence_missing")
-        for evidence in sorted(decision.evidence, key=lambda item: (item.start_offset, item.id)):
+        for evidence in sorted(active_evidence, key=lambda item: (item.start_offset, item.id)):
             exact = cited_version.content[evidence.start_offset : evidence.end_offset]
             if (
                 evidence.source_id != source.id
@@ -92,11 +109,17 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
                 raise DecisionHealthError("citation_provenance_invalid")
             if current_version.id == cited_version.id:
                 continue
-            cited_anchor = build_evidence_anchor(
-                cited_version.content,
-                evidence.start_offset,
-                evidence.end_offset,
+            expected_anchor = build_evidence_anchor(
+                cited_version.content, evidence.start_offset, evidence.end_offset
             )
+            cited_anchor = EvidenceAnchor(
+                version=evidence.anchor_version,
+                section_path=tuple(evidence.section_path),
+                prefix_sha256=evidence.prefix_sha256,
+                suffix_sha256=evidence.suffix_sha256,
+            )
+            if cited_anchor != expected_anchor:
+                raise DecisionHealthError("citation_anchor_invalid")
             resolution = resolve_evidence_anchor(
                 quote=evidence.quote,
                 cited_anchor=cited_anchor,
@@ -104,10 +127,12 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
             )
             if resolution.state == "unchanged":
                 continue
+            candidate = resolution.candidates[0] if resolution.candidates else None
             findings.append(
                 DecisionHealthFinding(
                     decision_id=decision.id,
                     decision_title=decision.title,
+                    evidence_id=evidence.id,
                     source_id=source.id,
                     source_uri=source.uri,
                     source_title=source.title,
@@ -121,6 +146,10 @@ def check_decision_health(session: Session) -> list[DecisionHealthFinding]:
                     cited_content_sha256=cited_version.content_hash,
                     current_content_sha256=current_version.content_hash,
                     reason=resolution.state,
+                    candidate_start_offset=candidate.start_offset if candidate else None,
+                    candidate_end_offset=candidate.end_offset if candidate else None,
+                    candidate_start_line=candidate.start_line if candidate else None,
+                    candidate_end_line=candidate.end_line if candidate else None,
                 )
             )
     return findings
