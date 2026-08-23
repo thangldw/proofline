@@ -124,6 +124,50 @@ def test_nonblocking_policy_returns_zero_but_preserves_finding(
     assert document["blocking_count"] == 0
 
 
+def test_blocking_json_contract_is_content_free_and_returns_one(session, monkeypatch, capsys):
+    _finding(session)
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    monkeypatch.setattr(cli_module, "SessionLocal", factory)
+
+    with pytest.raises(SystemExit) as blocked:
+        main(["check-decisions", "--format", "json"])
+
+    assert blocked.value.code == 1
+    document = json.loads(capsys.readouterr().out)
+    assert set(document) == {
+        "valid",
+        "finding_count",
+        "blocking_count",
+        "policy_sha256",
+        "findings",
+    }
+    assert document["valid"] is False
+    assert document["finding_count"] == 1
+    assert document["blocking_count"] == 1
+    assert set(document["findings"][0]) == {
+        "decision_id",
+        "evidence_id",
+        "source_id",
+        "cited_source_version_id",
+        "current_source_version_id",
+        "start_offset",
+        "end_offset",
+        "start_line",
+        "end_line",
+        "quote_sha256",
+        "cited_content_sha256",
+        "current_content_sha256",
+        "reason",
+        "candidate_start_offset",
+        "candidate_end_offset",
+        "candidate_start_line",
+        "candidate_end_line",
+    }
+    serialized = json.dumps(document, sort_keys=True)
+    for confidential_value in ("SQLite", "NATS", "requirement.md", "file://"):
+        assert confidential_value not in serialized
+
+
 def test_refresh_reviews_persists_content_free_summary(session, monkeypatch, capsys):
     _finding(session)
     factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
