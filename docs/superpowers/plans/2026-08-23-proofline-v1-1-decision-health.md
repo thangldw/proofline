@@ -775,4 +775,4 @@ git commit -m "chore: gate decision health milestone"
 - [ ] Confirm `git status --short` is clean and commits are task-scoped.
 - [ ] Confirm no public version, tag, GitHub release, PyPI artifact, or plugin submission changed.
 - [ ] Record exact test counts, dependency-audit scope, benchmark environment, and synthetic qualification.
-- [ ] Start a separate approved spec and plan for v1.2 transitive impact and attestations.
+- [x] Start a separate approved spec and plan for v1.2 transitive impact and attestations.
