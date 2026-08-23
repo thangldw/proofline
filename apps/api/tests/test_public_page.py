@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import yaml
-
 from proofline.decision_policy import load_decision_policy
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -86,9 +85,7 @@ def test_ci_can_verify_an_explicit_immutable_ref():
     }
     for name, job in jobs.items():
         checkouts = [
-            step
-            for step in job["steps"]
-            if step.get("uses", "").startswith("actions/checkout@")
+            step for step in job["steps"] if step.get("uses", "").startswith("actions/checkout@")
         ]
         assert len(checkouts) == 1, name
         assert checkouts[0]["with"]["ref"] == expected_ref, name
