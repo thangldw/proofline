@@ -13,6 +13,7 @@ from proofline.ingestion import ingest_source
 from proofline.models import AuditEvent, Decision, DecisionRelation, DecisionReview, Evidence
 from proofline.schemas import SourceCreate
 from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 
 ORIGINAL = "# Queue\n\nDecision: Use SQLite.\nReason: local durability."
 CHANGED = "# Queue\n\nDecision: Use NATS.\nReason: shared workload."
@@ -124,6 +125,31 @@ def test_review_actions_are_workspace_scoped(session):
         )
 
 
+def test_stale_concurrent_action_is_rejected_by_conditional_update(session):
+    source, _decision, review = _open_review(session)
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    with factory() as first, factory() as stale:
+        assert first.get(DecisionReview, review.id).state == "open"
+        assert stale.get(DecisionReview, review.id).state == "open"
+        apply_review_action(
+            first,
+            review.id,
+            workspace_id=source.workspace_id,
+            action="acknowledge",
+            actor="alice",
+        )
+        first.commit()
+
+        with pytest.raises(DecisionReviewError, match="^review_state_conflict$"):
+            apply_review_action(
+                stale,
+                review.id,
+                workspace_id=source.workspace_id,
+                action="acknowledge",
+                actor="bob",
+            )
+
+
 def test_reanchor_rejects_source_version_conflict(session):
     source, _decision, review = _open_review(session)
     start = CHANGED.index("Decision: Use NATS.")
@@ -209,6 +235,8 @@ def test_resolve_review_can_supersede_decision(session):
         )
     )
     assert replacement is not None
+    replacement.status = "accepted"
+    session.commit()
 
     resolve_review(
         session,

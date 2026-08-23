@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .decision_health import DecisionHealthError, check_decision_health
@@ -139,6 +140,40 @@ def _clean_actor(actor: str) -> str:
     return cleaned
 
 
+def _claim_transition(
+    session: Session,
+    review: DecisionReview,
+    *,
+    state: str,
+    resolution: str | None,
+    actor: str,
+    note: str | None,
+    closed_at: datetime | None,
+) -> dict[str, str | None]:
+    before = _snapshot(review)
+    result = session.execute(
+        update(DecisionReview)
+        .where(
+            DecisionReview.id == review.id,
+            DecisionReview.workspace_id == review.workspace_id,
+            DecisionReview.state == review.state,
+        )
+        .values(
+            state=state,
+            resolution=resolution,
+            actor=actor,
+            note=note,
+            closed_at=closed_at,
+            updated_at=utc_now(),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        raise DecisionReviewError("review_state_conflict")
+    session.refresh(review)
+    return before
+
+
 def apply_review_action(
     session: Session,
     review_id: str,
@@ -169,13 +204,15 @@ def apply_review_action(
     else:
         raise DecisionReviewError("review_action_invalid")
 
-    before = _snapshot(review)
-    review.state = next_state
-    review.resolution = resolution
-    review.actor = selected_actor
-    review.note = note
-    review.closed_at = closed_at
-    review.updated_at = utc_now()
+    before = _claim_transition(
+        session,
+        review,
+        state=next_state,
+        resolution=resolution,
+        actor=selected_actor,
+        note=note,
+        closed_at=closed_at,
+    )
     _audit_transition(
         session,
         review,
@@ -241,6 +278,15 @@ def reanchor_review(
         binding_root_id=evidence.binding_root_id,
     )
     now = utc_now()
+    before = _claim_transition(
+        session,
+        review,
+        state="resolved",
+        resolution="reanchored",
+        actor=selected_actor,
+        note=selected_reason,
+        closed_at=now,
+    )
     decision.evidence.append(replacement)
     session.flush()
     evidence.binding_state = "superseded"
@@ -248,13 +294,6 @@ def reanchor_review(
     evidence.superseded_by_id = replacement.id
     decision.source_version_id = current_version.id
     decision.updated_at = now
-    before = _snapshot(review)
-    review.state = "resolved"
-    review.resolution = "reanchored"
-    review.actor = selected_actor
-    review.note = selected_reason
-    review.closed_at = now
-    review.updated_at = now
     _audit_transition(
         session,
         review,
@@ -308,6 +347,7 @@ def resolve_review(
             .where(
                 Decision.id == replacement_decision_id,
                 Decision.kind == "decision",
+                Decision.status == "accepted",
                 Source.workspace_id == workspace_id,
             )
         )
@@ -315,6 +355,15 @@ def resolve_review(
             raise DecisionReviewError("replacement_decision_not_found")
 
     now = utc_now()
+    before = _claim_transition(
+        session,
+        review,
+        state="resolved",
+        resolution=action,
+        actor=selected_actor,
+        note=selected_reason,
+        closed_at=now,
+    )
     decision.status = "obsolete"
     decision.valid_to = now
     decision.updated_at = now
@@ -331,13 +380,6 @@ def resolve_review(
             )
         )
 
-    before = _snapshot(review)
-    review.state = "resolved"
-    review.resolution = action
-    review.actor = selected_actor
-    review.note = selected_reason
-    review.closed_at = now
-    review.updated_at = now
     _audit_transition(
         session,
         review,
@@ -348,6 +390,33 @@ def resolve_review(
             "replacement_decision_id": replacement.id if replacement else None,
         },
     )
+    other_reviews = session.scalars(
+        select(DecisionReview).where(
+            DecisionReview.decision_id == decision.id,
+            DecisionReview.id != review.id,
+            DecisionReview.state.in_(ACTIVE_REVIEW_STATES),
+        )
+    ).all()
+    for other in other_reviews:
+        other_before = _claim_transition(
+            session,
+            other,
+            state="resolved",
+            resolution=action,
+            actor=selected_actor,
+            note=selected_reason,
+            closed_at=now,
+        )
+        _audit_transition(
+            session,
+            other,
+            action=f"decision_review_{action}",
+            before=other_before,
+            after_extra={
+                "decision_status": decision.status,
+                "replacement_decision_id": replacement.id if replacement else None,
+            },
+        )
     session.flush()
     return review
 
