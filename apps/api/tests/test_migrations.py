@@ -1,4 +1,5 @@
 import hashlib
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -28,7 +29,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == list(range(1, 22))
+    assert versions == list(range(1, 23))
     assert {
         "sources",
         "source_versions",
@@ -52,7 +53,121 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
         "proposal_citations",
         "studio_artifacts",
         "studio_citations",
+        "decision_reviews",
     } <= tables
+    engine.dispose()
+
+
+def test_v22_backfills_evidence_anchors_and_binding_identity(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v22-decision-reviews.db'}")
+    now = "2026-08-23T00:00:00+00:00"
+    content = "Decision: Use SQLite."
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""
+        )
+        for version, description, migration in MIGRATIONS[:21]:
+            migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migrations(version, description) "
+                    "VALUES (:version, :description)"
+                ),
+                {"version": version, "description": description},
+            )
+        connection.execute(
+            text(
+                """INSERT INTO sources
+                   (id, workspace_id, title, kind, uri, content, content_hash, status,
+                    created_at, indexed_at, current_version_id)
+                   VALUES ('source-v21', :workspace, 'ADR', 'markdown', 'file:///adr.md',
+                           :content, :identity, 'indexed', :now, :now, 'version-v21')"""
+            ),
+            {
+                "workspace": "00000000-0000-0000-0000-000000000001",
+                "content": content,
+                "identity": hashlib.sha256(b"source:source-v21").hexdigest(),
+                "now": now,
+            },
+        )
+        connection.execute(
+            text(
+                """INSERT INTO source_versions
+                   (id, source_id, content_hash, content, version_number, content_length,
+                    status, parser_version, created_at)
+                   VALUES ('version-v21', 'source-v21', :content_hash, :content, 1,
+                           :content_length, 'indexed', 'deterministic-v2', :now)"""
+            ),
+            {
+                "content_hash": hashlib.sha256(content.encode()).hexdigest(),
+                "content": content,
+                "content_length": len(content),
+                "now": now,
+            },
+        )
+        connection.execute(
+            text(
+                """INSERT INTO decisions
+                   (id, source_id, source_version_id, kind, title, statement, rationale,
+                    status, confidence, extraction_method, created_at, updated_at)
+                   VALUES ('decision-v21', 'source-v21', 'version-v21', 'decision', 'ADR',
+                           'Use SQLite.', NULL, 'accepted', 1.0, 'deterministic', :now, :now)"""
+            ),
+            {"now": now},
+        )
+        connection.execute(
+            text(
+                """INSERT INTO evidence
+                   (id, decision_id, source_id, source_version_id, quote, quote_hash,
+                    start_offset, end_offset, start_line, end_line)
+                   VALUES ('evidence-v21', 'decision-v21', 'source-v21', 'version-v21',
+                           :quote, :quote_hash, 0, :end_offset, 1, 1)"""
+            ),
+            {
+                "quote": content,
+                "quote_hash": hashlib.sha256(content.encode()).hexdigest(),
+                "end_offset": len(content),
+            },
+        )
+
+    initialize_database(engine)
+    initialize_database(engine)
+
+    with engine.connect() as connection:
+        versions = list(
+            connection.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            .scalars()
+            .all()
+        )
+        evidence = (
+            connection.execute(text("SELECT * FROM evidence WHERE id = 'evidence-v21'"))
+            .mappings()
+            .one()
+        )
+        review_columns = {
+            column[1]
+            for column in connection.exec_driver_sql("PRAGMA table_info(decision_reviews)")
+        }
+
+    empty_hash = hashlib.sha256(b"").hexdigest()
+    assert versions == list(range(1, 23))
+    assert evidence["anchor_version"] == "markdown-context-v1"
+    assert json.loads(evidence["section_path"]) == []
+    assert evidence["prefix_sha256"] == empty_hash
+    assert evidence["suffix_sha256"] == empty_hash
+    assert evidence["binding_root_id"] == "evidence-v21"
+    assert evidence["binding_state"] == "active"
+    assert {
+        "finding_fingerprint",
+        "anchor_state",
+        "policy_hash",
+        "state",
+        "resolution",
+    } <= review_columns
     engine.dispose()
 
 
@@ -139,7 +254,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 22))
+    assert versions == list(range(1, 23))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -273,7 +388,7 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 22))
+    assert versions == list(range(1, 23))
     engine.dispose()
 
 
@@ -354,7 +469,7 @@ def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
             .all()
         )
     assert statuses == {"memory-v10": "obsolete", "memory-v10-custom": "candidate"}
-    assert versions == list(range(1, 22))
+    assert versions == list(range(1, 23))
     engine.dispose()
 
 
@@ -443,7 +558,7 @@ def test_v11_database_gains_persistent_unique_import_receipts(tmp_path):
     }
     assert columns["imported_at"]["default"] == "CURRENT_TIMESTAMP"
     assert indexes["ix_import_receipts_payload_sha256"] == 1
-    assert versions == list(range(1, 22))
+    assert versions == list(range(1, 23))
     reopened.dispose()
 
 

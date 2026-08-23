@@ -363,6 +363,81 @@ class EvidenceRead(BaseModel):
     end_line: int
 
 
+class DecisionReviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    decision_id: str
+    evidence_id: str
+    cited_source_version_id: str
+    current_source_version_id: str
+    finding_fingerprint: str
+    anchor_state: Literal["moved", "ambiguous", "changed", "deleted"]
+    severity: Literal["warning", "error"]
+    policy_hash: str
+    candidate_start_offset: int | None
+    candidate_end_offset: int | None
+    candidate_start_line: int | None
+    candidate_end_line: int | None
+    state: Literal["open", "acknowledged", "resolved", "waived", "superseded"]
+    resolution: str | None
+    actor: str
+    note: str | None
+    opened_at: datetime
+    updated_at: datetime
+    closed_at: datetime | None
+
+
+class DecisionReviewOverview(BaseModel):
+    healthy_accepted: int = Field(ge=0)
+    review_required: int = Field(ge=0)
+    overdue: int = Field(ge=0)
+    waived: int = Field(ge=0)
+
+
+class DecisionReviewAction(BaseModel):
+    action: Literal["acknowledge", "waive"]
+    reason: str | None = Field(default=None, max_length=2_000)
+
+    @model_validator(mode="after")
+    def require_waiver_reason(self) -> DecisionReviewAction:
+        if self.action == "waive" and not (self.reason or "").strip():
+            raise ValueError("waive requires a reason")
+        return self
+
+
+class DecisionReviewReanchor(BaseModel):
+    expected_current_source_version_id: str = Field(min_length=36, max_length=36)
+    start_offset: int = Field(ge=0)
+    end_offset: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=2_000)
+
+    @model_validator(mode="after")
+    def validate_reanchor(self) -> DecisionReviewReanchor:
+        if self.end_offset <= self.start_offset:
+            raise ValueError("reanchor offsets are invalid")
+        if not self.reason.strip():
+            raise ValueError("reanchor reason is required")
+        return self
+
+
+class DecisionReviewResolve(BaseModel):
+    action: Literal["obsolete_decision", "supersede_decision"]
+    replacement_decision_id: str | None = Field(default=None, min_length=36, max_length=36)
+    reason: str = Field(min_length=1, max_length=2_000)
+
+    @model_validator(mode="after")
+    def validate_resolution(self) -> DecisionReviewResolve:
+        if not self.reason.strip():
+            raise ValueError("resolution reason is required")
+        if self.action == "supersede_decision" and self.replacement_decision_id is None:
+            raise ValueError("replacement decision is required")
+        if self.action == "obsolete_decision" and self.replacement_decision_id is not None:
+            raise ValueError("replacement decision is not allowed")
+        return self
+
+
 class DecisionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

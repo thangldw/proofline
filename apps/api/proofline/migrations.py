@@ -7,6 +7,8 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection, Engine, inspect, text
 
+from .anchors import build_evidence_anchor
+
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
 
 Migration = tuple[int, str, Callable[[Connection], None]]
@@ -711,6 +713,120 @@ def _add_evidence_first_studio(connection: Connection) -> None:
     )
 
 
+def _add_decision_review_ledger(connection: Connection) -> None:
+    columns = {column["name"] for column in inspect(connection).get_columns("evidence")}
+    additions = {
+        "anchor_version": "VARCHAR(40)",
+        "section_path": "JSON",
+        "prefix_sha256": "VARCHAR(64)",
+        "suffix_sha256": "VARCHAR(64)",
+        "binding_root_id": "VARCHAR(36)",
+        "binding_state": "VARCHAR(20)",
+        "superseded_at": "DATETIME",
+        "superseded_by_id": "VARCHAR(36) REFERENCES evidence(id) ON DELETE SET NULL",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            connection.exec_driver_sql(f"ALTER TABLE evidence ADD COLUMN {name} {definition}")
+
+    evidence_rows = connection.execute(
+        text(
+            """SELECT e.id, e.start_offset, e.end_offset, v.content
+               FROM evidence e
+               JOIN source_versions v ON v.id = e.source_version_id
+               WHERE e.anchor_version IS NULL
+                  OR e.section_path IS NULL
+                  OR e.prefix_sha256 IS NULL
+                  OR e.suffix_sha256 IS NULL
+                  OR e.binding_root_id IS NULL
+                  OR e.binding_state IS NULL
+               ORDER BY e.id"""
+        )
+    ).mappings()
+    for row in evidence_rows:
+        anchor = build_evidence_anchor(
+            row["content"],
+            row["start_offset"],
+            row["end_offset"],
+        )
+        connection.execute(
+            text(
+                """UPDATE evidence
+                   SET anchor_version = :anchor_version,
+                       section_path = :section_path,
+                       prefix_sha256 = :prefix_sha256,
+                       suffix_sha256 = :suffix_sha256,
+                       binding_root_id = COALESCE(binding_root_id, id),
+                       binding_state = COALESCE(binding_state, 'active')
+                   WHERE id = :id"""
+            ),
+            {
+                "id": row["id"],
+                "anchor_version": anchor.version,
+                "section_path": json.dumps(
+                    list(anchor.section_path),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                "prefix_sha256": anchor.prefix_sha256,
+                "suffix_sha256": anchor.suffix_sha256,
+            },
+        )
+
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_evidence_binding_root_id ON evidence (binding_root_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_evidence_binding_state ON evidence (binding_state)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_evidence_superseded_by_id ON evidence (superseded_by_id)"
+    )
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS decision_reviews (
+            id VARCHAR(36) PRIMARY KEY,
+            workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+            decision_id VARCHAR(36) NOT NULL REFERENCES decisions(id) ON DELETE CASCADE,
+            evidence_id VARCHAR(36) NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+            cited_source_version_id VARCHAR(36) NOT NULL
+                REFERENCES source_versions(id) ON DELETE CASCADE,
+            current_source_version_id VARCHAR(36) NOT NULL
+                REFERENCES source_versions(id) ON DELETE CASCADE,
+            finding_fingerprint VARCHAR(64) NOT NULL UNIQUE,
+            anchor_state VARCHAR(20) NOT NULL,
+            severity VARCHAR(20) NOT NULL,
+            policy_hash VARCHAR(64) NOT NULL,
+            candidate_start_offset INTEGER,
+            candidate_end_offset INTEGER,
+            candidate_start_line INTEGER,
+            candidate_end_line INTEGER,
+            state VARCHAR(20) NOT NULL,
+            resolution VARCHAR(40),
+            actor VARCHAR(100) NOT NULL,
+            note TEXT,
+            opened_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            closed_at DATETIME
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_reviews_workspace_state "
+        "ON decision_reviews (workspace_id, state, opened_at)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_reviews_decision_state "
+        "ON decision_reviews (decision_id, state)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_reviews_evidence_id "
+        "ON decision_reviews (evidence_id)"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_decision_reviews_current_version "
+        "ON decision_reviews (current_source_version_id)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -733,6 +849,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (19, "evidence-first study cards", _add_evidence_first_study_cards),
     (20, "grounded human-reviewed action proposals", _add_grounded_action_proposals),
     (21, "evidence-first deterministic studio", _add_evidence_first_studio),
+    (22, "decision evidence review ledger", _add_decision_review_ledger),
 )
 
 

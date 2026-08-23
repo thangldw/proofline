@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from .anchors import build_evidence_anchor
 from .database import Base
 
 DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
@@ -179,6 +180,74 @@ class Evidence(Base):
     end_offset: Mapped[int] = mapped_column(Integer)
     start_line: Mapped[int] = mapped_column(Integer)
     end_line: Mapped[int] = mapped_column(Integer)
+    anchor_version: Mapped[str] = mapped_column(String(40), default="markdown-context-v1")
+    section_path: Mapped[list[str]] = mapped_column(JSON, default=list)
+    prefix_sha256: Mapped[str] = mapped_column(String(64))
+    suffix_sha256: Mapped[str] = mapped_column(String(64))
+    binding_root_id: Mapped[str] = mapped_column(String(36), index=True)
+    binding_state: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    superseded_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("evidence.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    @classmethod
+    def anchored(cls, *, source_content: str, **values) -> Evidence:
+        evidence_id = values.pop("id", new_id())
+        anchor = build_evidence_anchor(
+            source_content,
+            values["start_offset"],
+            values["end_offset"],
+        )
+        return cls(
+            id=evidence_id,
+            anchor_version=anchor.version,
+            section_path=list(anchor.section_path),
+            prefix_sha256=anchor.prefix_sha256,
+            suffix_sha256=anchor.suffix_sha256,
+            binding_root_id=values.pop("binding_root_id", evidence_id),
+            binding_state=values.pop("binding_state", "active"),
+            **values,
+        )
+
+
+class DecisionReview(Base):
+    __tablename__ = "decision_reviews"
+    __table_args__ = (
+        UniqueConstraint("finding_fingerprint", name="uq_decision_review_fingerprint"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decisions.id", ondelete="CASCADE"), index=True
+    )
+    evidence_id: Mapped[str] = mapped_column(
+        ForeignKey("evidence.id", ondelete="CASCADE"), index=True
+    )
+    cited_source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    current_source_version_id: Mapped[str] = mapped_column(
+        ForeignKey("source_versions.id", ondelete="CASCADE"), index=True
+    )
+    finding_fingerprint: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    anchor_state: Mapped[str] = mapped_column(String(20), index=True)
+    severity: Mapped[str] = mapped_column(String(20), default="warning", index=True)
+    policy_hash: Mapped[str] = mapped_column(String(64))
+    candidate_start_offset: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidate_end_offset: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidate_start_line: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidate_end_line: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    state: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    resolution: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    actor: Mapped[str] = mapped_column(String(100), default="local_system")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+    closed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
 class IngestionJob(Base):
