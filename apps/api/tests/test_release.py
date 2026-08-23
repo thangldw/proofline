@@ -122,8 +122,12 @@ def test_source_distribution_excludes_local_build_and_test_state():
         "/.ruff_cache",
         "/.venv",
         "/.worktrees",
+        "/apps/web/dist",
         "**/__pycache__",
+        "**/node_modules",
+        "**/*.db",
         "**/*.pyc",
+        "**/*.tsbuildinfo",
     } <= excluded
 
 
