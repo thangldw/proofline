@@ -49,8 +49,10 @@ and subject linkage. Signing first verifies the DEP and optional receipt and rej
 bound to another DEP.
 
 Key generation writes PKCS#8 PEM private keys with mode `0600` and SubjectPublicKeyInfo PEM public
-keys. Existing outputs are never overwritten without `--force`. No key material enters SQLite,
-logs, exports, packages, or plugin assets.
+keys when owner-only descriptor permissions are available, and fails closed otherwise. Existing
+outputs are never overwritten without `--force`. No key material enters SQLite, logs, exports,
+packages, or plugin assets. The signed statement itself binds algorithm and key ID; envelopes are
+bounded to 1 MiB.
 
 Attestation proves integrity and control of a corresponding private key relative to the supplied
 public key. It does not prove a legal identity, CA trust chain, trusted timestamp, transparency-log

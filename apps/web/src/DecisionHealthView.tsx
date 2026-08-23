@@ -1,5 +1,5 @@
 import { RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { DecisionReviewDetail } from "./DecisionReviewDetail";
 import type {
@@ -28,6 +28,24 @@ function titleCase(value: string) {
   return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
 }
 
+function validateImpactSnapshot(
+  impacts: DecisionImpact[],
+  summary: DecisionImpactSummary,
+) {
+  const rootReviews = new Set(impacts.map((item) => item.root_review_id)).size;
+  const impactedDecisions = new Set(impacts.map((item) => item.impacted_decision_id)).size;
+  const maxDepth = impacts.reduce((maximum, item) => Math.max(maximum, item.depth), 0);
+  if (
+    impacts.some((item) => item.evaluated_at !== summary.evaluated_at) ||
+    summary.finding_count !== impacts.length ||
+    summary.root_review_count !== rootReviews ||
+    summary.impacted_decision_count !== impactedDecisions ||
+    summary.max_depth !== maxDepth
+  ) {
+    throw new Error("impact_snapshot_mismatch");
+  }
+}
+
 export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }: Props) {
   const [reviews, setReviews] = useState<DecisionReview[]>([]);
   const [state, setState] = useState<DecisionReviewState | "">("");
@@ -44,6 +62,7 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
   const [impactSummary, setImpactSummary] = useState<DecisionImpactSummary | null>(null);
   const [impactLoading, setImpactLoading] = useState(true);
   const [impactError, setImpactError] = useState("");
+  const impactGeneration = useRef(0);
 
   const filters: DecisionReviewFilters = {
     ...(state ? { state } : {}),
@@ -66,20 +85,32 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
   }, [workspaceId, state, anchorState, severity]);
 
   const loadImpacts = useCallback(async () => {
-    if (!workspaceId) return;
+    const generation = ++impactGeneration.current;
+    setImpacts([]);
+    setImpactSummary(null);
+    setImpactError("");
+    if (!workspaceId) {
+      setImpactLoading(false);
+      return;
+    }
     setImpactLoading(true);
     try {
-      const [nextImpacts, nextSummary] = await Promise.all([
-        api.decisionImpacts(),
-        api.decisionImpactSummary(),
-      ]);
+      const asOf = new Date().toISOString();
+      const snapshot = await api.decisionImpactSnapshot(workspaceId, asOf);
+      if (generation !== impactGeneration.current) return;
+      const nextImpacts = snapshot.findings;
+      const nextSummary = snapshot.summary;
+      validateImpactSnapshot(nextImpacts, nextSummary);
       setImpacts(nextImpacts);
       setImpactSummary(nextSummary);
       setImpactError("");
     } catch (reason) {
+      if (generation !== impactGeneration.current) return;
+      setImpacts([]);
+      setImpactSummary(null);
       setImpactError(message(reason));
     } finally {
-      setImpactLoading(false);
+      if (generation === impactGeneration.current) setImpactLoading(false);
     }
   }, [workspaceId]);
 
@@ -91,6 +122,9 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
 
   useEffect(() => {
     void loadImpacts();
+    return () => {
+      impactGeneration.current += 1;
+    };
   }, [loadImpacts, workspaceId]);
 
   async function openReview(id: string) {

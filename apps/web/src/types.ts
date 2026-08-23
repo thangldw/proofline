@@ -49,6 +49,11 @@ export type DecisionImpactSummary = {
   evaluated_at: string;
 };
 
+export type DecisionImpactSnapshot = {
+  findings: DecisionImpact[];
+  summary: DecisionImpactSummary;
+};
+
 export type DecisionReview = {
   id: string;
   workspace_id: string;

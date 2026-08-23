@@ -23,6 +23,7 @@ const apiMock = vi.hoisted(() => ({
   decisionReviews: vi.fn(),
   decisionImpacts: vi.fn(),
   decisionImpactSummary: vi.fn(),
+  decisionImpactSnapshot: vi.fn(),
   decisionReview: vi.fn(),
   refreshDecisionReviews: vi.fn(),
   updateDecisionReview: vi.fn(),
@@ -145,12 +146,22 @@ function renderView() {
   );
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 describe("DecisionHealthView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiMock.decisionReviews.mockResolvedValue([review]);
-    apiMock.decisionImpacts.mockResolvedValue([impact]);
-    apiMock.decisionImpactSummary.mockResolvedValue(impactSummary);
+    apiMock.decisionImpactSnapshot.mockResolvedValue({
+      findings: [impact],
+      summary: impactSummary,
+    });
     apiMock.decisionReview.mockResolvedValue(detail);
     apiMock.refreshDecisionReviews.mockResolvedValue({
       opened: 0,
@@ -183,6 +194,53 @@ describe("DecisionHealthView", () => {
     expect(within(drawer).getByText("Accepted · review required")).toBeInTheDocument();
     expect(within(drawer).getByText("Decision: Use SQLite.")).toBeInTheDocument();
     expect(within(drawer).getByText("Decision: Use NATS.")).toBeInTheDocument();
+  });
+
+  it("ignores late impact responses from the previous workspace", async () => {
+    const snapshotA = deferred<{ findings: (typeof impact)[]; summary: typeof impactSummary }>();
+    const impactB = {
+      ...impact,
+      root_decision_title: "Workspace B root",
+      impacted_decision_title: "Workspace B leaf",
+      fingerprint: "f".repeat(64),
+    };
+    const summaryB = { ...impactSummary };
+    apiMock.decisionImpactSnapshot.mockImplementation((workspaceId: string) =>
+      workspaceId === "workspace-a"
+        ? snapshotA.promise
+        : Promise.resolve({ findings: [impactB], summary: summaryB }),
+    );
+    const onOverviewChanged = vi.fn().mockResolvedValue(undefined);
+    const rendered = render(
+      <DecisionHealthView
+        overview={overview}
+        workspaceId="workspace-a"
+        onOverviewChanged={onOverviewChanged}
+      />,
+    );
+    await waitFor(() =>
+      expect(apiMock.decisionImpactSnapshot).toHaveBeenCalledWith(
+        "workspace-a",
+        expect.any(String),
+      ),
+    );
+
+    rendered.rerender(
+      <DecisionHealthView
+        overview={overview}
+        workspaceId="workspace-b"
+        onOverviewChanged={onOverviewChanged}
+      />,
+    );
+    expect(await screen.findByText("Workspace B root → Workspace B leaf")).toBeInTheDocument();
+    expect(screen.getByText("Transitively impacted").previousSibling).toHaveTextContent("1");
+
+    snapshotA.resolve({ findings: [impact], summary: impactSummary });
+    await waitFor(() => {
+      expect(screen.queryByText("Queue storage → Worker topology")).not.toBeInTheDocument();
+      expect(screen.getByText("Workspace B root → Workspace B leaf")).toBeInTheDocument();
+      expect(screen.getByText("Transitively impacted").previousSibling).toHaveTextContent("1");
+    });
   });
 
   it("applies metadata filters without rendering quotes in the inbox", async () => {
@@ -287,19 +345,21 @@ describe("DecisionHealthView", () => {
   });
 
   it("renders transitive impact empty and isolated error states", async () => {
-    apiMock.decisionImpacts.mockResolvedValue([]);
-    apiMock.decisionImpactSummary.mockResolvedValue({
-      ...impactSummary,
-      root_review_count: 0,
-      impacted_decision_count: 0,
-      finding_count: 0,
-      max_depth: 0,
+    apiMock.decisionImpactSnapshot.mockResolvedValue({
+      findings: [],
+      summary: {
+        ...impactSummary,
+        root_review_count: 0,
+        impacted_decision_count: 0,
+        finding_count: 0,
+        max_depth: 0,
+      },
     });
     renderView();
     expect(await screen.findByText("No transitive impacts.")).toBeInTheDocument();
 
     cleanup();
-    apiMock.decisionImpacts.mockRejectedValue(new Error("impact_graph_unavailable"));
+    apiMock.decisionImpactSnapshot.mockRejectedValue(new Error("impact_graph_unavailable"));
     render(
       <DecisionHealthView
         overview={overview}
@@ -310,6 +370,24 @@ describe("DecisionHealthView", () => {
     expect(await screen.findByRole("alert", { name: "Transitive impact error" })).toHaveTextContent(
       "impact_graph_unavailable",
     );
+  });
+
+  it("fails closed when impact paths and summary are from inconsistent snapshots", async () => {
+    apiMock.decisionImpactSnapshot.mockResolvedValue({
+      findings: [impact],
+      summary: {
+        ...impactSummary,
+        finding_count: 2,
+        impacted_decision_count: 2,
+      },
+    });
+
+    renderView();
+
+    expect(await screen.findByRole("alert", { name: "Transitive impact error" })).toHaveTextContent(
+      "impact_snapshot_mismatch",
+    );
+    expect(screen.getByText("Transitively impacted").previousSibling).toHaveTextContent("0");
   });
 
   it("makes Decision Health the default view with the active-review badge", async () => {

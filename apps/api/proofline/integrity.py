@@ -4,7 +4,7 @@ import hashlib
 import json
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Connection, Engine, text
 
@@ -170,7 +170,7 @@ def _verify_memories_and_evidence(
         row["id"]: row
         for row in connection.execute(
             text(
-                "SELECT id, source_id, source_version_id, extraction_method, model_run_id "
+                "SELECT id, source_id, source_version_id, kind, extraction_method, model_run_id "
                 "FROM decisions ORDER BY id"
             )
         ).mappings()
@@ -276,6 +276,60 @@ def _verify_memories_and_evidence(
     if any(evidence_counts[memory_id] == 0 for memory_id in memories):
         _fail("memory_evidence_missing")
     return memories, evidence_rows
+
+
+def _relation_datetime(value: object, *, nullable: bool = False) -> datetime | None:
+    if value is None and nullable:
+        return None
+    if not isinstance(value, str):
+        _fail("decision_relation_temporal_invalid")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        _fail("decision_relation_temporal_invalid")
+    if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+        return parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
+def _verify_decision_relations(connection: Connection, sources: dict, memories: dict) -> int:
+    allowed_kinds = {"supersedes", "implements", "contradicts", "based_on", "considered"}
+    relations = list(
+        connection.execute(
+            text(
+                "SELECT id, source_decision_id, target_decision_id, kind, valid_from, valid_to, "
+                "created_by, created_at FROM decision_relations ORDER BY id"
+            )
+        ).mappings()
+    )
+    for relation in relations:
+        source = memories.get(relation["source_decision_id"])
+        target = memories.get(relation["target_decision_id"])
+        if (
+            source is None
+            or target is None
+            or source["kind"] != "decision"
+            or target["kind"] != "decision"
+            or relation["source_decision_id"] == relation["target_decision_id"]
+        ):
+            _fail("decision_relation_endpoint_invalid")
+        if (
+            sources[source["source_id"]]["workspace_id"]
+            != sources[target["source_id"]]["workspace_id"]
+        ):
+            _fail("decision_relation_workspace_invalid")
+        if relation["kind"] not in allowed_kinds:
+            _fail("decision_relation_kind_invalid")
+        if not isinstance(relation["id"], str) or not relation["id"]:
+            _fail("decision_relation_identity_invalid")
+        if not isinstance(relation["created_by"], str) or not relation["created_by"]:
+            _fail("decision_relation_identity_invalid")
+        _relation_datetime(relation["created_at"])
+        valid_from = _relation_datetime(relation["valid_from"], nullable=True)
+        valid_to = _relation_datetime(relation["valid_to"], nullable=True)
+        if valid_from is not None and valid_to is not None and valid_from >= valid_to:
+            _fail("decision_relation_temporal_invalid")
+    return len(relations)
 
 
 def _parse_database_datetime(value: str | None, *, nullable: bool = False) -> datetime | None:
@@ -504,6 +558,7 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
             sources, versions = _verify_sources_and_versions(connection)
             chunks = _verify_chunks(connection, versions)
             memories, evidence_rows = _verify_memories_and_evidence(connection, sources, versions)
+            decision_relation_count = _verify_decision_relations(connection, sources, memories)
             decision_reviews = _verify_decision_reviews(
                 connection, sources, versions, memories, evidence_rows
             )
@@ -517,6 +572,7 @@ def verify_live_database(engine: Engine) -> dict[str, int | bool]:
                 "memories": connection.execute(text("SELECT count(*) FROM decisions")).scalar_one(),
                 "evidence": connection.execute(text("SELECT count(*) FROM evidence")).scalar_one(),
                 "decision_reviews": len(decision_reviews),
+                "decision_relations": decision_relation_count,
                 "embeddings": embedding_count,
                 "vector_index_rows": vector_index_count,
             }

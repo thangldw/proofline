@@ -12,17 +12,25 @@
     "statement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema", "issued_at", "package", "review_receipt"],
+      "required": [
+        "schema", "algorithm", "key_id", "issued_at", "package", "review_receipt"
+      ],
       "properties": {
         "schema": {"const": "proofline-attestation-statement-v1"},
-        "issued_at": {"type": "string", "format": "date-time"},
+        "algorithm": {"const": "ed25519"},
+        "key_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "issued_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{0,5}[1-9])?Z$"
+        },
         "package": {
           "type": "object",
           "additionalProperties": false,
           "required": ["root_hash", "artifact_id"],
           "properties": {
             "root_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-            "artifact_id": {"type": "string", "format": "uuid"}
+            "artifact_id": {"type": "string", "minLength": 1}
           }
         },
         "review_receipt": {

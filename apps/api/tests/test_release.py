@@ -1,7 +1,10 @@
+import io
 import json
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -87,7 +90,10 @@ def test_ci_workflow_runs_release_critical_commands():
         "npm ci",
         "make test",
         "make check",
+        "make audit",
         "npm audit --omit=dev --audit-level=high",
+        "npm run test:e2e",
+        "verify_release_artifacts.py",
         "proofline verify-package",
         "proofline verify-review-receipt",
         "proofline verify-attestation",
@@ -96,7 +102,32 @@ def test_ci_workflow_runs_release_critical_commands():
     ):
         assert command in workflow
     assert "verify-package-conformance:" in makefile
+    assert "pip-audit --local --skip-editable" in makefile
     assert "spec/signed-attestation/v1/test-vectors/valid-ed25519.json" in makefile
+
+
+def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
+    root = repository_root()
+    local = (root / "scripts/release_local.sh").read_text(encoding="utf-8")
+    windows = (root / "scripts/release_windows.ps1").read_text(encoding="utf-8")
+
+    for script in (local, windows):
+        for command in (
+            "test:e2e",
+            "verify_release_artifacts.py",
+            "qualify_python_artifact.py",
+            "publish_pypi.py",
+        ):
+            assert command in script
+        assert ".whl" in script
+        assert ".tar.gz" in script
+        assert script.index("publish_pypi.py") < script.index("git tag")
+    assert "make audit" in local
+    assert "verify-package-conformance" in local
+    assert "pip_audit" in windows
+    assert "verify_attestation_vector.py" in windows
+    assert 'if ($Tag -like "v0.*" -or $Tag.Contains("-"))' in windows
+    assert "gh release create @ReleaseArgs" in windows
 
 
 def test_release_check_covers_public_plugin_version_surfaces():
@@ -129,6 +160,52 @@ def test_source_distribution_excludes_local_build_and_test_state():
         "**/*.pyc",
         "**/*.tsbuildinfo",
     } <= excluded
+
+
+def test_python_release_archives_use_fail_closed_content_selection():
+    root = repository_root()
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    targets = pyproject["tool"]["hatch"]["build"]["targets"]
+
+    assert set(targets["sdist"]["include"]) == {
+        "/LICENSE",
+        "/README.md",
+        "/pyproject.toml",
+        "/apps/api/proofline",
+        "/spec",
+    }
+    for target in (targets["wheel"], targets["sdist"]):
+        assert {"**/*.key", "**/*.db", "**/*.pyc"} <= set(target["exclude"])
+    assert "**/*.pem" in targets["wheel"]["exclude"]
+
+
+@pytest.mark.parametrize("archive_kind", ["wheel", "sdist"])
+def test_release_artifact_verifier_rejects_private_key_bytes(tmp_path, archive_kind):
+    marker = b"-----BEGIN PRIVATE KEY-----\nPRIVATE RELEASE MARKER\n"
+    if archive_kind == "wheel":
+        archive = tmp_path / "proofline-2.0.0-py3-none-any.whl"
+        with zipfile.ZipFile(archive, "w") as handle:
+            handle.writestr("proofline/local-key.bin", marker)
+    else:
+        archive = tmp_path / "proofline-2.0.0.tar.gz"
+        with tarfile.open(archive, "w:gz") as handle:
+            info = tarfile.TarInfo("proofline-2.0.0/local-key.bin")
+            info.size = len(marker)
+            handle.addfile(info, io.BytesIO(marker))
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/verify_release_artifacts.py", str(archive)],
+        cwd=repository_root(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 1
+    assert completed.stderr.strip() == (
+        "release artifact verification failed: private_key_material"
+    )
+    assert "PRIVATE RELEASE MARKER" not in completed.stderr
 
 
 def test_nanoid_security_override_is_locked_to_patched_compatible_version():

@@ -1,4 +1,4 @@
-.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance verify-package-conformance benchmark-retrieval benchmark-provenance benchmark-evidence-package benchmark-decision-reviews benchmark-watcher simulate-pilot check format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
+.PHONY: setup dev dev-api dev-web seed embed test eval verify-provenance verify-package-conformance benchmark-retrieval benchmark-provenance benchmark-evidence-package benchmark-decision-reviews benchmark-watcher simulate-pilot check audit format sync-web-bundle desktop-sidecar desktop-check desktop-build release-check release-local
 
 setup:
 	python3 -m venv .venv
@@ -83,6 +83,10 @@ check:
 	npm run build:web
 	.venv/bin/python scripts/sync_web_bundle.py --check
 	$(MAKE) eval
+
+audit:
+	.venv/bin/pip-audit --local --skip-editable
+	npm audit --omit=dev --audit-level=high
 
 sync-web-bundle:
 	npm run build:web

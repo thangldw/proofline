@@ -15,6 +15,7 @@ from . import __version__
 from .attestations import (
     AttestationError,
     atomic_write_attestation,
+    attestation_paths_conflict,
     build_signed_attestation,
     generate_attestation_keypair,
     load_and_verify_attestation,
@@ -147,6 +148,20 @@ def _parse_attestation_time(value: str | None) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise AttestationError("issued_at_invalid")
     return parsed.astimezone(UTC)
+
+
+def _reject_attestation_output_conflict(
+    output: Path,
+    *,
+    package: Path,
+    private_key: Path,
+    review_receipt: Path | None,
+) -> None:
+    inputs = [package, private_key]
+    if review_receipt is not None:
+        inputs.append(review_receipt)
+    if any(attestation_paths_conflict(output, path) for path in inputs):
+        raise AttestationError("output_conflict")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -583,6 +598,12 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(report, sort_keys=True))
     elif args.command == "attest":
         try:
+            _reject_attestation_output_conflict(
+                args.output,
+                package=args.package,
+                private_key=args.private_key,
+                review_receipt=args.review_receipt,
+            )
             _package, package_report = load_and_verify_package(args.package)
             review_report = None
             if args.review_receipt is not None:
@@ -780,9 +801,18 @@ def main(argv: list[str] | None = None) -> None:
             if findings:
                 for finding in findings:
                     print("Decision transitively impacted")
+                    print(f"Depth: {finding.depth}")
+                    print(f"Decision path: {' -> '.join(finding.decision_path)}")
                     print(
-                        f"{finding.root_decision_id} -> {finding.impacted_decision_id} "
-                        f"(depth {finding.depth})"
+                        "Relation path: "
+                        + " -> ".join(
+                            f"{kind}:{relation_id}"
+                            for kind, relation_id in zip(
+                                finding.relation_kinds,
+                                finding.relation_path,
+                                strict=True,
+                            )
+                        )
                     )
             else:
                 print("No decisions are transitively impacted.")
