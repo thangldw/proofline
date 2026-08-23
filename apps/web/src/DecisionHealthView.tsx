@@ -5,6 +5,8 @@ import { DecisionReviewDetail } from "./DecisionReviewDetail";
 import type {
   DecisionAnchorState,
   DecisionHealthOverview,
+  DecisionImpact,
+  DecisionImpactSummary,
   DecisionReview,
   DecisionReviewDetail as DecisionReviewDetailData,
   DecisionReviewFilters,
@@ -38,6 +40,10 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [pending, setPending] = useState(false);
+  const [impacts, setImpacts] = useState<DecisionImpact[]>([]);
+  const [impactSummary, setImpactSummary] = useState<DecisionImpactSummary | null>(null);
+  const [impactLoading, setImpactLoading] = useState(true);
+  const [impactError, setImpactError] = useState("");
 
   const filters: DecisionReviewFilters = {
     ...(state ? { state } : {}),
@@ -59,11 +65,30 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
     }
   }, [workspaceId, state, anchorState, severity]);
 
+  const loadImpacts = useCallback(async () => {
+    if (!workspaceId) return;
+    setImpactLoading(true);
+    try {
+      const [nextImpacts, nextSummary] = await Promise.all([
+        api.decisionImpacts(),
+        api.decisionImpactSummary(),
+      ]);
+      setImpacts(nextImpacts);
+      setImpactSummary(nextSummary);
+      setImpactError("");
+    } catch (reason) {
+      setImpactError(message(reason));
+    } finally {
+      setImpactLoading(false);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
     setSelectedId(null);
     setDetail(null);
     void loadReviews();
-  }, [loadReviews, workspaceId]);
+    void loadImpacts();
+  }, [loadImpacts, loadReviews, workspaceId]);
 
   async function openReview(id: string) {
     setSelectedId(id);
@@ -83,6 +108,7 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
     const [nextDetail] = await Promise.all([
       api.decisionReview(id),
       loadReviews(),
+      loadImpacts(),
       onOverviewChanged(),
     ]);
     setDetail(nextDetail);
@@ -106,7 +132,7 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
     setPending(true);
     try {
       await api.refreshDecisionReviews();
-      await Promise.all([loadReviews(), onOverviewChanged()]);
+      await Promise.all([loadReviews(), loadImpacts(), onOverviewChanged()]);
       setError("");
     } catch (reason) {
       setError(message(reason));
@@ -122,7 +148,51 @@ export function DecisionHealthView({ overview, workspaceId, onOverviewChanged }:
         <article className="attention"><strong>{overview.review_required}</strong><span>Review required</span></article>
         <article><strong>{overview.overdue}</strong><span>Overdue</span></article>
         <article><strong>{overview.waived}</strong><span>Waived</span></article>
+        <article className={impacts.length ? "attention" : ""}>
+          <strong>{impactSummary?.impacted_decision_count ?? 0}</strong>
+          <span>Transitively impacted</span>
+        </article>
+        <article>
+          <strong>{impactSummary?.max_depth ?? 0}</strong>
+          <span>Maximum impact depth</span>
+        </article>
       </div>
+
+      <section className="decision-impact-panel" aria-labelledby="decision-impact-title">
+        <header>
+          <div>
+            <span className="eyebrow">EXPLICIT DEPENDENCY GRAPH</span>
+            <h2 id="decision-impact-title">Transitive impact paths</h2>
+          </div>
+          {impactSummary ? (
+            <time dateTime={impactSummary.evaluated_at}>
+              Evaluated {new Date(impactSummary.evaluated_at).toLocaleString()}
+            </time>
+          ) : null}
+        </header>
+        {impactLoading ? <p className="decision-impact-state">Loading transitive impacts…</p> : null}
+        {impactError ? (
+          <p role="alert" aria-label="Transitive impact error" className="decision-impact-state error">
+            {impactError}
+          </p>
+        ) : null}
+        {!impactLoading && !impactError && impacts.length === 0 ? (
+          <p className="decision-impact-state">No transitive impacts.</p>
+        ) : null}
+        {!impactLoading && !impactError && impacts.length ? (
+          <ol className="decision-impact-list">
+            {impacts.map((impact) => (
+              <li key={impact.fingerprint}>
+                <div>
+                  <strong>{impact.root_decision_title} → {impact.impacted_decision_title}</strong>
+                  <span>Depth {impact.depth} · {impact.relation_kinds.join(" → ")}</span>
+                </div>
+                <code>{impact.decision_path.join(" → ")}</code>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </section>
 
       <div className="decision-health-toolbar">
         <div>
