@@ -221,7 +221,10 @@ def note_to_read(source: Source, notes: list[Source] | None = None) -> NoteRead:
 
 def decision_to_read(decision: Decision, source_title: str | None = None) -> DecisionRead:
     return DecisionRead.model_validate(decision).model_copy(
-        update={"source_title": source_title, "evidence": decision.evidence}
+        update={
+            "source_title": source_title,
+            "evidence": [item for item in decision.evidence if item.binding_state == "active"],
+        }
     )
 
 
