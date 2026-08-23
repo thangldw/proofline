@@ -1970,6 +1970,8 @@ def review_action_proposal(
     return proposal
 
 
+from .decision_impact_api import router as decision_impact_router  # noqa: E402
 from .decision_review_api import router as decision_review_router  # noqa: E402
 
 router.include_router(decision_review_router)
+router.include_router(decision_impact_router)

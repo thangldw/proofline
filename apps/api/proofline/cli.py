@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from .backup import (
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .decision_health import DecisionHealthError, check_decision_health
+from .decision_impacts import compute_decision_impacts
 from .decision_policy import (
     DecisionPolicyError,
     load_decision_policy,
@@ -71,7 +73,7 @@ from .review_receipts import (
     build_review_receipt,
     load_and_verify_review_receipt,
 )
-from .sarif import build_decision_health_sarif
+from .sarif import build_decision_health_sarif, build_decision_impact_sarif
 from .schemas import SourceCreate
 from .server import run_server
 from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
@@ -106,6 +108,23 @@ def seed_demo() -> None:
 def _decision_check_failed(code: str) -> None:
     print(f"decision check failed: {code}", file=sys.stderr)
     raise SystemExit(2)
+
+
+def _impact_check_failed(code: str) -> None:
+    print(f"impact check failed: {code}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def _parse_impact_as_of(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(UTC)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        _impact_check_failed("as_of_invalid")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        _impact_check_failed("as_of_timezone_required")
+    return parsed.astimezone(UTC)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -286,6 +305,13 @@ def main(argv: list[str] | None = None) -> None:
         help="Persist the current deterministic decision review ledger",
     )
     refresh_reviews.add_argument("--policy", type=Path)
+    check_impacts = subcommands.add_parser(
+        "check-impacts",
+        help="Read-only CI check for transitive impact through explicit dependencies",
+    )
+    check_impacts.add_argument("--format", choices=("text", "json", "sarif"), default="text")
+    check_impacts.add_argument("--as-of")
+    check_impacts.add_argument("--output", type=Path)
     demo = subcommands.add_parser("demo", help="Run a self-contained product story")
     demo_commands = demo.add_subparsers(dest="demo_name", required=True)
     stale_demo = demo_commands.add_parser(
@@ -614,6 +640,55 @@ def main(argv: list[str] | None = None) -> None:
         else:
             print("All approved decision citations resolve in current sources.")
         if blocking:
+            raise SystemExit(1)
+    elif args.command == "check-impacts":
+        evaluated_at = _parse_impact_as_of(args.as_of)
+        try:
+            with SessionLocal() as session:
+                workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
+                findings = [
+                    finding
+                    for workspace_id in workspace_ids
+                    for finding in compute_decision_impacts(
+                        session,
+                        workspace_id=workspace_id,
+                        as_of=evaluated_at,
+                    )
+                ]
+        except (OSError, SQLAlchemyError):
+            _impact_check_failed("database_unavailable")
+        if args.format == "sarif":
+            document = build_decision_impact_sarif(findings)
+        elif args.format == "json":
+            document = {
+                "valid": not findings,
+                "finding_count": len(findings),
+                "root_review_count": len({item.root_review_id for item in findings}),
+                "impacted_decision_count": len({item.impacted_decision_id for item in findings}),
+                "evaluated_at": evaluated_at.isoformat(),
+                "findings": [item.model_dump() for item in findings],
+            }
+        else:
+            document = None
+        if args.output is not None:
+            if document is None:
+                _impact_check_failed("output_format_invalid")
+            try:
+                atomic_write_export(args.output, document)
+            except PortabilityError as exc:
+                _impact_check_failed(exc.code)
+        elif document is not None:
+            print(json.dumps(document, sort_keys=True))
+        elif findings:
+            for finding in findings:
+                print("Decision transitively impacted")
+                print(
+                    f"{finding.root_decision_id} -> {finding.impacted_decision_id} "
+                    f"(depth {finding.depth})"
+                )
+        else:
+            print("No decisions are transitively impacted.")
+        if findings:
             raise SystemExit(1)
     elif args.command == "refresh-reviews":
         try:

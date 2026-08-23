@@ -400,6 +400,29 @@ class DecisionReviewOverview(BaseModel):
     waived: int = Field(ge=0)
 
 
+class DecisionImpactRead(BaseModel):
+    root_review_id: str
+    root_review_fingerprint: str
+    root_decision_id: str
+    root_decision_title: str
+    impacted_decision_id: str
+    impacted_decision_title: str
+    depth: int = Field(ge=1)
+    decision_path: list[str]
+    relation_path: list[str]
+    relation_kinds: list[Literal["based_on", "implements"]]
+    evaluated_at: datetime
+    fingerprint: str = Field(min_length=64, max_length=64)
+
+
+class DecisionImpactSummary(BaseModel):
+    root_review_count: int = Field(ge=0)
+    impacted_decision_count: int = Field(ge=0)
+    finding_count: int = Field(ge=0)
+    max_depth: int = Field(ge=0)
+    evaluated_at: datetime
+
+
 class DecisionReviewAction(BaseModel):
     action: Literal["acknowledge", "waive"]
     reason: str | None = Field(default=None, max_length=2_000)

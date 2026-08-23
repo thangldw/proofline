@@ -1,11 +1,16 @@
+import json
 from datetime import UTC, datetime, timedelta
 
+import proofline.cli as cli_module
+import pytest
+from proofline.cli import main
 from proofline.decision_impacts import compute_decision_impacts
 from proofline.decision_reviews import refresh_decision_reviews
 from proofline.ingestion import ingest_source
 from proofline.models import Decision, DecisionRelation, DecisionReview
 from proofline.schemas import SourceCreate
 from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 
 ORIGINAL = "# Root\n\nDecision: Keep local writes.\nReason: deterministic recovery."
 CHANGED = "# Root\n\nDecision: Use remote writes.\nReason: shared recovery."
@@ -187,3 +192,97 @@ def test_impact_disappears_when_review_closes_and_is_workspace_scoped(session):
     review.closed_at = AS_OF
     session.commit()
     assert compute_decision_impacts(session, workspace_id=workspace_id, as_of=AS_OF) == []
+
+
+def test_impact_api_lists_summary_and_enforces_workspace_and_timezone(client, session):
+    root, review, workspace_id = _root_with_review(session)
+    dependent = _decision(session, "api-dependent")
+    _relation(session, "00000000-0000-0000-0000-000000000051", dependent, root, "based_on")
+
+    response = client.get("/api/v1/decision-impacts", params={"as_of": AS_OF.isoformat()})
+
+    assert response.status_code == 200
+    assert response.json()[0]["root_review_id"] == review.id
+    assert response.json()[0]["impacted_decision_id"] == dependent.id
+    assert "quote" not in json.dumps(response.json(), sort_keys=True)
+    summary = client.get("/api/v1/decision-impacts/summary", params={"as_of": AS_OF.isoformat()})
+    assert summary.json() == {
+        "root_review_count": 1,
+        "impacted_decision_count": 1,
+        "finding_count": 1,
+        "max_depth": 1,
+        "evaluated_at": AS_OF.isoformat().replace("+00:00", "Z"),
+    }
+    assert (
+        client.get("/api/v1/decision-impacts", params={"as_of": "2026-08-23T12:00:00"}).status_code
+        == 422
+    )
+    other_workspace = client.post(
+        "/api/v1/workspaces", json={"slug": "impact-other", "title": "Impact Other"}
+    ).json()
+    assert (
+        client.get(
+            "/api/v1/decision-impacts",
+            headers={"X-Proofline-Workspace-ID": other_workspace["id"]},
+        ).json()
+        == []
+    )
+    assert workspace_id != other_workspace["id"]
+
+
+def test_check_impacts_cli_json_sarif_and_exit_codes(session, monkeypatch, tmp_path, capsys):
+    root, _review, workspace_id = _root_with_review(session)
+    dependent = _decision(session, "cli-dependent")
+    _relation(session, "00000000-0000-0000-0000-000000000061", dependent, root, "implements")
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    monkeypatch.setattr(cli_module, "SessionLocal", factory)
+
+    with pytest.raises(SystemExit) as blocked:
+        main(["check-impacts", "--format", "json", "--as-of", AS_OF.isoformat()])
+
+    assert blocked.value.code == 1
+    document = json.loads(capsys.readouterr().out)
+    assert document["valid"] is False
+    assert document["finding_count"] == 1
+    assert document["findings"][0]["impacted_decision_id"] == dependent.id
+    sarif_path = tmp_path / "impact.sarif"
+    with pytest.raises(SystemExit) as sarif_blocked:
+        main(
+            [
+                "check-impacts",
+                "--format",
+                "sarif",
+                "--as-of",
+                AS_OF.isoformat(),
+                "--output",
+                str(sarif_path),
+            ]
+        )
+    assert sarif_blocked.value.code == 1
+    sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
+    assert sarif["runs"][0]["results"][0]["ruleId"] == "proofline/transitive-impact"
+    assert "cli-dependent" not in json.dumps(sarif, sort_keys=True)
+    review = session.scalar(
+        select(DecisionReview).where(DecisionReview.workspace_id == workspace_id)
+    )
+    assert review is not None
+    review.state = "resolved"
+    review.resolution = "source_restored"
+    review.closed_at = AS_OF
+    session.commit()
+
+    main(["check-impacts", "--as-of", AS_OF.isoformat()])
+
+    assert capsys.readouterr().out.strip() == "No decisions are transitively impacted."
+
+
+def test_check_impacts_cli_rejects_naive_as_of_before_database(monkeypatch, capsys):
+    def database_must_not_open():
+        raise AssertionError("database opened before timestamp validation")
+
+    monkeypatch.setattr(cli_module, "SessionLocal", database_must_not_open)
+    with pytest.raises(SystemExit) as invalid:
+        main(["check-impacts", "--as-of", "2026-08-23T12:00:00"])
+
+    assert invalid.value.code == 2
+    assert capsys.readouterr().err.strip() == "impact check failed: as_of_timezone_required"

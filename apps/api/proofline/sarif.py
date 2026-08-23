@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from . import __version__
 from .decision_health import DecisionHealthFinding
+from .decision_impacts import DecisionImpactFinding
 from .decision_policy import DecisionHealthPolicy, policy_sha256
 from .decision_reviews import review_fingerprint
 
@@ -83,6 +84,77 @@ def build_decision_health_sarif(
                 },
                 "properties": {"policySha256": policy_sha256(policy)},
                 "results": [_result(finding) for finding in ordered],
+            }
+        ],
+    }
+
+
+def build_decision_impact_sarif(findings: Iterable[DecisionImpactFinding]) -> dict:
+    ordered = sorted(
+        findings,
+        key=lambda item: (
+            item.root_review_id,
+            item.depth,
+            item.relation_path,
+            item.impacted_decision_id,
+        ),
+    )
+    evaluated_at = ordered[0].evaluated_at.isoformat() if ordered else None
+    return {
+        "$schema": SARIF_SCHEMA,
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "Proofline",
+                        "semanticVersion": __version__,
+                        "informationUri": "https://github.com/thangldw/proofline",
+                        "rules": [
+                            {
+                                "id": "proofline/transitive-impact",
+                                "shortDescription": {
+                                    "text": "Decision is transitively exposed to stale evidence"
+                                },
+                                "defaultConfiguration": {"level": "warning"},
+                            }
+                        ],
+                    }
+                },
+                "properties": {"evaluatedAt": evaluated_at},
+                "results": [
+                    {
+                        "ruleId": "proofline/transitive-impact",
+                        "level": "warning",
+                        "message": {
+                            "text": (
+                                "Explicit dependency path leads to an unresolved evidence review."
+                            )
+                        },
+                        "partialFingerprints": {"prooflineImpact/v1": item.fingerprint},
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {
+                                        "uri": (
+                                            f"proofline://decisions/{item.impacted_decision_id}"
+                                        )
+                                    }
+                                }
+                            }
+                        ],
+                        "properties": {
+                            "rootReviewId": item.root_review_id,
+                            "rootDecisionId": item.root_decision_id,
+                            "impactedDecisionId": item.impacted_decision_id,
+                            "depth": item.depth,
+                            "decisionPath": list(item.decision_path),
+                            "relationPath": list(item.relation_path),
+                            "relationKinds": list(item.relation_kinds),
+                        },
+                    }
+                    for item in ordered
+                ],
             }
         ],
     }
