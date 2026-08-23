@@ -18,6 +18,7 @@ from .models import (
     Evidence,
     Source,
     SourceVersion,
+    new_id,
     utc_now,
 )
 
@@ -88,7 +89,6 @@ def _audit_transition(
     before: dict[str, str | None],
     after_extra: dict[str, str | None] | None = None,
 ) -> None:
-    session.flush()
     after = _snapshot(review)
     if after_extra:
         after.update(after_extra)
@@ -421,17 +421,14 @@ def resolve_review(
     return review
 
 
-def _scoped_active_reviews(
+def _scoped_reviews(
     session: Session, *, workspace_id: str, source_ids: set[str] | None
 ) -> list[DecisionReview]:
     statement = (
         select(DecisionReview)
         .join(Decision, Decision.id == DecisionReview.decision_id)
         .join(Source, Source.id == Decision.source_id)
-        .where(
-            DecisionReview.workspace_id == workspace_id,
-            DecisionReview.state.in_(ACTIVE_REVIEW_STATES),
-        )
+        .where(DecisionReview.workspace_id == workspace_id)
         .order_by(DecisionReview.opened_at, DecisionReview.id)
     )
     if source_ids is not None:
@@ -459,11 +456,16 @@ def refresh_decision_reviews(
         raise DecisionReviewError(code) from exc
 
     opened = superseded = resolved = updated = unchanged = 0
-    active_reviews = _scoped_active_reviews(
+    scoped_reviews = _scoped_reviews(
         session,
         workspace_id=workspace_id,
         source_ids=source_ids,
     )
+    active_reviews = [item for item in scoped_reviews if item.state in ACTIVE_REVIEW_STATES]
+    active_by_evidence: dict[str, list[DecisionReview]] = {}
+    for review in active_reviews:
+        active_by_evidence.setdefault(review.evidence_id, []).append(review)
+    existing_by_fingerprint = {item.finding_fingerprint: item for item in scoped_reviews}
     findings_by_evidence = {finding.evidence_id: finding for finding in findings}
 
     for finding in findings:
@@ -474,12 +476,8 @@ def refresh_decision_reviews(
             current_source_version_id=finding.current_source_version_id,
             anchor_state=finding.reason,
         )
-        for review in active_reviews:
-            if (
-                review.evidence_id == finding.evidence_id
-                and review.current_source_version_id != finding.current_source_version_id
-                and review.state in ACTIVE_REVIEW_STATES
-            ):
+        for review in active_by_evidence.get(finding.evidence_id, []):
+            if review.current_source_version_id != finding.current_source_version_id:
                 before = _snapshot(review)
                 review.state = "superseded"
                 review.resolution = "newer_source_version"
@@ -493,9 +491,7 @@ def refresh_decision_reviews(
                 )
                 superseded += 1
 
-        existing = session.scalar(
-            select(DecisionReview).where(DecisionReview.finding_fingerprint == fingerprint)
-        )
+        existing = existing_by_fingerprint.get(fingerprint)
         if existing is not None:
             if existing.policy_hash != selected_policy_hash:
                 before = _snapshot(existing)
@@ -513,6 +509,7 @@ def refresh_decision_reviews(
             continue
 
         review = DecisionReview(
+            id=new_id(),
             workspace_id=workspace_id,
             decision_id=finding.decision_id,
             evidence_id=finding.evidence_id,
@@ -532,6 +529,8 @@ def refresh_decision_reviews(
         session.add(review)
         _audit_transition(session, review, action="decision_review_opened", before={})
         active_reviews.append(review)
+        active_by_evidence.setdefault(review.evidence_id, []).append(review)
+        existing_by_fingerprint[fingerprint] = review
         opened += 1
 
     for review in active_reviews:

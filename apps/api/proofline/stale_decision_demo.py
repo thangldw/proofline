@@ -5,10 +5,12 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from .database import initialize_database, make_engine
 from .decision_health import DecisionHealthFinding, check_decision_health
+from .decision_reviews import refresh_decision_reviews
 from .evidence_packages import (
     EvidencePackageError,
     atomic_write_html_report,
@@ -17,8 +19,9 @@ from .evidence_packages import (
     load_and_verify_package,
 )
 from .ingestion import ingest_source
-from .models import Decision, Evidence, SourceVersion
+from .models import Decision, DecisionReview, Evidence, SourceVersion
 from .portability import PortabilityError, atomic_write_export
+from .review_receipts import build_review_receipt
 from .schemas import SourceCreate
 
 DEMO_DIRECTORY = "proofline-demo-stale-decision"
@@ -165,6 +168,27 @@ def run_stale_decision_demo(output_dir: Path, *, force: bool = False) -> dict[st
             )
             if finding is None:
                 raise EvidencePackageError("demo_stale_decision_not_detected")
+            refresh_decision_reviews(session, workspace_id=source.workspace_id)
+            review = session.scalar(
+                select(DecisionReview).where(
+                    DecisionReview.decision_id == decision.id,
+                    DecisionReview.state == "open",
+                )
+            )
+            if review is None:
+                raise EvidencePackageError("demo_review_not_opened")
+            cited_version = session.get(SourceVersion, review.cited_source_version_id)
+            current_version = session.get(SourceVersion, review.current_source_version_id)
+            if cited_version is None or current_version is None:
+                raise EvidencePackageError("demo_source_version_missing")
+            review_receipt = build_review_receipt(
+                review,
+                evidence_package["manifest"]["root_hash"],
+                cited_content_sha256=cited_version.content_hash,
+                current_content_sha256=current_version.content_hash,
+            )
+            review_receipt_path = output_dir / "decision-review.json"
+            atomic_write_export(review_receipt_path, review_receipt)
 
             report_path = output_dir / "report.html"
             atomic_write_html_report(
@@ -186,6 +210,9 @@ def run_stale_decision_demo(output_dir: Path, *, force: bool = False) -> dict[st
                 "package": package_path,
                 "report": report_path,
                 "health_receipt": receipt_path,
+                "review_receipt": review_receipt_path,
+                "review": review,
+                "decision_status": decision.status,
                 "verification": verification,
             }
     finally:

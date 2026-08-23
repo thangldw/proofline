@@ -25,19 +25,22 @@ flowchart LR
 
 Proofline is a local-first Engineering Decision Memory for evidence-backed ADRs. It preserves source identity, source version and exact cited spans, exports self-contained Decision Evidence Packages, and performs deterministic stale-decision checks without requiring an AI provider.
 
+Decision status and evidence health are separate: an approved ADR remains historical fact while a stale citation is shown as **Accepted · review required**. Proofline never silently rewrites an accepted decision.
+
 Requirements: Python 3.11+, Node.js 20+ and npm.
 
 ```bash
 make setup
 .venv/bin/proofline demo stale-decision
 .venv/bin/proofline verify-package proofline-demo-stale-decision/evidence.zip
+.venv/bin/proofline verify-review-receipt proofline-demo-stale-decision/decision-review.json
 make test
 make check
 ```
 
 The current boundary is a single-user local workflow with recoverable data. Hosted sync, shared workspaces, signatures and permission-aware connector fleets are not implemented.
 
-Current technical references: [architecture](docs/architecture.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.1 release notes](docs/releases/v1.0.1.md).
+Current technical references: [architecture](docs/architecture.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/OPERATIONS.md), [security](SECURITY.md) and [v1.0.1 release notes](docs/releases/v1.0.1.md).
 
 The repository is also packaged as a local plugin for ChatGPT, Codex, Claude Code and Cowork. Proofline 1.0.1 is published in the public [OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa). It does not claim hosted sync or a remote MCP connector. See the [directory submission package](docs/submission/DIRECTORY_SUBMISSION.md), [privacy policy](PRIVACY.md), [terms](TERMS.md), and [support guidance](SUPPORT.md).
 
