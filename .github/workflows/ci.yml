@@ -71,8 +71,8 @@ jobs:
       - run: python -m venv .venv && .venv/bin/python -m pip install -e '.[dev]'
       - run: .venv/bin/python -m build --outdir dist
       - run: .venv/bin/python scripts/verify_release_artifacts.py dist/*.whl dist/*.tar.gz
-      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0-py3-none-any.whl --expected-version 2.0.0
-      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.0.tar.gz --expected-version 2.0.0
+      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.1-py3-none-any.whl --expected-version 2.0.1
+      - run: .venv/bin/python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.1.tar.gz --expected-version 2.0.1
 
   decision-health-sarif:
     runs-on: ubuntu-latest

@@ -4,7 +4,7 @@
 
 ### Boundary
 
-Proofline 2.0.0 is a single-user, local-first application. The authoritative state is local SQLite plus user-controlled files. CLI, local FastAPI, web UI, and desktop shell share the same domain model. There is no hosted control plane, tenant isolation, organization identity, OAuth, or remote MCP.
+Proofline 2.0.1 is a single-user, local-first application. The authoritative state is local SQLite plus user-controlled files. CLI, local FastAPI, web UI, and desktop shell share the same domain model. There is no hosted control plane, tenant isolation, organization identity, OAuth, or remote MCP.
 
 View the [trilingual system architecture diagram](diagrams/system-architecture.html).
 
@@ -30,7 +30,7 @@ Hashes detect mutation. Ed25519 verifies a signature against a supplied trusted 
 
 ### Boundary
 
-Proofline 2.0.0 là application single-user, local-first. State authoritative là SQLite local cùng file do người dùng kiểm soát. CLI, FastAPI local, web UI và desktop shell dùng chung domain model. Không có hosted control plane, tenant isolation, organization identity, OAuth hoặc remote MCP.
+Proofline 2.0.1 là application single-user, local-first. State authoritative là SQLite local cùng file do người dùng kiểm soát. CLI, FastAPI local, web UI và desktop shell dùng chung domain model. Không có hosted control plane, tenant isolation, organization identity, OAuth hoặc remote MCP.
 
 Xem [sơ đồ system architecture ba ngôn ngữ](diagrams/system-architecture.html).
 
@@ -56,7 +56,7 @@ Hash phát hiện mutation. Ed25519 verify signature với trusted public key đ
 
 ### Boundary
 
-Proofline 2.0.0 は single-user / local-first application です。Authoritative state は local SQLite と user-controlled file です。CLI、local FastAPI、web UI、desktop shell は同じ domain model を共有します。Hosted control plane、tenant isolation、organization identity、OAuth、remote MCP はありません。
+Proofline 2.0.1 は single-user / local-first application です。Authoritative state は local SQLite と user-controlled file です。CLI、local FastAPI、web UI、desktop shell は同じ domain model を共有します。Hosted control plane、tenant isolation、organization identity、OAuth、remote MCP はありません。
 
 [三言語 system architecture diagram](diagrams/system-architecture.html) を参照してください。
 
