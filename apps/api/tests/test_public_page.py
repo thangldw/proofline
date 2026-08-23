@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_public_docs_are_current_trilingual_and_release_scoped():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    release_notes = (ROOT / "docs/releases/v1.0.1.md").read_text(encoding="utf-8")
+    release_notes = (ROOT / "docs/releases/v2.0.0.md").read_text(encoding="utf-8")
     contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
     evidence_packages = (ROOT / "docs/evidence-packages.md").read_text(encoding="utf-8")
 
@@ -16,12 +16,15 @@ def test_public_docs_are_current_trilingual_and_release_scoped():
         assert language in readme
         assert language in release_notes
     assert "```mermaid" in readme
-    assert "v1.0.1" in release_notes
+    assert "v2.0.0" in release_notes
     assert "make test" in contributing
     assert "[evidence package formats](docs/evidence-packages.md)" in readme
     assert "Accepted · review required" in readme
     assert "integrity, not authenticity" in evidence_packages
     assert "proofline-decision-review-receipt-v1" in evidence_packages
+    assert "proofline-signed-attestation-v1" in evidence_packages
+    assert "trusted public key" in evidence_packages
+    assert "transitive impact" in readme.lower()
     assert "single-user" in evidence_packages
 
 
@@ -36,5 +39,8 @@ def test_default_decision_policy_and_ci_contract_are_committed():
         "package-conformance",
         "decision-health-sarif",
         "artifacts/decision-health.sarif",
+        "decision-impact-sarif",
+        "artifacts/decision-impact.sarif",
+        "verify-attestation",
     ):
         assert required in workflow

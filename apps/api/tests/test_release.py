@@ -89,10 +89,25 @@ def test_ci_workflow_runs_release_critical_commands():
         "npm audit --omit=dev --audit-level=high",
         "proofline verify-package",
         "proofline verify-review-receipt",
+        "proofline verify-attestation",
         "proofline check-decisions --format sarif",
+        "proofline check-impacts --format sarif",
     ):
         assert command in workflow
     assert "verify-package-conformance:" in makefile
+    assert "spec/signed-attestation/v1/test-vectors/valid-ed25519.json" in makefile
+
+
+def test_release_check_covers_public_plugin_version_surfaces():
+    root = repository_root()
+    release_check = (root / "scripts/release_check.py").read_text(encoding="utf-8")
+
+    for manifest in (
+        ".codex-plugin/plugin.json",
+        ".claude-plugin/plugin.json",
+        ".kimi-plugin/plugin.json",
+    ):
+        assert manifest in release_check
 
 
 def test_nanoid_security_override_is_locked_to_patched_compatible_version():

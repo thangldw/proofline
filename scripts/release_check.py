@@ -69,6 +69,13 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         (repository / "apps/desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8")
     )
     lock = json.loads((repository / "package-lock.json").read_text(encoding="utf-8"))
+    codex_plugin = json.loads(
+        (repository / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
+    )
+    claude_plugin = json.loads(
+        (repository / ".claude-plugin/plugin.json").read_text(encoding="utf-8")
+    )
+    kimi_plugin = json.loads((repository / ".kimi-plugin/plugin.json").read_text(encoding="utf-8"))
     runtime_version = read_dunder_version(repository / "apps/api/proofline/__init__.py")
 
     observed = {
@@ -80,6 +87,9 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         "apps/desktop/src-tauri/Cargo.toml": desktop_cargo["package"]["version"],
         "package-lock.json workspace": lock["packages"]["apps/web"]["version"],
         "package-lock.json desktop workspace": lock["packages"]["apps/desktop"]["version"],
+        ".codex-plugin/plugin.json": codex_plugin["version"],
+        ".claude-plugin/plugin.json": claude_plugin["version"],
+        ".kimi-plugin/plugin.json": kimi_plugin["version"],
     }
     for surface, value in observed.items():
         expected = (

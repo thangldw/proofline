@@ -44,6 +44,9 @@ verify-package-conformance:
 		spec/decision-evidence-package/v1/test-vectors/valid-minimal.json
 	.venv/bin/python skills/manage-evidence-decisions/scripts/proofline_package.py verify-review \
 		spec/decision-review-receipt/v1/test-vectors/valid-minimal.json
+	.venv/bin/python scripts/verify_attestation_vector.py \
+		spec/signed-attestation/v1/test-vectors/valid-ed25519.json \
+		spec/signed-attestation/v1/test-vectors/valid-ed25519-public.pem
 
 simulate-pilot:
 	@.venv/bin/python scripts/simulate_pilot.py \
