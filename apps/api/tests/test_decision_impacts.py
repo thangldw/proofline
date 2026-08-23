@@ -190,6 +190,7 @@ def test_impact_disappears_when_review_closes_and_is_workspace_scoped(session):
     review.state = "resolved"
     review.resolution = "source_restored"
     review.closed_at = AS_OF
+    review.updated_at = AS_OF
     session.commit()
     assert compute_decision_impacts(session, workspace_id=workspace_id, as_of=AS_OF) == []
 
@@ -269,11 +270,36 @@ def test_check_impacts_cli_json_sarif_and_exit_codes(session, monkeypatch, tmp_p
     review.state = "resolved"
     review.resolution = "source_restored"
     review.closed_at = AS_OF
+    review.updated_at = AS_OF
     session.commit()
 
+    main(["check-impacts", "--format", "sarif", "--as-of", AS_OF.isoformat()])
+
+    empty_sarif = json.loads(capsys.readouterr().out)
+    assert empty_sarif["runs"][0]["properties"]["evaluatedAt"] == AS_OF.isoformat()
     main(["check-impacts", "--as-of", AS_OF.isoformat()])
 
-    assert capsys.readouterr().out.strip() == "No decisions are transitively impacted."
+    assert capsys.readouterr().out.strip().splitlines() == [
+        f"Evaluated at {AS_OF.isoformat()}",
+        "No decisions are transitively impacted.",
+    ]
+
+
+def test_check_impacts_cli_fails_closed_on_invalid_review_provenance(session, monkeypatch, capsys):
+    _root, review, _workspace_id = _root_with_review(session)
+    review.finding_fingerprint = "0" * 64
+    session.commit()
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    monkeypatch.setattr(cli_module, "SessionLocal", factory)
+
+    with pytest.raises(SystemExit) as invalid:
+        main(["check-impacts", "--as-of", AS_OF.isoformat()])
+
+    assert invalid.value.code == 2
+    assert (
+        capsys.readouterr().err.strip()
+        == "impact check failed: decision_review_fingerprint_invalid"
+    )
 
 
 def test_check_impacts_cli_rejects_naive_as_of_before_database(monkeypatch, capsys):

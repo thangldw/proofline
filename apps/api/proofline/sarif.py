@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 
 from . import __version__
 from .decision_health import DecisionHealthFinding
@@ -89,7 +90,9 @@ def build_decision_health_sarif(
     }
 
 
-def build_decision_impact_sarif(findings: Iterable[DecisionImpactFinding]) -> dict:
+def build_decision_impact_sarif(
+    findings: Iterable[DecisionImpactFinding], *, evaluated_at: datetime
+) -> dict:
     ordered = sorted(
         findings,
         key=lambda item: (
@@ -99,7 +102,6 @@ def build_decision_impact_sarif(findings: Iterable[DecisionImpactFinding]) -> di
             item.impacted_decision_id,
         ),
     )
-    evaluated_at = ordered[0].evaluated_at.isoformat() if ordered else None
     return {
         "$schema": SARIF_SCHEMA,
         "version": "2.1.0",
@@ -121,7 +123,7 @@ def build_decision_impact_sarif(findings: Iterable[DecisionImpactFinding]) -> di
                         ],
                     }
                 },
-                "properties": {"evaluatedAt": evaluated_at},
+                "properties": {"evaluatedAt": evaluated_at.isoformat()},
                 "results": [
                     {
                         "ruleId": "proofline/transitive-impact",
