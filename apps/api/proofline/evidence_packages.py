@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import __version__
-from .models import Chunk, Decision, ModelRun, Source, SourceVersion
+from .models import Chunk, Decision, Evidence, ModelRun, Source, SourceVersion
 from .portability import PortabilityError, atomic_write_export, canonical_json_bytes
 
 DECISION_PACKAGE_SCHEMA = "proofline-decision-evidence-package-v1"
@@ -139,7 +139,14 @@ def build_decision_package(
             "parser_version": version.parser_version,
         },
     )
-    ordered_evidence = sorted(decision.evidence, key=lambda item: (item.start_offset, item.id))
+    ordered_evidence = session.scalars(
+        select(Evidence)
+        .where(
+            Evidence.decision_id == decision.id,
+            Evidence.binding_state == "active",
+        )
+        .order_by(Evidence.start_offset, Evidence.id)
+    ).all()
     stored_chunks = session.scalars(
         select(Chunk).where(Chunk.source_version_id == version.id).order_by(Chunk.ordinal, Chunk.id)
     ).all()
