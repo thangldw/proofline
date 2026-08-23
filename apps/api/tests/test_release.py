@@ -173,6 +173,42 @@ def test_trusted_publisher_workflow_separates_build_publish_and_public_verificat
     )
 
 
+def test_desktop_artifact_workflow_is_manual_gated_and_never_publishes():
+    workflow = (repository_root() / ".github/workflows/desktop-artifacts.yml").read_text(
+        encoding="utf-8"
+    )
+
+    for contract in (
+        "workflow_dispatch:",
+        "source_ref:",
+        "release_grade:",
+        "ref: ${{ inputs.source_ref }}",
+        "platform: macos",
+        "platform: windows",
+        "scripts/desktop_release_gate.py",
+        "scripts/desktop_release_receipt.py",
+        "scripts/windows_desktop_receipt.py",
+        '"--signed-executable"',
+        "codesign --verify --deep --strict",
+        "xcrun stapler validate",
+        "Get-AuthenticodeSignature",
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "if-no-files-found: error",
+    ):
+        assert contract in workflow
+    for publishing_contract in (
+        "gh release create",
+        "softprops/action-gh-release",
+        "releaseId:",
+        "tagName:",
+        "contents: write",
+    ):
+        assert publishing_contract not in workflow
+    assert workflow.index("scripts/desktop_release_gate.py") < workflow.index(
+        "npm run build --workspace @proofline/desktop"
+    )
+
+
 def test_release_check_covers_public_plugin_version_surfaces():
     root = repository_root()
     release_check = (root / "scripts/release_check.py").read_text(encoding="utf-8")
