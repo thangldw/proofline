@@ -1,16 +1,17 @@
 # Proofline directory submission
 
-Prepared: 2026-08-02
+Prepared: 2026-08-23
 
 ## Current status
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Submission ID: `appsub_6a6efdf2d6188191be8c8493bd738576`
+- Submission ID: `appsub_6a8ab28cfc44819197f0057d5f274cc4`
 - Public version before this update: `1.0.1`
 - Prepared update version: `2.0.0`
-- Update submission status: **Pending submission** as of 2026-08-23
-- Review status: **Approved** on 2026-08-02
-- Publication status: **Published** on 2026-08-02
+- Update submission status: **Submitted for review** on 2026-08-23
+- Update review status: **Awaiting OpenAI review** as of 2026-08-23
+- Prior public review status: **Approved** for version `1.0.1` on 2026-08-02
+- Publication status: version `1.0.1` remains public until the `2.0.0` review completes
 - Directory URL: https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa
 
 ## Submission choice
@@ -81,7 +82,8 @@ does not claim identity, trusted time, hosted sync or a remote MCP connector.
 ## Verified submission checks
 
 - The exact OpenAI ZIP was extracted and executed in a clean temporary directory with no repository imports.
+- Submitted ZIP SHA-256: `5d3abb3412b2eff44dc05eed30641cd4884441a54958898ff72441526216287f`.
 - The bundled verifier passed the canonical valid fixture and all mutation vectors.
-- The repository test suite passed 379 Python tests and 56 web tests before submission.
+- The release gate passed 524 Python tests, 67 web tests, 3 egress tests and 2 browser E2E tests before submission.
 - OpenAI accepted the verified publisher identity and public legal/support URLs.
 - The listing does not describe hosted sync, shared workspaces, or OAuth as implemented.
