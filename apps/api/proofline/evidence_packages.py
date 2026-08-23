@@ -829,7 +829,10 @@ dt{{font-weight:700}}dd{{margin:0;overflow-wrap:anywhere}}
 pre{{white-space:pre-wrap;background:#f2f5f9;border-radius:10px;padding:16px;
 overflow-wrap:anywhere}}
 code{{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}}
+.locator,code{{overflow-wrap:anywhere;word-break:break-word}}
 .citation+.citation{{margin-top:16px}}
+@media (max-width:640px){{main{{padding:28px 14px 48px}}
+header,section{{padding:20px}}dl{{grid-template-columns:1fr}}}}
 </style>
 </head>
 <body><main>

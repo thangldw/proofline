@@ -378,6 +378,21 @@ def test_html_report_is_verified_self_contained_and_escapes_content(session):
     assert "https://" not in report
 
 
+def test_html_report_wraps_complete_provenance_on_narrow_screens(session):
+    _source, decision = _seed_decision(session)
+    package = build_decision_package(session, decision.id)
+
+    report = render_decision_package_html(package)
+
+    assert "@media (max-width:640px)" in report
+    assert "dl{grid-template-columns:1fr}" in report
+    assert "main{padding:28px 14px 48px}" in report
+    assert "header,section{padding:20px}" in report
+    assert "overflow-wrap:anywhere" in report
+    assert "display:none" not in report
+    assert "text-overflow:ellipsis" not in report
+
+
 def _write_test_archive(
     path, entries: list[tuple[str, bytes]], *, compression: int = zipfile.ZIP_STORED
 ):

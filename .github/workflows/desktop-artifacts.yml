@@ -1,0 +1,269 @@
+name: Desktop artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Immutable commit SHA or release tag to build
+        required: true
+        type: string
+      release_grade:
+        description: Require distribution signing and native trust verification
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-14
+          - platform: windows
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.source_ref }}
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "20"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+      - name: Install build dependencies
+        run: |
+          python -m pip install -e ".[dev]"
+          npm ci
+      - name: Prepare receipt directory
+        run: python -c "from pathlib import Path; Path('artifacts').mkdir(exist_ok=True)"
+
+      - name: Gate macOS credential presence
+        if: matrix.platform == 'macos'
+        shell: bash
+        env:
+          RELEASE_GRADE: ${{ inputs.release_grade }}
+          APPLE_CERTIFICATE_PRESENT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+          APPLE_CERTIFICATE_PASSWORD_PRESENT: ${{ secrets.APPLE_CERTIFICATE_PASSWORD != '' }}
+          KEYCHAIN_PASSWORD_PRESENT: ${{ secrets.KEYCHAIN_PASSWORD != '' }}
+          APPLE_SIGNING_IDENTITY_PRESENT: ${{ secrets.APPLE_SIGNING_IDENTITY != '' }}
+          APPLE_ID_PRESENT: ${{ secrets.APPLE_ID != '' }}
+          APPLE_PASSWORD_PRESENT: ${{ secrets.APPLE_PASSWORD != '' }}
+          APPLE_TEAM_ID_PRESENT: ${{ secrets.APPLE_TEAM_ID != '' }}
+        run: |
+          release_args=()
+          if [[ "${RELEASE_GRADE,,}" == "true" ]]; then release_args+=(--release-grade); fi
+          python scripts/desktop_release_gate.py --platform macos "${release_args[@]}" \
+            --credential "apple_certificate=$APPLE_CERTIFICATE_PRESENT" \
+            --credential "apple_certificate_password=$APPLE_CERTIFICATE_PASSWORD_PRESENT" \
+            --credential "keychain_password=$KEYCHAIN_PASSWORD_PRESENT" \
+            --credential "apple_signing_identity=$APPLE_SIGNING_IDENTITY_PRESENT" \
+            --credential "apple_id=$APPLE_ID_PRESENT" \
+            --credential "apple_password=$APPLE_PASSWORD_PRESENT" \
+            --credential "apple_team_id=$APPLE_TEAM_ID_PRESENT" \
+            | tee artifacts/desktop-release-gate.json
+
+      - name: Gate Windows credential presence
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          RELEASE_GRADE: ${{ inputs.release_grade }}
+          WINDOWS_CERTIFICATE_PRESENT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+          WINDOWS_CERTIFICATE_PASSWORD_PRESENT: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+          WINDOWS_CERTIFICATE_THUMBPRINT_PRESENT: ${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT != '' }}
+          WINDOWS_TIMESTAMP_URL_PRESENT: ${{ secrets.WINDOWS_TIMESTAMP_URL != '' }}
+        run: |
+          $GateArgs = @("--platform", "windows")
+          if ($env:RELEASE_GRADE.ToLower() -eq "true") { $GateArgs += "--release-grade" }
+          $GateArgs += @(
+            "--credential", "windows_certificate=$($env:WINDOWS_CERTIFICATE_PRESENT.ToLower())",
+            "--credential", "windows_certificate_password=$($env:WINDOWS_CERTIFICATE_PASSWORD_PRESENT.ToLower())",
+            "--credential", "windows_certificate_thumbprint=$($env:WINDOWS_CERTIFICATE_THUMBPRINT_PRESENT.ToLower())",
+            "--credential", "windows_timestamp_url=$($env:WINDOWS_TIMESTAMP_URL_PRESENT.ToLower())"
+          )
+          python scripts/desktop_release_gate.py @GateArgs |
+            Out-File -Encoding utf8 artifacts/desktop-release-gate.json
+
+      - name: Import Apple Developer ID certificate
+        if: inputs.release_grade && matrix.platform == 'macos'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/proofline-signing.p12"
+          keychain_path="$RUNNER_TEMP/proofline-signing.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+
+      - name: Build macOS package
+        if: matrix.platform == 'macos'
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ inputs.release_grade && secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          python scripts/build_desktop_sidecar.py
+          npm run build --workspace @proofline/desktop
+
+      - name: Verify macOS distribution trust
+        if: inputs.release_grade && matrix.platform == 'macos'
+        shell: bash
+        run: |
+          app_path=$(find apps/desktop/src-tauri/target/release/bundle/macos -name '*.app' -print -quit)
+          dmg_path=$(find apps/desktop/src-tauri/target/release/bundle/dmg -name '*.dmg' -print -quit)
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          xcrun stapler validate "$dmg_path"
+
+      - name: Write macOS qualification receipt
+        if: matrix.platform == 'macos'
+        shell: bash
+        env:
+          RELEASE_GRADE: ${{ inputs.release_grade }}
+        run: |
+          app_path=$(find apps/desktop/src-tauri/target/release/bundle/macos -name '*.app' -print -quit)
+          dmg_path=$(find apps/desktop/src-tauri/target/release/bundle/dmg -name '*.dmg' -print -quit)
+          expected_version=$(python -c "import json; print(json.load(open('apps/desktop/package.json'))['version'])")
+          receipt_args=()
+          if [[ "${RELEASE_GRADE,,}" == "true" ]]; then receipt_args+=(--release-grade); fi
+          python scripts/desktop_release_receipt.py --app "$app_path" --dmg "$dmg_path" \
+            --expected-version "$expected_version" --output artifacts/desktop-receipt.json \
+            "${receipt_args[@]}"
+
+      - name: Import Windows Authenticode certificate
+        if: inputs.release_grade && matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE_THUMBPRINT: ${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
+        run: |
+          $CertificatePath = Join-Path $env:RUNNER_TEMP "proofline-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $CertificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          )
+          $Password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD `
+            -AsPlainText -Force
+          Import-PfxCertificate -FilePath $CertificatePath `
+            -CertStoreLocation Cert:\CurrentUser\My -Password $Password | Out-Null
+          @{
+            bundle = @{
+              windows = @{
+                certificateThumbprint = $env:WINDOWS_CERTIFICATE_THUMBPRINT
+                digestAlgorithm = "sha256"
+                timestampUrl = $env:WINDOWS_TIMESTAMP_URL
+              }
+            }
+          } | ConvertTo-Json -Depth 4 |
+            Out-File -Encoding utf8 (Join-Path $env:RUNNER_TEMP "proofline-windows-signing.json")
+
+      - name: Build experimental Windows package
+        if: matrix.platform == 'windows' && !inputs.release_grade
+        shell: pwsh
+        run: |
+          python scripts/build_desktop_sidecar.py
+          npm run build --workspace @proofline/desktop
+
+      - name: Build release-grade Windows package
+        if: matrix.platform == 'windows' && inputs.release_grade
+        shell: pwsh
+        run: |
+          python scripts/build_desktop_sidecar.py
+          $Config = Join-Path $env:RUNNER_TEMP "proofline-windows-signing.json"
+          npm run tauri --workspace @proofline/desktop -- build --config $Config
+
+      - name: Verify Windows Authenticode signatures
+        if: inputs.release_grade && matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $Artifacts = @(
+            Get-Item apps/desktop/src-tauri/target/release/proofline-desktop.exe
+            Get-ChildItem apps/desktop/src-tauri/target/release/bundle -Recurse `
+              -Include *.msi,*.exe
+          )
+          if ($Artifacts.Count -lt 2) { throw "desktop artifacts missing" }
+          foreach ($Artifact in $Artifacts) {
+            $Signature = Get-AuthenticodeSignature -LiteralPath $Artifact.FullName
+            if ($Signature.Status -ne "Valid") { throw "Authenticode verification failed" }
+          }
+
+      - name: Write Windows qualification receipt
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          RELEASE_GRADE: ${{ inputs.release_grade }}
+        run: |
+          $Sidecar = Get-ChildItem apps/desktop/src-tauri/binaries/proofline-sidecar-*.exe |
+            Select-Object -First 1
+          $SignedExecutable = Get-Item `
+            apps/desktop/src-tauri/target/release/proofline-desktop.exe
+          $Installers = @(
+            Get-ChildItem apps/desktop/src-tauri/target/release/bundle -Recurse `
+              -Include *.msi,*.exe
+          )
+          $ExpectedVersion = python -c `
+            "import json; print(json.load(open('apps/desktop/package.json'))['version'])"
+          $ReceiptArgs = @(
+            "--sidecar", $Sidecar.FullName,
+            "--signed-executable", $SignedExecutable.FullName,
+            "--expected-version", $ExpectedVersion,
+            "--output", "artifacts/desktop-receipt.json"
+          )
+          foreach ($Installer in $Installers) {
+            $ReceiptArgs += @("--installer", $Installer.FullName)
+          }
+          if ($env:RELEASE_GRADE.ToLower() -eq "true") { $ReceiptArgs += "--release-grade" }
+          python scripts/windows_desktop_receipt.py @ReceiptArgs
+
+      - name: Upload isolated workflow artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: proofline-${{ matrix.platform }}-${{ inputs.release_grade && 'release-grade' || 'experimental' }}-${{ github.run_id }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle
+            artifacts/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove imported signing material
+        if: always() && inputs.release_grade
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_THUMBPRINT: ${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}
+        run: |
+          if ($IsMacOS) {
+            security delete-keychain "$env:RUNNER_TEMP/proofline-signing.keychain-db" 2>$null
+            Remove-Item "$env:RUNNER_TEMP/proofline-signing.p12" -Force -ErrorAction SilentlyContinue
+          }
+          if ($IsWindows) {
+            Remove-Item "Cert:\CurrentUser\My\$env:WINDOWS_CERTIFICATE_THUMBPRINT" `
+              -Force -ErrorAction SilentlyContinue
+            Remove-Item "$env:RUNNER_TEMP/proofline-signing.pfx" `
+              -Force -ErrorAction SilentlyContinue
+            Remove-Item "$env:RUNNER_TEMP/proofline-windows-signing.json" `
+              -Force -ErrorAction SilentlyContinue
+          }
