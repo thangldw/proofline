@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -108,6 +109,22 @@ def test_release_check_covers_public_plugin_version_surfaces():
         ".kimi-plugin/plugin.json",
     ):
         assert manifest in release_check
+
+
+def test_source_distribution_excludes_local_build_and_test_state():
+    root = repository_root()
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    excluded = set(pyproject["tool"]["hatch"]["build"]["targets"]["sdist"]["exclude"])
+
+    assert {
+        "/.hypothesis",
+        "/.pytest_cache",
+        "/.ruff_cache",
+        "/.venv",
+        "/.worktrees",
+        "**/__pycache__",
+        "**/*.pyc",
+    } <= excluded
 
 
 def test_nanoid_security_override_is_locked_to_patched_compatible_version():

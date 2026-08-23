@@ -48,11 +48,18 @@ packages = ["apps/api/proofline"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [
+  "/.hypothesis",
+  "/.pytest_cache",
+  "/.ruff_cache",
+  "/.venv",
+  "/.worktrees",
   "/apps/desktop/src-tauri/binaries",
   "/apps/desktop/src-tauri/gen",
   "/apps/desktop/src-tauri/target",
   "/build",
   "/node_modules",
+  "**/__pycache__",
+  "**/*.pyc",
 ]
 
 [tool.pytest.ini_options]
