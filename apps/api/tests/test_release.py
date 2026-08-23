@@ -106,6 +106,12 @@ def test_ci_workflow_runs_release_critical_commands():
     assert "spec/signed-attestation/v1/test-vectors/valid-ed25519.json" in makefile
 
 
+def test_release_toolchain_pins_non_vulnerable_pip_floor():
+    project = tomllib.loads((repository_root() / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "pip>=26.2,<27" in project["project"]["optional-dependencies"]["dev"]
+
+
 def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
     root = repository_root()
     local = (root / "scripts/release_local.sh").read_text(encoding="utf-8")
