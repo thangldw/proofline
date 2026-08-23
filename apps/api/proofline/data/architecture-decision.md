@@ -1,31 +1,33 @@
-# ADR: Local ingestion queue
+<!-- Executable source fixture: intentionally English-only to preserve extraction cardinality. -->
+
+# ADR: Immutable evidence index
 
 ## Context
 
-Proofline runs as a single-user local application. Ingestion jobs must survive process restarts
-without requiring another service.
+Proofline must reproduce which source bytes supported a decision even after the source changes.
+Verification must remain available without a hosted service.
 
-## Decision: Keep ingestion jobs in SQLite
+## Decision: Store immutable source versions in SQLite
 
-Rationale: SQLite provides transactional state and recovery inside the existing local database.
+Rationale: Transactional local storage preserves version identity, exact offsets, and hash bindings
+inside the same recoverable database.
 Status: active
 
 ## Assumption: One local runtime owns writes
 
-Rationale: The current supported experiment has one user and one supervised application runtime.
+Rationale: The supported profile has one user and one supervised application runtime.
 
-## Constraint: Local development works without infrastructure
+## Constraint: Package verification works offline
 
-Rationale: Deterministic ingestion, retrieval, and review must run without credentials or external
-services.
+Rationale: Integrity checks cannot depend on model credentials, network access, or mutable search
+results.
 
-## Alternative: Operate a separate message broker
+## Alternative: Keep only the latest source text
 
-Rationale: A broker adds deployment and recovery cost that the current local workload does not
-justify.
+Rationale: Mutable text cannot reproduce the exact evidence used for a historical decision.
 Status: rejected
 
 ## Consequence
 
-Workers lease jobs from SQLite. A future hosted profile may implement the queue interface with a
-managed broker, but it cannot change historical source identity or evidence spans.
+Every content change creates a new source version. Review state may change, but historical source
+identity and citation spans remain intact.
