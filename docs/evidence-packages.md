@@ -1,63 +1,97 @@
-# Evidence package formats
+# Evidence packages and attestations
 
-Proofline has three independent, canonical JSON contracts.
+## English
 
-`proofline-decision-evidence-package-v1` captures the immutable source version, exact cited spans,
-transformation lineage, decision content and historical decision status. Its root hash proves package
-integrity, not authenticity. It is not a signature and does not identify the person who approved the
-decision.
+### Decision Evidence Package
 
-`proofline-decision-review-receipt-v1` binds a deterministic stale-evidence finding and its review
-state to the original package root. It contains UUIDs, SHA-256 hashes, anchor state, policy hash,
-resolution and timestamps; it deliberately excludes source and quote content. An accepted decision
-can therefore remain historical fact while its separate review state is open: “Accepted · review
-required.”
+A Decision Evidence Package (DEP) is a self-contained JSON document or canonical ZIP containing one memory artifact, immutable source-version evidence, exact citation spans, and a root hash. `proofline verify-package PATH` validates schema, identifiers, quote/span hashes, canonical ordering, and the root without database, network, or AI access. The root establishes integrity, not authenticity.
 
-`proofline-signed-attestation-v1` signs a canonical statement containing the package root and
-artifact ID plus an optional bound review-receipt hash. Verification requires the exact package,
-the optional receipt when present, and a trusted Ed25519 public key selected independently from the
-artifact. The signed statement also binds the Ed25519 algorithm, raw-public-key SHA-256 key ID and
-canonical RFC 3339 UTC issuance time using `Z`, with zero fractional seconds omitted and any
-fraction limited to microseconds with trailing zeros omitted. The private key is never included in
-the envelope.
+### Decision-review receipt
 
-Verify both without database or AI-provider access:
+A `proofline-decision-review-receipt-v1` receipt contains no source or quote content. It binds a decision-review snapshot, policy/result fingerprints, and evidence bindings to an exact verified DEP root. `proofline verify-review-receipt PATH` verifies the portable receipt independently. A receipt proves deterministic binding and integrity, not reviewer identity or source truth.
+
+### Signed attestation
+
+A `proofline-signed-attestation-v1` envelope binds a verified package and optional verified receipt to an Ed25519 signature. Verify with:
 
 ```bash
-proofline verify-package evidence.zip
-proofline verify-review-receipt decision-review.json
-python skills/manage-evidence-decisions/scripts/proofline_package.py verify evidence.zip
-python skills/manage-evidence-decisions/scripts/proofline_package.py verify-review decision-review.json
+proofline verify-attestation envelope.json \
+  --public-key trusted-public.pem \
+  --package evidence.json \
+  --review-receipt decision-review.json
 ```
 
-Create and verify an attestation with the full Proofline 2.0.0 runtime:
+The verifier must obtain the trusted public key through an independent channel. Signature validity proves matching private-key control for the exact subjects; it does not prove legal identity, authorization, trusted time, revocation, transparency-log inclusion, or artifact safety.
+
+### Specifications
+
+- [Decision Evidence Package](../spec/decision-evidence-package/README.md)
+- [Decision-review receipt](../spec/decision-review-receipt/README.md)
+- [Signed attestation](../spec/signed-attestation/README.md)
+- [Trilingual verification diagram](diagrams/evidence-verification.html)
+
+All formats are provider-independent and fail closed on schema, canonicalization, hash, binding, or signature errors. The shipped workflow is single-user and local; these artifacts do not add hosted coordination.
+
+## Tiếng Việt
+
+### Decision Evidence Package
+
+Decision Evidence Package (DEP) là JSON document self-contained hoặc canonical ZIP chứa một memory artifact, evidence của immutable source version, exact citation span và root hash. `proofline verify-package PATH` verify schema, identifier, quote/span hash, canonical ordering và root mà không cần database, network hoặc AI. Integrity không phải authenticity.
+
+### Decision-review receipt
+
+Receipt `proofline-decision-review-receipt-v1` không chứa source hoặc quote content. Nó gắn decision-review snapshot, policy/result fingerprint và evidence binding với đúng DEP root đã verify. `proofline verify-review-receipt PATH` verify receipt portable độc lập. Receipt chứng minh deterministic binding và integrity, không chứng minh reviewer identity hoặc source truth.
+
+### Signed attestation
+
+Envelope `proofline-signed-attestation-v1` gắn package đã verify và receipt tùy chọn đã verify với signature Ed25519. Verify bằng:
 
 ```bash
-key_dir="${PROOFLINE_KEY_DIR:?set PROOFLINE_KEY_DIR outside repositories and synced folders}"
-install -d -m 700 "$key_dir"
-proofline generate-attestation-key \
-  --private-key "$key_dir/signing.pem" --public-key "$key_dir/signing.pub.pem"
-proofline attest --package evidence.zip --review-receipt decision-review.json \
-  --private-key "$key_dir/signing.pem" --output attestation.json
-proofline verify-attestation attestation.json --public-key "$key_dir/signing.pub.pem" \
-  --package evidence.zip --review-receipt decision-review.json
+proofline verify-attestation envelope.json \
+  --public-key trusted-public.pem \
+  --package evidence.json \
+  --review-receipt decision-review.json
 ```
 
-`generate-attestation-key` enforces owner-only descriptor permissions and fails closed with
-`secure_permissions_unsupported` where that primitive is unavailable, including CPython 3.12 on
-Windows. On such hosts, provision an Ed25519 PKCS#8 key with an owner-only Windows ACL using an
-external key-management workflow, then use `attest` and `verify-attestation`. Signed envelopes are
-bounded to 1 MiB; a larger DEP artifact ID is rejected before output.
+Verifier phải nhận trusted public key qua kênh độc lập. Signature hợp lệ chứng minh quyền kiểm soát private key tương ứng cho đúng subject; không chứng minh legal identity, authorization, trusted time, revocation, transparency-log inclusion hoặc artifact safety.
 
-The schema and mutation vectors live under `spec/decision-evidence-package/v1/` and
-`spec/decision-review-receipt/v1/`. Verification is fail-closed with stable, content-free error
-codes. Portable export v3 preserves review rows and active/superseded evidence chains; v1 and v2
-exports receive deterministic anchor backfill during verification/import.
+### Specification
 
-The signed schema and fixed Ed25519 vector live under `spec/signed-attestation/v1/`. A valid
-signature establishes integrity and control of the matching private key relative to the trusted
-public key. It does not establish legal identity, a CA trust chain, trusted timestamp,
-transparency-log inclusion, key revocation, authorization or artifact safety.
+- [Decision Evidence Package](../spec/decision-evidence-package/README.md)
+- [Decision-review receipt](../spec/decision-review-receipt/README.md)
+- [Signed attestation](../spec/signed-attestation/README.md)
+- [Sơ đồ verification ba ngôn ngữ](diagrams/evidence-verification.html)
 
-Current scope is a single-user local-first workflow. Preserve the original package, review receipt,
-attestation and independently trusted public key together when transferring evidence.
+Mọi format độc lập provider và fail closed khi có lỗi schema, canonicalization, hash, binding hoặc signature. Workflow đã phát hành là single-user và local; các artifact này không bổ sung hosted coordination.
+
+## 日本語
+
+### Decision Evidence Package
+
+Decision Evidence Package (DEP) は、一つの memory artifact、immutable source-version evidence、exact citation span、root hash を含む self-contained JSON document または canonical ZIP です。`proofline verify-package PATH` は database、network、AI なしで schema、identifier、quote/span hash、canonical ordering、root を検証します。Integrity は authenticity ではありません。
+
+### Decision-review receipt
+
+`proofline-decision-review-receipt-v1` receipt は source または quote content を含みません。Decision-review snapshot、policy/result fingerprint、evidence binding を、検証済み DEP の正確な root に結び付けます。`proofline verify-review-receipt PATH` は portable receipt を独立に検証します。Receipt が証明するのは deterministic binding と integrity であり、reviewer identity や source truth ではありません。
+
+### Signed attestation
+
+`proofline-signed-attestation-v1` envelope は検証済み package と任意の検証済み receipt を Ed25519 signature に結び付けます。
+
+```bash
+proofline verify-attestation envelope.json \
+  --public-key trusted-public.pem \
+  --package evidence.json \
+  --review-receipt decision-review.json
+```
+
+Verifier は trusted public key を独立 channel から取得する必要があります。Signature validity は正確な subject に対する matching private-key control を証明しますが、legal identity、authorization、trusted time、revocation、transparency-log inclusion、artifact safety は証明しません。
+
+### Specification
+
+- [Decision Evidence Package](../spec/decision-evidence-package/README.md)
+- [Decision-review receipt](../spec/decision-review-receipt/README.md)
+- [Signed attestation](../spec/signed-attestation/README.md)
+- [三言語 verification diagram](diagrams/evidence-verification.html)
+
+全 format は provider-independent であり、schema、canonicalization、hash、binding、signature error に対して fail closed します。出荷済み workflow は single-user/local で、これら artifact は hosted coordination を追加しません。
