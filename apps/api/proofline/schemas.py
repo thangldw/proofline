@@ -389,6 +389,10 @@ class DecisionReviewRead(BaseModel):
     closed_at: datetime | None
 
 
+class DecisionReviewListItem(DecisionReviewRead):
+    decision_status: str
+
+
 class DecisionReviewOverview(BaseModel):
     healthy_accepted: int = Field(ge=0)
     review_required: int = Field(ge=0)

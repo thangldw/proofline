@@ -1,0 +1,361 @@
+.decision-health-view {
+  max-width: 1180px;
+}
+
+.decision-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.decision-health-metrics article {
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgb(18 104 222 / 6%);
+}
+
+.decision-health-metrics article.attention {
+  border-color: #e9c77e;
+  background: var(--color-warning-soft);
+}
+
+.decision-health-metrics strong,
+.decision-health-metrics span {
+  display: block;
+}
+
+.decision-health-metrics strong {
+  font: 650 30px/1 var(--font-mono);
+}
+
+.decision-health-metrics span {
+  margin-top: 9px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.decision-health-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.decision-health-toolbar h2 {
+  margin: 7px 0;
+  font-size: 23px;
+}
+
+.decision-health-toolbar p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.decision-health-toolbar button,
+.decision-health-table button,
+.decision-health-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+}
+
+.decision-health-toolbar button:disabled,
+.decision-health-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.decision-health-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 210px));
+  gap: 12px;
+  margin: 24px 0 14px;
+}
+
+.decision-health-filters label,
+.decision-health-actions label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.decision-health-filters select,
+.decision-health-actions input,
+.decision-health-actions textarea {
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.decision-health-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  background: var(--color-surface);
+}
+
+.decision-health-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.decision-health-table th {
+  padding: 12px 16px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-subtle);
+  font: 600 10px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.decision-health-table td {
+  padding: 15px 16px;
+  border-top: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.decision-health-table td:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.decision-health-table small {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: 500 10px var(--font-mono);
+  text-overflow: ellipsis;
+}
+
+.anchor-badge,
+.decision-health-status {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font: 650 10px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.anchor-badge.deleted,
+.anchor-badge.ambiguous {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.decision-health-message,
+.decision-health-empty {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 11px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.decision-health-message.error {
+  border-style: solid;
+  border-color: #efb7aa;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.decision-health-drawer {
+  position: fixed;
+  z-index: 8;
+  inset: 0 0 0 auto;
+  width: min(570px, 94vw);
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border-strong);
+  padding: 28px;
+  background: var(--color-surface);
+  box-shadow: -18px 0 48px rgb(11 40 84 / 16%);
+}
+
+.decision-health-drawer > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.decision-health-drawer h2 {
+  margin: 7px 0 10px;
+}
+
+.decision-health-drawer > header > button {
+  border: 0;
+  padding: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.decision-health-statement {
+  margin: 22px 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.decision-health-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.decision-health-facts div {
+  padding: 12px;
+  border-radius: 9px;
+  background: var(--color-surface-subtle);
+}
+
+.decision-health-facts dt {
+  color: var(--color-text-subtle);
+  font: 600 9px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.decision-health-facts dd {
+  margin: 6px 0 0;
+  overflow: hidden;
+  font: 600 11px var(--font-mono);
+  text-overflow: ellipsis;
+}
+
+.decision-health-evidence {
+  margin-top: 18px;
+  padding: 17px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-surface-subtle);
+}
+
+.decision-health-evidence.current {
+  background: var(--color-warning-soft);
+}
+
+.decision-health-evidence > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.decision-health-evidence strong,
+.decision-health-evidence small {
+  color: var(--color-text-muted);
+  font: 550 10px var(--font-mono);
+}
+
+.decision-health-evidence blockquote {
+  margin: 14px 0 0;
+  padding-left: 13px;
+  border-left: 3px solid var(--color-mint);
+  font: 400 12px/1.65 var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.decision-health-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.decision-health-actions .primary-action {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.decision-health-actions .danger-action {
+  border-color: #d88775;
+  color: var(--color-danger);
+}
+
+.decision-health-actions details {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+}
+
+.decision-health-actions details[open] {
+  display: grid;
+}
+
+.decision-health-actions summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.decision-health-audit {
+  margin-top: 26px;
+}
+
+.decision-health-audit ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision-health-audit li {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border-strong);
+  font-size: 12px;
+}
+
+.decision-health-audit li span {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 760px) {
+  .decision-health-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decision-health-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decision-health-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-health-drawer {
+    width: 100vw;
+    padding: 20px;
+  }
+
+  .decision-health-facts {
+    grid-template-columns: 1fr;
+  }
+}

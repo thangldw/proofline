@@ -80,4 +80,78 @@ describe("search scope API contract", () => {
       "workspace-platform",
     );
   });
+
+  it("serializes decision review filters and mutation payloads", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.decisionReviews({
+      state: "open",
+      anchorState: "changed",
+      severity: "warning",
+      limit: 25,
+    });
+    await api.updateDecisionReview("review-1", {
+      action: "waive",
+      reason: "time-boxed exception",
+    });
+    await api.reanchorDecisionReview("review-1", {
+      expected_current_source_version_id: "version-current",
+      start_offset: 12,
+      end_offset: 31,
+      reason: "reviewed exact replacement",
+    });
+    await api.resolveDecisionReview("review-1", {
+      action: "supersede_decision",
+      replacement_decision_id: "decision-2",
+      reason: "replacement accepted",
+    });
+
+    const listUrl = new URL(fetchMock.mock.calls[0][0], "http://proofline.local");
+    expect(listUrl.pathname).toBe("/api/v1/decision-reviews");
+    expect(Object.fromEntries(listUrl.searchParams)).toEqual({
+      state: "open",
+      anchor_state: "changed",
+      severity: "warning",
+      limit: "25",
+    });
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/decision-reviews/review-1");
+    expect(fetchMock.mock.calls[1][1].method).toBe("PATCH");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      action: "waive",
+      reason: "time-boxed exception",
+    });
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "/api/v1/decision-reviews/review-1/reanchor",
+    );
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      "/api/v1/decision-reviews/review-1/resolve",
+    );
+  });
+
+  it("maps content-free API error objects to stable messages", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ detail: { code: "review_state_conflict" } }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(
+      api.updateDecisionReview("review-1", { action: "acknowledge" }),
+    ).rejects.toThrow("review_state_conflict");
+  });
 });

@@ -52,6 +52,7 @@ def test_overview_list_and_detail_are_scoped_and_content_bounded(client, session
     )
     assert response.status_code == 200
     assert [item["id"] for item in response.json()] == [review.id]
+    assert response.json()[0]["decision_status"] == "accepted"
     serialized = json.dumps(response.json(), sort_keys=True)
     assert "SQLite" not in serialized
     assert "NATS" not in serialized

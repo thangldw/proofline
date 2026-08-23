@@ -9,16 +9,19 @@ import {
   LayoutGrid,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   StickyNote,
   Upload,
   X,
 } from "lucide-react";
 import { api } from "./api";
+import { DecisionHealthView } from "./DecisionHealthView";
 import { StudioView } from "./StudioView";
 import type {
   DecisionTimeline,
   ActionProposal,
+  DecisionHealthOverview,
   Evidence,
   GroundedAnswer,
   IngestionJob,
@@ -42,6 +45,7 @@ import type {
 } from "./types";
 
 type View =
+  | "decision health"
   | "search"
   | "notes"
   | "study"
@@ -61,7 +65,7 @@ type DeletionState = {
 };
 
 export function App() {
-  const [view, setView] = useState<View>("search");
+  const [view, setView] = useState<View>("decision health");
   const [overview, setOverview] = useState<Overview>({
     sources: 0,
     chunks: 0,
@@ -69,6 +73,13 @@ export function App() {
     memories: 0,
     evidence: 0,
   });
+  const [decisionHealthOverview, setDecisionHealthOverview] =
+    useState<DecisionHealthOverview>({
+      healthy_accepted: 0,
+      review_required: 0,
+      overdue: 0,
+      waived: 0,
+    });
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [studyCards, setStudyCards] = useState<StudyCard[]>([]);
@@ -87,9 +98,26 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextSources, nextNotes, nextStudyCards, nextStudioArtifacts, nextProposals, nextMemories, nextJobs] =
+      const [
+        nextOverview,
+        nextDecisionHealthOverview,
+        nextSources,
+        nextNotes,
+        nextStudyCards,
+        nextStudioArtifacts,
+        nextProposals,
+        nextMemories,
+        nextJobs,
+      ] =
         await Promise.all([
           api.overview(),
+          api.decisionHealthOverview?.() ??
+            Promise.resolve({
+              healthy_accepted: 0,
+              review_required: 0,
+              overdue: 0,
+              waived: 0,
+            }),
           api.sources(),
           api.notes(),
           api.studyCards(),
@@ -99,6 +127,7 @@ export function App() {
           api.jobs(),
         ]);
       setOverview(nextOverview);
+      setDecisionHealthOverview(nextDecisionHealthOverview);
       setSources(nextSources);
       setNotes(nextNotes);
       setStudyCards(nextStudyCards);
@@ -112,6 +141,10 @@ export function App() {
         reason instanceof Error ? reason.message : "Cannot reach Proofline API",
       );
     }
+  }, []);
+
+  const refreshDecisionHealthOverview = useCallback(async () => {
+    setDecisionHealthOverview(await api.decisionHealthOverview());
   }, []);
 
   useEffect(() => {
@@ -188,6 +221,14 @@ export function App() {
           </select>
         </div>
         <nav aria-label="Primary navigation">
+          <Nav
+            icon={<ShieldCheck size={18} />}
+            active={view === "decision health"}
+            onClick={() => setView("decision health")}
+            count={decisionHealthOverview.review_required}
+          >
+            Decision Health
+          </Nav>
           <Nav
             icon={<StickyNote size={18} />}
             active={view === "notes"}
@@ -277,7 +318,7 @@ export function App() {
         <header className="topbar">
           <div>
             <span className="eyebrow">EVIDENCE-FIRST MEMORY</span>
-            <h1>{view[0].toUpperCase() + view.slice(1)}</h1>
+            <h1>{view === "decision health" ? "Decision Health" : view[0].toUpperCase() + view.slice(1)}</h1>
           </div>
           <label className="import-button">
             <Upload size={16} />
@@ -293,6 +334,13 @@ export function App() {
             />
           </label>
         </header>
+        {view === "decision health" && (
+          <DecisionHealthView
+            overview={decisionHealthOverview}
+            workspaceId={workspaceId}
+            onOverviewChanged={refreshDecisionHealthOverview}
+          />
+        )}
         {view === "search" && (
           <SearchView
             sources={sources}

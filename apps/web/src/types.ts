@@ -6,6 +6,105 @@ export type Overview = {
   evidence: number;
 };
 
+export type DecisionReviewState =
+  | "open"
+  | "acknowledged"
+  | "resolved"
+  | "waived"
+  | "superseded";
+
+export type DecisionAnchorState =
+  | "moved"
+  | "ambiguous"
+  | "changed"
+  | "deleted";
+
+export type DecisionHealthOverview = {
+  healthy_accepted: number;
+  review_required: number;
+  overdue: number;
+  waived: number;
+};
+
+export type DecisionReview = {
+  id: string;
+  workspace_id: string;
+  decision_id: string;
+  decision_status: string;
+  evidence_id: string;
+  cited_source_version_id: string;
+  current_source_version_id: string;
+  finding_fingerprint: string;
+  anchor_state: DecisionAnchorState;
+  severity: "warning" | "error";
+  policy_hash: string;
+  candidate_start_offset: number | null;
+  candidate_end_offset: number | null;
+  candidate_start_line: number | null;
+  candidate_end_line: number | null;
+  state: DecisionReviewState;
+  resolution: string | null;
+  actor: string;
+  note: string | null;
+  opened_at: string;
+  updated_at: string;
+  closed_at: string | null;
+};
+
+export type DecisionReviewFilters = {
+  state?: DecisionReviewState;
+  anchorState?: DecisionAnchorState;
+  severity?: "warning" | "error";
+  limit?: number;
+};
+
+export type DecisionReviewDetail = {
+  review: DecisionReview;
+  decision: {
+    id: string;
+    title: string;
+    statement: string;
+    status: string;
+  };
+  cited: {
+    source_version_id: string;
+    content_sha256: string;
+    start_offset: number;
+    end_offset: number;
+    start_line: number;
+    end_line: number;
+    quote: string;
+  };
+  current: {
+    source_version_id: string;
+    content_sha256: string;
+    candidate: {
+      start_offset: number;
+      end_offset: number;
+      start_line: number;
+      end_line: number;
+      quote: string;
+    } | null;
+  };
+  policy: { blocking: boolean; hash: string };
+  audit_events: Array<{
+    id: string;
+    actor: string;
+    action: string;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+    created_at: string;
+  }>;
+};
+
+export type DecisionReviewRefreshSummary = {
+  opened: number;
+  superseded: number;
+  resolved: number;
+  updated: number;
+  unchanged: number;
+};
+
 export type Workspace = {
   id: string;
   slug: string;
