@@ -738,6 +738,7 @@ def main(argv: list[str] | None = None) -> None:
         evaluated_at = _parse_impact_as_of(args.as_of)
         try:
             with SessionLocal() as session:
+                verify_live_database(session.get_bind())
                 workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
                 findings = [
                     finding
@@ -748,10 +749,12 @@ def main(argv: list[str] | None = None) -> None:
                         as_of=evaluated_at,
                     )
                 ]
+        except IntegrityVerificationError as exc:
+            _impact_check_failed(exc.code)
         except (OSError, SQLAlchemyError):
             _impact_check_failed("database_unavailable")
         if args.format == "sarif":
-            document = build_decision_impact_sarif(findings)
+            document = build_decision_impact_sarif(findings, evaluated_at=evaluated_at)
         elif args.format == "json":
             document = {
                 "valid": not findings,
@@ -772,15 +775,17 @@ def main(argv: list[str] | None = None) -> None:
                 _impact_check_failed(exc.code)
         elif document is not None:
             print(json.dumps(document, sort_keys=True))
-        elif findings:
-            for finding in findings:
-                print("Decision transitively impacted")
-                print(
-                    f"{finding.root_decision_id} -> {finding.impacted_decision_id} "
-                    f"(depth {finding.depth})"
-                )
         else:
-            print("No decisions are transitively impacted.")
+            print(f"Evaluated at {evaluated_at.isoformat()}")
+            if findings:
+                for finding in findings:
+                    print("Decision transitively impacted")
+                    print(
+                        f"{finding.root_decision_id} -> {finding.impacted_decision_id} "
+                        f"(depth {finding.depth})"
+                    )
+            else:
+                print("No decisions are transitively impacted.")
         if findings:
             raise SystemExit(1)
     elif args.command == "refresh-reviews":
