@@ -9,6 +9,7 @@ license-files = ["LICENSE"]
 authors = [{name = "Thang Luu"}]
 keywords = ["engineering", "knowledge", "provenance", "retrieval", "local-first"]
 dependencies = [
+  "cryptography>=50,<51",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "keyring>=25,<26",

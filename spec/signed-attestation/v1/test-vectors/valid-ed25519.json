@@ -1,0 +1,19 @@
+{
+  "algorithm": "ed25519",
+  "key_id": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+  "schema": "proofline-signed-attestation-v1",
+  "signature": "osLM3Xwvc7+TODS1gs77Us4r6vP9yGoYRAvSRLhJ64S9XsU+YsuyUXInPhtrZiWHly8AC+IFHiI5AIY7geU/Dw==",
+  "statement": {
+    "issued_at": "2026-08-23T12:00:00Z",
+    "package": {
+      "artifact_id": "00000000-0000-0000-0000-000000000101",
+      "root_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "review_receipt": {
+      "dep_root_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "receipt_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "review_id": "00000000-0000-0000-0000-000000000102"
+    },
+    "schema": "proofline-attestation-statement-v1"
+  }
+}
