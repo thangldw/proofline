@@ -53,13 +53,17 @@ exclude = [
   "/.ruff_cache",
   "/.venv",
   "/.worktrees",
+  "/apps/web/dist",
   "/apps/desktop/src-tauri/binaries",
   "/apps/desktop/src-tauri/gen",
   "/apps/desktop/src-tauri/target",
   "/build",
   "/node_modules",
   "**/__pycache__",
+  "**/node_modules",
+  "**/*.db",
   "**/*.pyc",
+  "**/*.tsbuildinfo",
 ]
 
 [tool.pytest.ini_options]
