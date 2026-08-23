@@ -88,6 +88,7 @@ def test_ci_workflow_runs_release_critical_commands():
 
     for command in (
         "npm ci",
+        "npx playwright install --with-deps chromium",
         "make test",
         "make check",
         "make audit",
@@ -104,6 +105,9 @@ def test_ci_workflow_runs_release_critical_commands():
     assert "verify-package-conformance:" in makefile
     assert "pip-audit --local --skip-editable" in makefile
     assert "spec/signed-attestation/v1/test-vectors/valid-ed25519.json" in makefile
+    assert workflow.index("npx playwright install --with-deps chromium") < workflow.index(
+        "npm run test:e2e"
+    )
 
 
 def test_release_toolchain_pins_non_vulnerable_pip_floor():
