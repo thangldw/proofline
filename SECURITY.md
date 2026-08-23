@@ -6,6 +6,6 @@
 
 SHA-256 roots and review receipts detect mutation; alone they are not signatures, authentication or authorization. Proofline 2.0.0 can sign their identifiers with Ed25519. Verification proves matching private-key control relative to an independently trusted public key; it does not provide legal identity, a CA chain, trusted timestamp, transparency log, revocation or authorization.
 
-Generated private keys are unencrypted PKCS#8 PEM files with mode `0600`. Store them outside repositories and synced folders, restrict backups, rotate them through an external trust process, and never attach them to issues or plugin bundles. Proofline does not store keys in SQLite or telemetry.
+Generated private keys are unencrypted PKCS#8 PEM files with owner-only mode `0600` where descriptor permission enforcement is available. Key generation fails closed with `secure_permissions_unsupported` otherwise, including CPython 3.12 on Windows; use an external owner-only Windows ACL/key-management workflow there. Store keys outside repositories and synced folders, restrict backups, rotate them through an external trust process, and never attach them to issues or plugin bundles. Proofline does not store keys in SQLite or telemetry.
 
 The current trust boundary is one local user and local SQLite state. Hosted sync, multi-user permissions, connector identity and remote attestation are outside the implemented boundary. Source/quote content appears in Decision Evidence Packages but not review receipts, signed envelopes, SARIF findings or safe verifier errors.

@@ -5,7 +5,10 @@ import binascii
 import hashlib
 import json
 import os
+import re
+import shutil
 import tempfile
+import unicodedata
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +18,7 @@ from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-from .portability import PortabilityError, atomic_write_export, canonical_json_bytes
+from .portability import canonical_json_bytes
 
 ATTESTATION_SCHEMA = "proofline-signed-attestation-v1"
 STATEMENT_SCHEMA = "proofline-attestation-statement-v1"
@@ -24,9 +27,17 @@ SIGNATURE_DOMAIN = b"proofline/signed-attestation/v1\0"
 MAX_ATTESTATION_BYTES = 1024 * 1024
 MAX_KEY_BYTES = 64 * 1024
 ENVELOPE_KEYS = {"schema", "algorithm", "key_id", "statement", "signature"}
-STATEMENT_KEYS = {"schema", "issued_at", "package", "review_receipt"}
+STATEMENT_KEYS = {
+    "schema",
+    "algorithm",
+    "key_id",
+    "issued_at",
+    "package",
+    "review_receipt",
+}
 PACKAGE_KEYS = {"root_hash", "artifact_id"}
 REVIEW_KEYS = {"receipt_hash", "review_id", "dep_root_hash"}
+CANONICAL_UTC_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{0,5}[1-9])?Z$")
 
 
 class AttestationError(RuntimeError):
@@ -54,8 +65,13 @@ def _require_uuid(value: Any, code: str) -> None:
         raise AttestationError(code)
 
 
+def _require_nonempty_string(value: Any, code: str) -> None:
+    if not isinstance(value, str) or not value:
+        raise AttestationError(code)
+
+
 def _issued_at(value: Any) -> datetime:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or CANONICAL_UTC_PATTERN.fullmatch(value) is None:
         raise AttestationError("issued_at_invalid")
     try:
         parsed = datetime.fromisoformat(value)
@@ -63,19 +79,53 @@ def _issued_at(value: Any) -> datetime:
         raise AttestationError("issued_at_invalid") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise AttestationError("issued_at_invalid")
-    return parsed.astimezone(UTC)
+    normalized = parsed.astimezone(UTC)
+    if value != _iso(normalized):
+        raise AttestationError("issued_at_invalid")
+    return normalized
 
 
 def _iso(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
         raise AttestationError("issued_at_invalid")
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    normalized = value.astimezone(UTC)
+    rendered = normalized.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    if normalized.microsecond == 0:
+        return rendered.replace(".000000Z", "Z")
+    return f"{rendered[:-1].rstrip('0')}Z"
 
 
 def _key_id(public_key: Ed25519PublicKey) -> str:
     return hashlib.sha256(
         public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     ).hexdigest()
+
+
+def attestation_paths_conflict(first: Path, second: Path) -> bool:
+    first_path = Path(os.path.abspath(first.expanduser()))
+    second_path = Path(os.path.abspath(second.expanduser()))
+    try:
+        if (
+            first_path.exists()
+            and second_path.exists()
+            and os.path.samefile(first_path, second_path)
+        ):
+            return True
+    except OSError:
+        pass
+    if first_path.resolve(strict=False) == second_path.resolve(strict=False):
+        return True
+    first_parent = first_path.parent.resolve(strict=False)
+    second_parent = second_path.parent.resolve(strict=False)
+    same_parent = first_parent == second_parent
+    if not same_parent:
+        try:
+            same_parent = os.path.samefile(first_parent, second_parent)
+        except OSError:
+            same_parent = False
+    first_name = unicodedata.normalize("NFC", first_path.name).casefold()
+    second_name = unicodedata.normalize("NFC", second_path.name).casefold()
+    return same_parent and first_name == second_name
 
 
 def _validate_report(report: Any, keys: set[str], code: str) -> dict[str, Any]:
@@ -99,8 +149,12 @@ def build_signed_attestation(
     )
     if review is not None and review["dep_root_hash"] != package["root_hash"]:
         raise AttestationError("subject_link_invalid")
+    public_key = private_key.public_key()
+    key_id = _key_id(public_key)
     statement = {
         "schema": STATEMENT_SCHEMA,
+        "algorithm": SIGNATURE_ALGORITHM,
+        "key_id": key_id,
         "issued_at": _iso(issued_at),
         "package": {
             "root_hash": package["root_hash"],
@@ -116,12 +170,11 @@ def build_signed_attestation(
             else None
         ),
     }
-    public_key = private_key.public_key()
     signature = private_key.sign(SIGNATURE_DOMAIN + canonical_json_bytes(statement))
     envelope = {
         "schema": ATTESTATION_SCHEMA,
         "algorithm": SIGNATURE_ALGORITHM,
-        "key_id": _key_id(public_key),
+        "key_id": key_id,
         "statement": statement,
         "signature": base64.b64encode(signature).decode("ascii"),
     }
@@ -143,13 +196,17 @@ def _validate_envelope(document: Any) -> tuple[dict[str, Any], dict[str, Any] | 
         raise AttestationError("statement_shape_invalid")
     if statement["schema"] != STATEMENT_SCHEMA:
         raise AttestationError("statement_schema_unsupported")
+    if statement["algorithm"] != document["algorithm"]:
+        raise AttestationError("algorithm_mismatch")
+    if statement["key_id"] != document["key_id"]:
+        raise AttestationError("key_id_mismatch")
     issued_at = _issued_at(statement["issued_at"])
     package = statement["package"]
     if not isinstance(package, dict) or set(package) != PACKAGE_KEYS:
         raise AttestationError("package_subject_invalid")
     if not _is_hash(package["root_hash"]):
         raise AttestationError("package_root_hash_invalid")
-    _require_uuid(package["artifact_id"], "artifact_id_invalid")
+    _require_nonempty_string(package["artifact_id"], "artifact_id_invalid")
     review = statement["review_receipt"]
     if review is not None:
         if not isinstance(review, dict) or set(review) != REVIEW_KEYS:
@@ -170,6 +227,8 @@ def verify_signed_attestation(
     review_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     package, review, issued_at = _validate_envelope(document)
+    if len(canonical_json_bytes(document)) + 1 > MAX_ATTESTATION_BYTES:
+        raise AttestationError("attestation_too_large")
     if not isinstance(public_key, Ed25519PublicKey):
         raise AttestationError("public_key_type_invalid")
     if document["key_id"] != _key_id(public_key):
@@ -277,33 +336,123 @@ def load_attestation_public_key(path: Path) -> Ed25519PublicKey:
     return key
 
 
-def _atomic_write_bytes(path: Path, data: bytes, *, mode: int, force: bool) -> None:
+def _stage_bytes(path: Path, data: bytes, *, mode: int) -> Path:
+    if mode == 0o600 and getattr(os, "fchmod", None) is None:
+        raise AttestationError("secure_permissions_unsupported")
     target = Path(os.path.abspath(path.expanduser()))
-    target.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
-    temporary = Path(temporary_name)
+    descriptor = -1
+    temporary: Path | None = None
+    completed = False
     try:
-        os.fchmod(descriptor, mode)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        temporary = Path(temporary_name)
+        fchmod = getattr(os, "fchmod", None)
+        if fchmod is not None:
+            fchmod(descriptor, mode)
         with os.fdopen(descriptor, "wb") as handle:
             descriptor = -1
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        if force:
-            os.replace(temporary, target)
-        else:
-            try:
-                os.link(temporary, target)
-            except FileExistsError as exc:
-                raise AttestationError("output_exists") from exc
-            temporary.unlink()
+        completed = True
+        return temporary
     except OSError as exc:
         raise AttestationError("output_unwritable") from exc
     finally:
         if descriptor >= 0:
             os.close(descriptor)
-        if temporary.exists():
+        if not completed and temporary is not None and temporary.exists():
             temporary.unlink()
+
+
+def _backup_target(target: Path) -> Path | None:
+    if not target.exists():
+        return None
+    descriptor = -1
+    backup: Path | None = None
+    try:
+        descriptor, backup_name = tempfile.mkstemp(
+            prefix=f".{target.name}.rollback.", dir=target.parent
+        )
+        os.close(descriptor)
+        descriptor = -1
+        backup = Path(backup_name)
+        shutil.copy2(target, backup)
+    except OSError as exc:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if backup is not None:
+            backup.unlink(missing_ok=True)
+        raise AttestationError("output_unwritable") from exc
+    return backup
+
+
+def _unlink_installed_link(target: Path, staged: Path) -> None:
+    try:
+        if target.exists() and os.path.samefile(target, staged):
+            target.unlink()
+    except OSError:
+        return
+
+
+def _install_keypair(
+    private_target: Path,
+    public_target: Path,
+    private_staged: Path,
+    public_staged: Path,
+    *,
+    force: bool,
+) -> None:
+    private_backup: Path | None = None
+    public_backup: Path | None = None
+    private_linked = False
+    public_linked = False
+    try:
+        if force:
+            private_backup = _backup_target(private_target)
+            public_backup = _backup_target(public_target)
+            try:
+                os.replace(private_staged, private_target)
+                os.replace(public_staged, public_target)
+            except OSError as exc:
+                try:
+                    if private_backup is None:
+                        private_target.unlink(missing_ok=True)
+                    else:
+                        os.replace(private_backup, private_target)
+                        private_backup = None
+                    if public_backup is None:
+                        public_target.unlink(missing_ok=True)
+                    else:
+                        os.replace(public_backup, public_target)
+                        public_backup = None
+                except OSError as rollback_exc:
+                    raise AttestationError("output_rollback_failed") from rollback_exc
+                raise AttestationError("output_unwritable") from exc
+        else:
+            try:
+                os.link(private_staged, private_target)
+                private_linked = True
+                os.link(public_staged, public_target)
+                public_linked = True
+            except FileExistsError as exc:
+                raise AttestationError("output_exists") from exc
+            except OSError as exc:
+                raise AttestationError("output_unwritable") from exc
+    except AttestationError:
+        if private_linked:
+            _unlink_installed_link(private_target, private_staged)
+        if public_linked:
+            _unlink_installed_link(public_target, public_staged)
+        raise
+    finally:
+        private_staged.unlink(missing_ok=True)
+        public_staged.unlink(missing_ok=True)
+        if private_backup is not None:
+            private_backup.unlink(missing_ok=True)
+        if public_backup is not None:
+            public_backup.unlink(missing_ok=True)
 
 
 def generate_attestation_keypair(
@@ -312,9 +461,9 @@ def generate_attestation_keypair(
     *,
     force: bool = False,
 ) -> dict[str, str]:
-    private_target = Path(os.path.abspath(private_path.expanduser()))
-    public_target = Path(os.path.abspath(public_path.expanduser()))
-    if private_target == public_target:
+    private_target = Path(os.path.abspath(private_path.expanduser())).resolve(strict=False)
+    public_target = Path(os.path.abspath(public_path.expanduser())).resolve(strict=False)
+    if attestation_paths_conflict(private_path, public_path):
         raise AttestationError("key_output_conflict")
     if not force and (private_target.exists() or public_target.exists()):
         raise AttestationError("output_exists")
@@ -328,13 +477,19 @@ def generate_attestation_keypair(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    _atomic_write_bytes(private_target, private_bytes, mode=0o600, force=force)
+    private_staged = _stage_bytes(private_target, private_bytes, mode=0o600)
     try:
-        _atomic_write_bytes(public_target, public_bytes, mode=0o644, force=force)
+        public_staged = _stage_bytes(public_target, public_bytes, mode=0o644)
     except AttestationError:
-        if not force:
-            private_target.unlink(missing_ok=True)
+        private_staged.unlink(missing_ok=True)
         raise
+    _install_keypair(
+        private_target,
+        public_target,
+        private_staged,
+        public_staged,
+        force=force,
+    )
     return {
         "algorithm": SIGNATURE_ALGORITHM,
         "key_id": _key_id(private_key.public_key()),
@@ -349,7 +504,22 @@ def atomic_write_attestation(
     *,
     force: bool = False,
 ) -> None:
+    data = canonical_json_bytes(document) + b"\n"
+    if len(data) > MAX_ATTESTATION_BYTES:
+        raise AttestationError("attestation_too_large")
+    target = Path(os.path.abspath(path.expanduser()))
+    staged = _stage_bytes(target, data, mode=0o644)
     try:
-        atomic_write_export(path, document, force=force)
-    except PortabilityError as exc:
-        raise AttestationError(exc.code) from exc
+        if force:
+            os.replace(staged, target)
+        else:
+            try:
+                os.link(staged, target)
+            except FileExistsError as exc:
+                raise AttestationError("output_exists") from exc
+    except AttestationError:
+        raise
+    except OSError as exc:
+        raise AttestationError("output_unwritable") from exc
+    finally:
+        staged.unlink(missing_ok=True)

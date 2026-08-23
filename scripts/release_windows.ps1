@@ -30,12 +30,27 @@ npm run build:web
 & $Proofline eval-extraction --dataset evals/extraction/seed-v1.json --min-precision 1 --min-recall 1 --min-f1 1 --min-evidence-resolution 1 --min-expected-evidence-accuracy 1 --min-negative-source-accuracy 1
 & $Proofline eval --dataset evals/retrieval/seed-v2.json --min-recall 1 --min-ndcg 1 --min-expected-empty-accuracy 1
 & $Proofline eval-grounded --dataset evals/grounded-qa/seed-v1.json --min-citation-resolution 1 --min-citation-precision 1 --min-grounded-success 1 --min-status-accuracy 1
+& $Python skills/manage-evidence-decisions/scripts/proofline_package.py verify spec/decision-evidence-package/v1/test-vectors/valid-minimal.json
+& $Python skills/manage-evidence-decisions/scripts/proofline_package.py verify-review spec/decision-review-receipt/v1/test-vectors/valid-minimal.json
+& $Python scripts/verify_attestation_vector.py spec/signed-attestation/v1/test-vectors/valid-ed25519.json spec/signed-attestation/v1/test-vectors/valid-ed25519-public.pem
+npm run test:e2e
+& $Python -m pip_audit --local --skip-editable
+npm audit --omit=dev --audit-level=high
 
 $ReleaseDir = Join-Path ([System.IO.Path]::GetTempPath()) ("proofline-windows-" + [guid]::NewGuid())
 $SmokeDir = Join-Path ([System.IO.Path]::GetTempPath()) ("proofline-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $ReleaseDir, $SmokeDir | Out-Null
 try {
-  & $Python -m build --outdir $ReleaseDir
+  $SourceZip = Join-Path $SmokeDir "source.zip"
+  $SourceDir = Join-Path $SmokeDir "source"
+  git archive --format=zip --output=$SourceZip HEAD
+  Expand-Archive -Path $SourceZip -DestinationPath $SourceDir
+  & $Python -m build --outdir $ReleaseDir $SourceDir
+  $Wheel = Get-ChildItem "$ReleaseDir\*.whl" | Select-Object -First 1
+  $Sdist = Get-ChildItem "$ReleaseDir\*.tar.gz" | Select-Object -First 1
+  & $Python scripts/verify_release_artifacts.py $Wheel.FullName $Sdist.FullName
+  & $Python scripts/qualify_python_artifact.py --artifact $Wheel.FullName --expected-version $Tag.TrimStart("v") --python $Python
+  & $Python scripts/qualify_python_artifact.py --artifact $Sdist.FullName --expected-version $Tag.TrimStart("v") --python $Python
   npm run build:web
   Compress-Archive -Path "apps\web\dist\*" -DestinationPath (Join-Path $ReleaseDir "proofline-web-$Tag.zip")
 
@@ -54,7 +69,6 @@ try {
   py -3.12 -m venv (Join-Path $SmokeDir "venv")
   $SmokePython = Join-Path $SmokeDir "venv\Scripts\python.exe"
   $SmokeProofline = Join-Path $SmokeDir "venv\Scripts\proofline.exe"
-  $Wheel = Get-ChildItem "$ReleaseDir\*.whl" | Select-Object -First 1
   & $SmokePython -m pip install --quiet $Wheel.FullName
   & $Python scripts/platform_release_receipt.py --proofline $SmokeProofline --python $SmokePython --artifact $Wheel.FullName --expected-version $Tag.TrimStart("v") --qualify-os-keyring --output (Join-Path $ReleaseDir "proofline-platform-$Tag-windows-x64.json")
 
@@ -64,10 +78,20 @@ try {
     "$Hash  $($_.Name)"
   } | Set-Content -Encoding ascii $ChecksumPath
 
+  & $Python scripts/publish_pypi.py --version $Tag.TrimStart("v") --dist-dir $ReleaseDir
+
   git tag -a $Tag -m "Proofline $Tag"
   git push origin $Tag
   $Assets = @(Get-ChildItem "$ReleaseDir\proofline-*").FullName + $ChecksumPath
-  gh release create $Tag $Assets --verify-tag --title "Proofline $Tag" --notes-file "docs/releases/$Tag.md" --prerelease
+  $ReleaseArgs = @($Tag) + $Assets + @(
+    "--verify-tag",
+    "--title", "Proofline $Tag",
+    "--notes-file", "docs/releases/$Tag.md"
+  )
+  if ($Tag -like "v0.*" -or $Tag.Contains("-")) {
+    $ReleaseArgs += "--prerelease"
+  }
+  gh release create @ReleaseArgs
 }
 finally {
   Remove-Item -Recurse -Force $ReleaseDir, $SmokeDir -ErrorAction SilentlyContinue

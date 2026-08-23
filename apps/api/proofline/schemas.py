@@ -423,6 +423,11 @@ class DecisionImpactSummary(BaseModel):
     evaluated_at: datetime
 
 
+class DecisionImpactSnapshot(BaseModel):
+    findings: list[DecisionImpactRead]
+    summary: DecisionImpactSummary
+
+
 class DecisionReviewAction(BaseModel):
     action: Literal["acknowledge", "waive"]
     reason: str | None = Field(default=None, max_length=2_000)

@@ -44,6 +44,9 @@ fi
 .venv/bin/python scripts/release_check.py --tag "$tag"
 make test
 make check
+make verify-package-conformance
+npm run test:e2e
+make audit
 
 release_dir=$(mktemp -d "${TMPDIR:-/tmp}/proofline-release.XXXXXX")
 smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/proofline-smoke.XXXXXX")
@@ -52,7 +55,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-.venv/bin/python -m build --outdir "$release_dir"
+source_dir="$release_dir/source-tree"
+mkdir -p "$source_dir"
+git archive HEAD | tar -xf - -C "$source_dir"
+.venv/bin/python -m build --outdir "$release_dir" "$source_dir"
+.venv/bin/python scripts/verify_release_artifacts.py \
+  "$release_dir"/*.whl "$release_dir"/*.tar.gz
+.venv/bin/python scripts/qualify_python_artifact.py \
+  --artifact "$release_dir"/*.whl --expected-version "${tag#v}"
+.venv/bin/python scripts/qualify_python_artifact.py \
+  --artifact "$release_dir"/*.tar.gz --expected-version "${tag#v}"
 npm run build:web
 tar -czf "$release_dir/proofline-web-$tag.tar.gz" -C apps/web/dist .
 
@@ -86,6 +98,9 @@ platform_slug=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
   cd "$release_dir"
   shasum -a 256 proofline-* > SHA256SUMS
 )
+
+.venv/bin/python scripts/publish_pypi.py \
+  --version "${tag#v}" --dist-dir "$release_dir"
 
 git tag -a "$tag" -m "Proofline $tag"
 if ! git push origin "$tag"; then

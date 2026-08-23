@@ -5,11 +5,15 @@ import stat
 from datetime import UTC, datetime
 from pathlib import Path
 
+import jsonschema
+import proofline.attestations as attestation_module
 import proofline.cli as cli_module
+import proofline.portability as portability_module
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from proofline.attestations import (
     ATTESTATION_SCHEMA,
+    SIGNATURE_DOMAIN,
     AttestationError,
     atomic_write_attestation,
     build_signed_attestation,
@@ -20,6 +24,7 @@ from proofline.attestations import (
     verify_signed_attestation,
 )
 from proofline.cli import main
+from proofline.portability import canonical_json_bytes
 
 ISSUED_AT = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
 PACKAGE = {
@@ -53,6 +58,8 @@ def test_attestation_is_deterministic_strict_and_content_free():
 
     assert first == second
     assert first["schema"] == ATTESTATION_SCHEMA
+    assert first["statement"]["algorithm"] == "ed25519"
+    assert first["statement"]["key_id"] == first["key_id"]
     report = verify_signed_attestation(first, _private_key().public_key())
     assert report == {
         "valid": True,
@@ -68,6 +75,47 @@ def test_attestation_is_deterministic_strict_and_content_free():
     assert "PRIVATE KEY" not in serialized
     assert "quote" not in serialized
     assert "source content" not in serialized
+
+
+def test_attestation_accepts_existing_dep_non_uuid_artifact_ids():
+    legacy_package = {**PACKAGE, "artifact_id": "ADR-auth-cache-v1"}
+
+    envelope = build_signed_attestation(
+        package_report=legacy_package,
+        private_key=_private_key(),
+        issued_at=ISSUED_AT,
+    )
+
+    assert (
+        verify_signed_attestation(
+            envelope,
+            _private_key().public_key(),
+            package_report=legacy_package,
+        )["artifact_id"]
+        == "ADR-auth-cache-v1"
+    )
+
+
+def test_attestation_rejects_valid_signature_over_non_utc_statement_time():
+    envelope = _attestation()
+    envelope["statement"]["issued_at"] = "2026-08-23T21:00:00+09:00"
+    envelope["signature"] = base64.b64encode(
+        _private_key().sign(SIGNATURE_DOMAIN + canonical_json_bytes(envelope["statement"]))
+    ).decode("ascii")
+
+    with pytest.raises(AttestationError, match="^issued_at_invalid$"):
+        verify_signed_attestation(envelope, _private_key().public_key())
+
+
+def test_attestation_uses_canonical_rfc3339_fractional_seconds():
+    envelope = build_signed_attestation(
+        package_report=PACKAGE,
+        private_key=_private_key(),
+        issued_at=datetime(2026, 8, 23, 12, 0, 0, 123000, tzinfo=UTC),
+    )
+
+    assert envelope["statement"]["issued_at"] == "2026-08-23T12:00:00.123Z"
+    assert verify_signed_attestation(envelope, _private_key().public_key())["valid"] is True
 
 
 def test_attestation_rejects_wrong_key_tampering_and_invalid_base64():
@@ -151,6 +199,21 @@ def test_attestation_loader_rejects_duplicate_keys_oversize_and_shape(tmp_path):
         load_and_verify_attestation(malformed, public_key)
 
 
+def test_attestation_rejects_oversized_dep_subject_before_output(tmp_path):
+    oversized_package = {**PACKAGE, "artifact_id": "x" * (1024 * 1024)}
+    output = tmp_path / "oversized-attestation.json"
+
+    with pytest.raises(AttestationError, match="^attestation_too_large$"):
+        document = build_signed_attestation(
+            package_report=oversized_package,
+            private_key=_private_key(),
+            issued_at=ISSUED_AT,
+        )
+        atomic_write_attestation(output, document)
+
+    assert not output.exists()
+
+
 def test_key_generation_permissions_loading_and_no_overwrite(tmp_path):
     private_path = tmp_path / "keys" / "attestation-private.pem"
     public_path = tmp_path / "keys" / "attestation-public.pem"
@@ -168,6 +231,85 @@ def test_key_generation_permissions_loading_and_no_overwrite(tmp_path):
     assert load_attestation_private_key(private_path).public_key().public_bytes_raw() == (
         load_attestation_public_key(public_path).public_bytes_raw()
     )
+
+
+def test_key_generation_fails_closed_without_secure_descriptor_permissions(tmp_path, monkeypatch):
+    monkeypatch.delattr(attestation_module.os, "fchmod")
+    monkeypatch.delattr(portability_module.os, "fchmod", raising=False)
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    output = tmp_path / "attestation.json"
+
+    with pytest.raises(AttestationError, match="^secure_permissions_unsupported$"):
+        generate_attestation_keypair(private_path, public_path)
+    atomic_write_attestation(output, _attestation())
+
+    assert not private_path.exists()
+    assert not public_path.exists()
+    assert load_and_verify_attestation(output, _private_key().public_key())[1]["valid"] is True
+
+
+def test_force_key_rotation_rolls_back_both_outputs_if_second_replace_fails(tmp_path, monkeypatch):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    generate_attestation_keypair(private_path, public_path)
+    before = (private_path.read_bytes(), public_path.read_bytes())
+    real_replace = attestation_module.os.replace
+    failed = False
+
+    def fail_public_replace(source, target):
+        nonlocal failed
+        if Path(target) == public_path and not failed:
+            failed = True
+            raise OSError("injected public replace failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(attestation_module.os, "replace", fail_public_replace)
+
+    with pytest.raises(AttestationError, match="^output_unwritable$"):
+        generate_attestation_keypair(private_path, public_path, force=True)
+
+    assert (private_path.read_bytes(), public_path.read_bytes()) == before
+
+
+def test_key_generation_rejects_parent_symlink_alias_conflict(tmp_path):
+    real_parent = tmp_path / "real"
+    real_parent.mkdir()
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+
+    with pytest.raises(AttestationError, match="^key_output_conflict$"):
+        generate_attestation_keypair(
+            real_parent / "attestation.pem",
+            alias_parent / "attestation.pem",
+        )
+
+    assert not (real_parent / "attestation.pem").exists()
+
+
+def test_key_generation_rejects_casefolded_output_aliases(tmp_path):
+    with pytest.raises(AttestationError, match="^key_output_conflict$"):
+        generate_attestation_keypair(
+            tmp_path / "Signing.pem",
+            tmp_path / "signing.pem",
+            force=True,
+        )
+
+    assert not (tmp_path / "Signing.pem").exists()
+    assert not (tmp_path / "signing.pem").exists()
+
+
+def test_key_generation_translates_staging_failures_to_content_free_error(tmp_path, monkeypatch):
+    def fail_staging(*_args, **_kwargs):
+        raise OSError("PRIVATE filesystem detail")
+
+    monkeypatch.setattr(attestation_module.tempfile, "mkstemp", fail_staging)
+
+    with pytest.raises(AttestationError) as raised:
+        generate_attestation_keypair(tmp_path / "private.pem", tmp_path / "public.pem")
+
+    assert raised.value.code == "output_unwritable"
+    assert "PRIVATE" not in str(raised.value)
 
 
 def test_atomic_attestation_output_refuses_overwrite_and_loads(tmp_path):
@@ -193,6 +335,30 @@ def test_tracked_ed25519_conformance_vector_matches_implementation():
 
     assert document == _attestation()
     assert report["key_id"] == "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c"
+
+
+def test_signed_attestation_schema_matches_vector_and_dep_artifact_id_contract():
+    vector_dir = ROOT / "spec/signed-attestation/v1/test-vectors"
+    schema = json.loads(
+        (ROOT / "spec/signed-attestation/v1/schema.json").read_text(encoding="utf-8")
+    )
+    validator = jsonschema.Draft202012Validator(
+        schema,
+        format_checker=jsonschema.FormatChecker(),
+    )
+
+    validator.validate(json.loads((vector_dir / "valid-ed25519.json").read_text(encoding="utf-8")))
+    validator.validate(
+        build_signed_attestation(
+            package_report={**PACKAGE, "artifact_id": "ADR-auth-cache-v1"},
+            private_key=_private_key(),
+            issued_at=ISSUED_AT,
+        )
+    )
+    noncanonical = _attestation()
+    noncanonical["statement"]["issued_at"] = "2026-08-23T12:00:00.000Z"
+    with pytest.raises(jsonschema.ValidationError):
+        validator.validate(noncanonical)
 
 
 def test_attestation_cli_generates_signs_and_verifies_exact_package(tmp_path, capsys):
@@ -266,6 +432,83 @@ def test_attestation_cli_rejects_mismatched_review_receipt(tmp_path):
                 str(tmp_path / "invalid.json"),
             ]
         )
+
+
+@pytest.mark.parametrize("conflicting_input", ["private_key", "package"])
+def test_attestation_cli_rejects_force_output_input_conflicts(tmp_path, conflicting_input):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    generate_attestation_keypair(private_path, public_path)
+    package = tmp_path / "evidence.json"
+    package.write_bytes(
+        (ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json").read_bytes()
+    )
+    protected = private_path if conflicting_input == "private_key" else package
+    before = protected.read_bytes()
+
+    with pytest.raises(SystemExit, match="attestation failed: output_conflict"):
+        main(
+            [
+                "attest",
+                "--package",
+                str(package),
+                "--private-key",
+                str(private_path),
+                "--output",
+                str(protected),
+                "--force",
+            ]
+        )
+
+    assert protected.read_bytes() == before
+
+
+def test_attestation_cli_rejects_output_symlink_alias_to_private_key(tmp_path):
+    private_path = tmp_path / "private.pem"
+    public_path = tmp_path / "public.pem"
+    output_alias = tmp_path / "output.json"
+    generate_attestation_keypair(private_path, public_path)
+    output_alias.symlink_to(private_path)
+    before = private_path.read_bytes()
+
+    with pytest.raises(SystemExit, match="attestation failed: output_conflict"):
+        main(
+            [
+                "attest",
+                "--package",
+                str(ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json"),
+                "--private-key",
+                str(private_path),
+                "--output",
+                str(output_alias),
+                "--force",
+            ]
+        )
+
+    assert private_path.read_bytes() == before
+
+
+def test_attestation_cli_rejects_casefolded_output_alias_to_private_key(tmp_path):
+    private_path = tmp_path / "Signing.pem"
+    public_path = tmp_path / "public.pem"
+    generate_attestation_keypair(private_path, public_path)
+    before = private_path.read_bytes()
+
+    with pytest.raises(SystemExit, match="attestation failed: output_conflict"):
+        main(
+            [
+                "attest",
+                "--package",
+                str(ROOT / "spec/decision-evidence-package/v1/test-vectors/valid-minimal.json"),
+                "--private-key",
+                str(private_path),
+                "--output",
+                str(tmp_path / "signing.PEM"),
+                "--force",
+            ]
+        )
+
+    assert private_path.read_bytes() == before
 
 
 def test_attestation_cli_does_not_initialize_database(tmp_path, monkeypatch):

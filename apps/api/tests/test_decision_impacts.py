@@ -7,7 +7,7 @@ from proofline.cli import main
 from proofline.decision_impacts import compute_decision_impacts
 from proofline.decision_reviews import refresh_decision_reviews
 from proofline.ingestion import ingest_source
-from proofline.models import Decision, DecisionRelation, DecisionReview
+from proofline.models import Decision, DecisionRelation, DecisionReview, Workspace
 from proofline.schemas import SourceCreate
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
@@ -214,6 +214,11 @@ def test_impact_api_lists_summary_and_enforces_workspace_and_timezone(client, se
         "max_depth": 1,
         "evaluated_at": AS_OF.isoformat().replace("+00:00", "Z"),
     }
+    snapshot = client.get(
+        "/api/v1/decision-impacts/snapshot", params={"as_of": AS_OF.isoformat()}
+    ).json()
+    assert snapshot["findings"] == response.json()
+    assert snapshot["summary"] == summary.json()
     assert (
         client.get("/api/v1/decision-impacts", params={"as_of": "2026-08-23T12:00:00"}).status_code
         == 422
@@ -263,6 +268,13 @@ def test_check_impacts_cli_json_sarif_and_exit_codes(session, monkeypatch, tmp_p
     sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
     assert sarif["runs"][0]["results"][0]["ruleId"] == "proofline/transitive-impact"
     assert "cli-dependent" not in json.dumps(sarif, sort_keys=True)
+    with pytest.raises(SystemExit) as text_blocked:
+        main(["check-impacts", "--as-of", AS_OF.isoformat()])
+    assert text_blocked.value.code == 1
+    text_lines = capsys.readouterr().out.strip().splitlines()
+    assert "Depth: 1" in text_lines
+    assert f"Decision path: {root.id} -> {dependent.id}" in text_lines
+    assert "Relation path: implements:00000000-0000-0000-0000-000000000061" in text_lines
     review = session.scalar(
         select(DecisionReview).where(DecisionReview.workspace_id == workspace_id)
     )
@@ -300,6 +312,54 @@ def test_check_impacts_cli_fails_closed_on_invalid_review_provenance(session, mo
         capsys.readouterr().err.strip()
         == "impact check failed: decision_review_fingerprint_invalid"
     )
+
+
+@pytest.mark.parametrize(
+    ("corruption", "expected_code"),
+    [
+        ("cross_workspace", "decision_relation_workspace_invalid"),
+        ("temporal_order", "decision_relation_temporal_invalid"),
+    ],
+)
+def test_check_impacts_cli_fails_closed_on_invalid_relation_provenance(
+    session, monkeypatch, capsys, corruption, expected_code
+):
+    root, _review, _workspace_id = _root_with_review(session)
+    if corruption == "cross_workspace":
+        other_workspace = Workspace(
+            id="00000000-0000-0000-0000-000000000099",
+            slug="impact-corrupt-other",
+            title="Impact Corrupt Other",
+        )
+        session.add(other_workspace)
+        session.commit()
+        dependent = _decision(session, "cross-workspace", workspace_id=other_workspace.id)
+        _relation(
+            session,
+            "00000000-0000-0000-0000-000000000071",
+            dependent,
+            root,
+            "based_on",
+        )
+    else:
+        dependent = _decision(session, "invalid-temporal-order")
+        _relation(
+            session,
+            "00000000-0000-0000-0000-000000000072",
+            dependent,
+            root,
+            "based_on",
+            valid_from=AS_OF,
+            valid_to=AS_OF,
+        )
+    factory = sessionmaker(bind=session.get_bind(), expire_on_commit=False)
+    monkeypatch.setattr(cli_module, "SessionLocal", factory)
+
+    with pytest.raises(SystemExit) as invalid:
+        main(["check-impacts", "--as-of", AS_OF.isoformat()])
+
+    assert invalid.value.code == 2
+    assert capsys.readouterr().err.strip() == f"impact check failed: {expected_code}"
 
 
 def test_check_impacts_cli_rejects_naive_as_of_before_database(monkeypatch, capsys):

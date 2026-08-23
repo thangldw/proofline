@@ -2,6 +2,7 @@ import type {
   DecisionTimeline,
   DecisionHealthOverview,
   DecisionImpact,
+  DecisionImpactSnapshot,
   DecisionImpactSummary,
   DecisionReview,
   DecisionReviewDetail,
@@ -63,9 +64,23 @@ export const api = {
   overview: () => request<Overview>("/api/v1/overview"),
   decisionHealthOverview: () =>
     request<DecisionHealthOverview>("/api/v1/decision-health/overview"),
-  decisionImpacts: () => request<DecisionImpact[]>("/api/v1/decision-impacts"),
-  decisionImpactSummary: () =>
-    request<DecisionImpactSummary>("/api/v1/decision-impacts/summary"),
+  decisionImpacts: (workspaceId = activeWorkspaceId, asOf?: string) =>
+    request<DecisionImpact[]>(
+      `/api/v1/decision-impacts${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`,
+      {
+      headers: { "X-Proofline-Workspace-ID": workspaceId },
+      },
+    ),
+  decisionImpactSummary: (workspaceId = activeWorkspaceId, asOf?: string) =>
+    request<DecisionImpactSummary>(
+      `/api/v1/decision-impacts/summary${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`,
+      { headers: { "X-Proofline-Workspace-ID": workspaceId } },
+    ),
+  decisionImpactSnapshot: (workspaceId = activeWorkspaceId, asOf?: string) =>
+    request<DecisionImpactSnapshot>(
+      `/api/v1/decision-impacts/snapshot${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`,
+      { headers: { "X-Proofline-Workspace-ID": workspaceId } },
+    ),
   decisionReviews: (filters: DecisionReviewFilters = {}) => {
     const params = new URLSearchParams();
     if (filters.state) params.set("state", filters.state);

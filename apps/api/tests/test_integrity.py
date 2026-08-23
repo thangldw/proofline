@@ -69,6 +69,7 @@ def test_live_integrity_verifier_accepts_clean_provenance(session):
         "memories": 1,
         "evidence": 1,
         "decision_reviews": 0,
+        "decision_relations": 0,
         "embeddings": 0,
         "vector_index_rows": 0,
     }
