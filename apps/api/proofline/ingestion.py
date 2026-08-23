@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .models import (
     Chunk,
     Decision,
@@ -91,6 +92,7 @@ SAFE_ERROR_DETAILS = {
     "ingestion_interrupted": "ingestion was interrupted before reaching a terminal state",
     "ingestion_input_missing": "staged ingestion input is unavailable",
     "ingestion_input_invalid": "staged ingestion input failed integrity validation",
+    "decision_review_refresh_failed": "decision review refresh failed deterministically",
 }
 DEFAULT_MAX_ATTEMPTS = 3
 
@@ -545,6 +547,26 @@ def _execute_staged_ingestion(session: Session, job_id: str) -> tuple[Source, bo
         staged_input = session.get(IngestionJobInput, job_id)
         job.source_id = source.id
         job.source_version_id = source.current_version_id
+        try:
+            with session.begin_nested():
+                refresh_decision_reviews(
+                    session,
+                    workspace_id=source.workspace_id,
+                    source_ids={source.id},
+                )
+        except DecisionReviewError as exc:
+            exhausted = job.attempts >= job.max_attempts
+            job.state = "dead_letter" if exhausted else "failed"
+            job.stage = "review_refresh"
+            job.error_code = "decision_review_refresh_failed"
+            job.error_detail = SAFE_ERROR_DETAILS[job.error_code]
+            job.retryable = not exhausted
+            job.finished_at = utc_now()
+            job.updated_at = job.finished_at
+            if exhausted:
+                session.delete(staged_input)
+            session.commit()
+            raise IngestionExecutionError(job_id) from exc
         job.state = "succeeded"
         job.stage = "ready"
         job.retryable = False
@@ -554,6 +576,8 @@ def _execute_staged_ingestion(session: Session, job_id: str) -> tuple[Source, bo
         job.updated_at = job.finished_at
         session.delete(staged_input)
         session.commit()
+    except IngestionExecutionError:
+        raise
     except Exception as exc:
         error_code = (
             "source_identity_conflict" if isinstance(exc, IngestionConflict) else "ingestion_error"
@@ -608,6 +632,7 @@ def retry_ingestion_job(session: Session, job_id: str) -> IngestionJob:
     if not job:
         raise IngestionJobNotFound(job_id)
     expected_attempts = job.attempts
+    retry_stage = job.stage
     now = utc_now()
     claimed = session.execute(
         update(IngestionJob)
@@ -620,7 +645,7 @@ def retry_ingestion_job(session: Session, job_id: str) -> IngestionJob:
         )
         .values(
             state="running",
-            stage="accepted",
+            stage="review_refresh" if retry_stage == "review_refresh" else "accepted",
             attempts=expected_attempts + 1,
             retryable=False,
             error_code=None,
@@ -634,6 +659,53 @@ def retry_ingestion_job(session: Session, job_id: str) -> IngestionJob:
         session.rollback()
         raise IngestionRetryConflict(job_id, "ingestion job is not claimable for retry")
     session.commit()
+    if retry_stage == "review_refresh":
+        job = session.get(IngestionJob, job_id)
+        if not job or not job.source_id:
+            _record_ingestion_failure(
+                session,
+                job_id,
+                "ingestion_input_missing",
+                force_dead_letter=True,
+            )
+            raise IngestionRetryConflict(job_id, "review refresh source is unavailable")
+        source = session.get(Source, job.source_id)
+        if source is None:
+            _record_ingestion_failure(
+                session,
+                job_id,
+                "ingestion_input_missing",
+                force_dead_letter=True,
+            )
+            raise IngestionRetryConflict(job_id, "review refresh source is unavailable")
+        try:
+            refresh_decision_reviews(
+                session,
+                workspace_id=source.workspace_id,
+                source_ids={source.id},
+            )
+        except DecisionReviewError as exc:
+            failed = _record_ingestion_failure(
+                session,
+                job_id,
+                "decision_review_refresh_failed",
+            )
+            failed.stage = "review_refresh"
+            session.commit()
+            raise IngestionExecutionError(job_id) from exc
+        job.state = "succeeded"
+        job.stage = "ready"
+        job.retryable = False
+        job.error_code = None
+        job.error_detail = None
+        job.finished_at = utc_now()
+        job.updated_at = job.finished_at
+        staged_input = session.get(IngestionJobInput, job_id)
+        if staged_input is not None:
+            session.delete(staged_input)
+        session.commit()
+        session.refresh(job)
+        return job
     _source, _created, completed_job = _execute_staged_ingestion(session, job_id)
     return completed_job
 
