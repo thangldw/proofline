@@ -4,7 +4,7 @@
 
 ### Choose a path
 
-- Evaluator: [Getting started](getting-started.md), [v2.0.1 release](releases/v2.0.1.md), then [architecture](architecture.md).
+- Evaluator: [Getting started](getting-started.md), [v2.0.1 release](releases/v2.0.1.md), [real pilot evidence](pilot.md), then [architecture](architecture.md).
 - Integrator: [CLI reference](cli-reference.md), [API reference](api-reference.md), and [evidence packages](evidence-packages.md).
 - Operator: [Operations](operations.md), [security](../SECURITY.md), and [release process](release-process.md).
 - Independent verifier: [Evidence packages](evidence-packages.md) and the [Decision Evidence Package specification](../spec/decision-evidence-package/README.md).
@@ -24,7 +24,7 @@ English is authoritative. Each public topic then provides complete Vietnamese an
 
 ### Chọn luồng
 
-- Evaluator: [Getting started](getting-started.md), [release v2.0.1](releases/v2.0.1.md), rồi [architecture](architecture.md).
+- Evaluator: [Getting started](getting-started.md), [release v2.0.1](releases/v2.0.1.md), [real pilot evidence](pilot.md), rồi [architecture](architecture.md).
 - Integrator: [CLI reference](cli-reference.md), [API reference](api-reference.md) và [evidence package](evidence-packages.md).
 - Operator: [Operations](operations.md), [security](../SECURITY.md) và [release process](release-process.md).
 - Independent verifier: [Evidence package](evidence-packages.md) và [spec Decision Evidence Package](../spec/decision-evidence-package/README.md).
@@ -44,7 +44,7 @@ English là bản authoritative. Sau đó mỗi chủ đề công khai có bản
 
 ### 読み方
 
-- Evaluator：[Getting started](getting-started.md)、[v2.0.1 release](releases/v2.0.1.md)、[architecture](architecture.md)。
+- Evaluator：[Getting started](getting-started.md)、[v2.0.1 release](releases/v2.0.1.md)、[real pilot evidence](pilot.md)、[architecture](architecture.md)。
 - Integrator：[CLI reference](cli-reference.md)、[API reference](api-reference.md)、[evidence package](evidence-packages.md)。
 - Operator：[Operations](operations.md)、[security](../SECURITY.md)、[release process](release-process.md)。
 - Independent verifier：[Evidence package](evidence-packages.md) と [Decision Evidence Package specification](../spec/decision-evidence-package/README.md)。
