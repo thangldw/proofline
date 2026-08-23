@@ -23,8 +23,7 @@
     "termsOfServiceURL": "https://github.com/thangldw/proofline/blob/main/TERMS.md",
     "defaultPrompt": [
       "Document this engineering decision with exact evidence.",
-      "Check whether the evidence behind this decision changed.",
-      "Trace transitive impact from this stale decision.",
+      "Check changed evidence and trace transitive decision impact.",
       "Verify this evidence package or signed attestation."
     ],
     "brandColor": "#102A43",
