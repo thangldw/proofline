@@ -25,7 +25,7 @@ Plugin submission is a separate external workflow. Rebuild and inspect the skill
 
 ### Current release
 
-As verified on 2026-08-24, PyPI reported `proofline-evidence` 2.0.1, GitHub reported release `v2.0.1` published at 2026-08-23T16:54:02Z, and the OpenAI Plugins Directory reported Proofline 2.0.1 as published. These immutable artifacts resolve to release commit `05fd080915da56944666189c424dbce2ea81de7d`.
+As verified on 2026-08-24, PyPI, GitHub Releases, and the OpenAI Plugins Directory reported Proofline 2.0.2 as published. The Git tag resolves to release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be`. Public PyPI SHA-256 digests are `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474` for the wheel and `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` for the sdist. The submitted plugin ZIP SHA-256 is `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`, and submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` was observed as published.
 
 ## Tiếng Việt
 
@@ -52,7 +52,7 @@ Plugin submission là external workflow riêng. Rebuild và inspect skills-only 
 
 ### Release hiện tại
 
-Theo verification ngày 2026-08-24, PyPI báo `proofline-evidence` 2.0.1, GitHub báo release `v2.0.1` publish lúc 2026-08-23T16:54:02Z và OpenAI Plugins Directory báo Proofline 2.0.1 đã published. Các immutable artifact này resolve tới release commit `05fd080915da56944666189c424dbce2ea81de7d`.
+Theo verification ngày 2026-08-24, PyPI, GitHub Releases và OpenAI Plugins Directory đều báo Proofline 2.0.2 đã published. Git tag resolve tới release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be`. Public PyPI SHA-256 là `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474` cho wheel và `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` cho sdist. Submitted plugin ZIP SHA-256 là `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`; submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` đã được quan sát ở trạng thái published.
 
 ## 日本語
 
@@ -79,4 +79,4 @@ Plugin submission は別の external workflow です。Skills-only bundle を再
 
 ### Current release
 
-2026-08-24 の verification では、PyPI は `proofline-evidence` 2.0.1、GitHub は 2026-08-23T16:54:02Z 公開の `v2.0.1` release、OpenAI Plugins Directory は Proofline 2.0.1 の published status を報告しました。これらの immutable artifact は release commit `05fd080915da56944666189c424dbce2ea81de7d` に対応します。
+2026-08-24 の verification では、PyPI、GitHub Releases、OpenAI Plugins Directory のすべてで Proofline 2.0.2 の published status を確認しました。Git tag は release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be` に resolve します。Public PyPI SHA-256 は wheel が `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474`、sdist が `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` です。Submitted plugin ZIP SHA-256 は `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360` で、submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` の published status を観測しました。

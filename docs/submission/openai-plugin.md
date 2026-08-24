@@ -7,15 +7,16 @@ Observation date: 2026-08-24
 ### Repository facts
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Published v2.0.1 submission ID: `appsub_6a8b260a08788191a9117758dd99b29f`
-- Repository/plugin manifest version prepared for submission: `2.0.2`
+- Published v2.0.2 submission ID: `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d`
+- Repository/plugin manifest version: `2.0.2`
 - Directory URL: `https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Bundle type: skills-only, local, no authentication, no hosted MCP endpoint.
-- Historical submitted ZIP SHA-256 for 2.0.1: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
+- Submitted v2.0.2 ZIP SHA-256: `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`.
+- Historical submitted v2.0.1 ZIP SHA-256: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
 
 ### External state
 
-Authenticated portal observation on 2026-08-24: submission `appsub_6a8b260a08788191a9117758dd99b29f` passed scanning and review, and version 2.0.1 was published to the Plugins Directory. Treat approval/publication as external state, not a repository guarantee.
+Authenticated portal and public Directory observation at 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` passed scanning and review, and version 2.0.2 was published at the stable plugin URL. The public page showed the expected three prompts, `Manage Evidence Decisions` skill, `Read, Write` capabilities, developer `DUC THANG LUU`, and version 2.0.2. The accidental duplicate draft plugin was deleted, and the portal then listed one Proofline plugin. Treat approval/publication as external state, not a repository guarantee.
 
 ### Reviewer workflow
 
@@ -38,15 +39,16 @@ Proofline reviews evidence-backed engineering decisions, preserves exact cited s
 ### Repository fact
 
 - OpenAI plugin ID: `plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Submission ID v2.0.1 đã publish: `appsub_6a8b260a08788191a9117758dd99b29f`
-- Version repository/plugin manifest đã chuẩn bị để submit: `2.0.2`
+- Submission ID v2.0.2 đã publish: `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d`
+- Version repository/plugin manifest: `2.0.2`
 - Directory URL: `https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Loại bundle: skills-only, local, không authentication, không hosted MCP endpoint.
-- Historical submitted ZIP SHA-256 của 2.0.1: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
+- Submitted ZIP SHA-256 của v2.0.2: `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`.
+- Historical submitted ZIP SHA-256 của v2.0.1: `67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`.
 
 ### External state
 
-Quan sát portal authenticated ngày 2026-08-24: submission `appsub_6a8b260a08788191a9117758dd99b29f` đã pass scanning và review; version 2.0.1 đã được publish lên Plugins Directory. Xem approval/publication là external state, không phải guarantee của repository.
+Quan sát authenticated portal và public Directory lúc 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` đã pass scanning và review; version 2.0.2 đã được publish tại stable plugin URL. Public page hiển thị đúng ba prompt, skill `Manage Evidence Decisions`, capabilities `Read, Write`, developer `DUC THANG LUU` và version 2.0.2. Duplicate draft plugin tạo nhầm đã được xoá; portal sau đó chỉ còn một plugin Proofline. Xem approval/publication là external state, không phải guarantee của repository.
 
 ### Reviewer workflow
 
@@ -69,15 +71,16 @@ Proofline review engineering decision có evidence, giữ exact cited span, veri
 ### Repository fact
 
 - OpenAI plugin ID：`plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
-- Published v2.0.1 submission ID：`appsub_6a8b260a08788191a9117758dd99b29f`
-- Submission 用に準備した repository/plugin manifest version：`2.0.2`
+- Published v2.0.2 submission ID：`appsub_6a8ba7cb85dc81919f961b5ca9a9f62d`
+- Repository/plugin manifest version：`2.0.2`
 - Directory URL：`https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa`
 - Bundle type：skills-only、local、authentication なし、hosted MCP endpoint なし。
-- Historical v2.0.1 submitted ZIP SHA-256：`67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`。
+- Submitted v2.0.2 ZIP SHA-256：`c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`。
+- Historical submitted v2.0.1 ZIP SHA-256：`67ab5b9dc61160537f19f99041a141cb7f6abdaf0c5da1044b741501f8888560`。
 
 ### External state
 
-2026-08-24 の authenticated portal observation では、submission `appsub_6a8b260a08788191a9117758dd99b29f` は scanning と review に合格し、version 2.0.1 が Plugins Directory に publish されました。Approval/publication は external state であり repository guarantee ではありません。
+2026-08-24T11:25+09:00 の authenticated portal と public Directory の observation では、submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` は scanning と review に合格し、version 2.0.2 が stable plugin URL に publish されました。Public page は想定された 3 つの prompt、`Manage Evidence Decisions` skill、`Read, Write` capabilities、developer `DUC THANG LUU`、version 2.0.2 を表示しました。誤って作成した duplicate draft plugin は削除され、その後 portal には Proofline plugin が 1 つだけ表示されました。Approval/publication は external state であり repository guarantee ではありません。
 
 ### Reviewer workflow
 
