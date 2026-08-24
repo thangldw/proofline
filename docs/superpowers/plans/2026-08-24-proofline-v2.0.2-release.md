@@ -69,6 +69,10 @@ Expected: failures identify 2.0.1 metadata, workflow artifact names, documentati
 - Modify: `docs/architecture.md`
 - Modify: `docs/submission/openai-plugin.md`
 - Modify: `scripts/check_documentation.py`
+- Modify: `scripts/release_check.py`
+- Modify: `scripts/release_local.sh`
+- Modify: `scripts/release_windows.ps1`
+- Create: `scripts/select_release_assets.py`
 - Modify: `skills/manage-evidence-decisions/SKILL.md`
 - Modify: `skills/manage-evidence-decisions/references/commands.md`
 - Create: `docs/releases/v2.0.2.md`
@@ -100,7 +104,11 @@ Run:
 
 Expected: all focused tests pass and release check returns `{"status":"ready","tag":"v2.0.2"}`.
 
-- [ ] **Step 5: Commit the release preparation**
+- [ ] **Step 5: Close release-path fail-open gaps**
+
+Add a red regression proving that `release_check.py` rejects a stale `proofline-desktop` entry in `Cargo.lock`. Add a second red regression proving release-asset selection excludes unsigned desktop installers even when they exist beside qualified Python, web, and platform artifacts. Implement exact Cargo lock validation and one explicit cross-platform asset selector used by both local release entrypoints.
+
+- [ ] **Step 6: Commit the release preparation**
 
 ```bash
 git add .

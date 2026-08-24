@@ -12,6 +12,7 @@
 - Made decision-health JSON output content-free while preserving deterministic stale and impact semantics.
 - Added a fail-closed real-pilot dataset freezer with manifest hashes, permission checks, and explicit synthetic-versus-team evidence boundaries.
 - Added gated macOS and Windows desktop artifact workflows with lifecycle receipts; current desktop outputs remain experimental, unsigned, and not release-grade.
+- Made release qualification reject a stale desktop Cargo lock and constrained local GitHub Release assets to an explicit non-desktop allowlist.
 - Published aligned Python, web, desktop metadata, CI artifact names, and plugin manifests for immutable release v2.0.2.
 
 ### 2.0.1
@@ -41,6 +42,7 @@
 - Chuyển decision-health JSON sang content-free nhưng giữ nguyên stale và impact semantics xác định.
 - Bổ sung real-pilot dataset freezer fail-closed với manifest hash, permission check và ranh giới rõ giữa synthetic evidence với evidence team thật.
 - Bổ sung workflow desktop artifact có gate cho macOS và Windows kèm lifecycle receipt; output desktop hiện vẫn experimental, unsigned và không phải release-grade.
+- Bắt release qualification từ chối desktop Cargo lock stale và giới hạn local GitHub Release asset bằng allowlist non-desktop explicit.
 - Đồng bộ Python, web, desktop metadata, CI artifact name và plugin manifest cho release bất biến v2.0.2.
 
 ### 2.0.1
@@ -70,6 +72,7 @@
 - Deterministic stale / impact semantics を維持しながら、decision-health JSON output を content-free にしました。
 - Manifest hash、permission check、synthetic evidence と real-team evidence の明示的境界を備えた fail-closed real-pilot dataset freezer を追加しました。
 - Lifecycle receipt を伴う gated macOS / Windows desktop artifact workflow を追加しました。現在の desktop output は experimental、unsigned で release-grade ではありません。
+- Release qualification が stale desktop Cargo lock を拒否し、local GitHub Release asset を明示的な non-desktop allowlist に限定するようにしました。
 - Immutable v2.0.2 release に向けて Python、web、desktop metadata、CI artifact name、plugin manifest を同期しました。
 
 ### 2.0.1

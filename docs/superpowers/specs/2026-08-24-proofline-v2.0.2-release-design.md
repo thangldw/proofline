@@ -14,6 +14,7 @@ Publish the post-v2.0.1 hardening already merged to `main` as immutable Prooflin
 - Qualify the exact release commit with Python, web, egress, E2E, package-conformance, artifact, and dependency-audit gates.
 - Publish `proofline-evidence==2.0.2` through the project-scoped PyPI Trusted Publisher, then create immutable tag `v2.0.2` and a GitHub Release from the same commit.
 - Build a skills-only plugin ZIP from the same commit, verify it in a clean directory, and submit version `2.0.2` through the authenticated OpenAI portal.
+- Fail release qualification on a stale desktop `Cargo.lock`, and select GitHub Release assets from an explicit non-desktop allowlist so experimental unsigned installers cannot be published accidentally.
 
 ### Boundaries
 
@@ -41,6 +42,7 @@ Phát hành phần hardening sau v2.0.1 đã merge vào `main` thành artifact P
 - Qualification exact release commit bằng Python, web, egress, E2E, package conformance, artifact và dependency-audit gates.
 - Publish `proofline-evidence==2.0.2` qua PyPI Trusted Publisher của project, sau đó tạo tag bất biến `v2.0.2` và GitHub Release từ cùng commit.
 - Build plugin ZIP skills-only từ cùng commit, verify trong clean directory và submit version `2.0.2` qua OpenAI portal đã authenticated.
+- Fail release qualification nếu desktop `Cargo.lock` stale và chọn GitHub Release asset bằng allowlist non-desktop explicit để không thể publish nhầm installer experimental unsigned.
 
 ### Ranh giới
 
@@ -68,6 +70,7 @@ PyPI files, Git tag, GitHub assets, source commit, plugin manifest và plugin ZI
 - Exact release commit に対して Python、web、egress、E2E、package conformance、artifact、dependency audit gate を実行します。
 - Project-scoped PyPI Trusted Publisher で `proofline-evidence==2.0.2` を publish し、同一 commit から不変 tag `v2.0.2` と GitHub Release を作成します。
 - 同一 commit から skills-only plugin ZIP を build し、clean directory で verify して、authenticated OpenAI portal から version `2.0.2` を submit します。
+- Desktop `Cargo.lock` が stale なら release qualification を失敗させ、明示的な non-desktop allowlist から GitHub Release asset を選び、experimental unsigned installer の誤公開を防ぎます。
 
 ### 境界
 
