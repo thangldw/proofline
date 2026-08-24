@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,23 +28,33 @@ def windows_release_qualification(*, release_grade: bool, statuses: list[str]) -
 
 
 def authenticode_status(path: Path) -> str:
+    powershell = shutil.which("pwsh") or shutil.which("powershell.exe")
+    if powershell is None:
+        raise RuntimeError("authenticode_probe_powershell_missing")
     environment = dict(os.environ)
     environment["PROOFLINE_SIGNATURE_PATH"] = str(path)
     completed = subprocess.run(
         [
-            "powershell.exe",
+            powershell,
+            "-NoLogo",
             "-NoProfile",
             "-NonInteractive",
             "-Command",
             "(Get-AuthenticodeSignature -LiteralPath "
             "$env:PROOFLINE_SIGNATURE_PATH).Status.ToString()",
         ],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env=environment,
     )
-    return completed.stdout.strip()
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or "no stderr"
+        raise RuntimeError(f"authenticode_probe_failed:{path.name}:{detail}")
+    status = completed.stdout.strip()
+    if not status:
+        raise RuntimeError(f"authenticode_probe_empty_status:{path.name}")
+    return status
 
 
 def main() -> None:
