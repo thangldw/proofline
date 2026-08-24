@@ -51,6 +51,18 @@ def read_dunder_version(path: Path) -> str:
     raise ValueError(f"{path} does not define a literal __version__")
 
 
+def read_cargo_package_version(path: Path, package_name: str) -> str | None:
+    lock = tomllib.loads(path.read_text(encoding="utf-8"))
+    matches = [
+        package.get("version")
+        for package in lock.get("package", [])
+        if package.get("name") == package_name
+    ]
+    if len(matches) != 1 or not isinstance(matches[0], str):
+        return None
+    return matches[0]
+
+
 def validate_release(repository: Path, tag: str) -> list[str]:
     try:
         expected_python = python_version_for(tag)
@@ -77,6 +89,9 @@ def validate_release(repository: Path, tag: str) -> list[str]:
     )
     kimi_plugin = json.loads((repository / ".kimi-plugin/plugin.json").read_text(encoding="utf-8"))
     runtime_version = read_dunder_version(repository / "apps/api/proofline/__init__.py")
+    cargo_lock_version = read_cargo_package_version(
+        repository / "apps/desktop/src-tauri/Cargo.lock", "proofline-desktop"
+    )
 
     observed = {
         "pyproject.toml": project["project"]["version"],
@@ -85,6 +100,7 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         "apps/desktop/package.json": desktop["version"],
         "apps/desktop/src-tauri/tauri.conf.json": tauri["version"],
         "apps/desktop/src-tauri/Cargo.toml": desktop_cargo["package"]["version"],
+        "Cargo.lock proofline-desktop": cargo_lock_version,
         "package-lock.json workspace": lock["packages"]["apps/web"]["version"],
         "package-lock.json desktop workspace": lock["packages"]["apps/desktop"]["version"],
         ".codex-plugin/plugin.json": codex_plugin["version"],
