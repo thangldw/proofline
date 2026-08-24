@@ -36,6 +36,17 @@ def test_desktop_workflow_is_compatible_with_macos_system_bash():
     assert "${RELEASE_GRADE,,}" not in workflow
 
 
+def test_experimental_macos_build_does_not_export_notarization_credentials():
+    workflow = DESKTOP_WORKFLOW.read_text(encoding="utf-8")
+    experimental = workflow.split("- name: Build experimental macOS package", maxsplit=1)[1]
+    experimental = experimental.split("- name: Build release-grade macOS package", maxsplit=1)[0]
+
+    assert "APPLE_SIGNING_IDENTITY" in experimental
+    assert "APPLE_ID" not in experimental
+    assert "APPLE_PASSWORD" not in experimental
+    assert "APPLE_TEAM_ID" not in experimental
+
+
 def test_macos_release_qualification_requires_developer_id_and_native_checks():
     assert (
         macos_release_qualification(

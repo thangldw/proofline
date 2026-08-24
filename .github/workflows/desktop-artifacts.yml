@@ -114,11 +114,20 @@ jobs:
             "$keychain_path"
           security list-keychains -d user -s "$keychain_path"
 
-      - name: Build macOS package
-        if: matrix.platform == 'macos'
+      - name: Build experimental macOS package
+        if: matrix.platform == 'macos' && !inputs.release_grade
         shell: bash
         env:
-          APPLE_SIGNING_IDENTITY: ${{ inputs.release_grade && secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_SIGNING_IDENTITY: "-"
+        run: |
+          python scripts/build_desktop_sidecar.py
+          npm run build --workspace @proofline/desktop
+
+      - name: Build release-grade macOS package
+        if: matrix.platform == 'macos' && inputs.release_grade
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
