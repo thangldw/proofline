@@ -94,10 +94,20 @@ platform_slug=$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
   --expected-version "$installed_version" \
   --qualify-os-keyring \
   --output "$release_dir/proofline-platform-$tag-$platform_slug.json" >/dev/null
-release_assets=("$release_dir"/proofline_evidence-* "$release_dir"/proofline-*)
+asset_output=$(.venv/bin/python scripts/select_release_assets.py \
+  --dist-dir "$release_dir" \
+  --tag "$tag" \
+  --web-format tar.gz \
+  --platform-slug "$platform_slug")
+release_assets=()
+while IFS= read -r asset; do
+  release_assets+=("$asset")
+done <<< "$asset_output"
 (
   cd "$release_dir"
-  shasum -a 256 proofline_evidence-* proofline-* > SHA256SUMS
+  for asset in "${release_assets[@]}"; do
+    shasum -a 256 "$(basename "$asset")"
+  done > SHA256SUMS
 )
 
 .venv/bin/python scripts/publish_pypi.py \

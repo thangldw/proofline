@@ -1,5 +1,6 @@
 import io
 import json
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -45,6 +46,52 @@ def test_release_check_rejects_a_tag_that_does_not_match_metadata():
     )
     assert completed.returncode == 1
     assert "release check failed" in completed.stderr
+
+
+def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
+    root = repository_root()
+    candidate = tmp_path / "candidate"
+    required = (
+        "pyproject.toml",
+        "package-lock.json",
+        "CHANGELOG.md",
+        ".codex-plugin/plugin.json",
+        ".claude-plugin/plugin.json",
+        ".kimi-plugin/plugin.json",
+        "apps/api/proofline/__init__.py",
+        "apps/web/package.json",
+        "apps/desktop/package.json",
+        "apps/desktop/src-tauri/tauri.conf.json",
+        "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/Cargo.lock",
+        "docs/releases/v2.0.2.md",
+        "scripts/release_check.py",
+    )
+    for relative in required:
+        target = candidate / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / relative, target)
+
+    cargo_lock = candidate / "apps/desktop/src-tauri/Cargo.lock"
+    cargo_lock.write_text(
+        cargo_lock.read_text(encoding="utf-8").replace(
+            'name = "proofline-desktop"\nversion = "2.0.2"',
+            'name = "proofline-desktop"\nversion = "2.0.1"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/release_check.py", "--tag", "v2.0.2"],
+        cwd=candidate,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 1
+    assert "Cargo.lock proofline-desktop is '2.0.1'; expected '2.0.2'" in completed.stderr
 
 
 @pytest.mark.parametrize(
@@ -151,6 +198,48 @@ def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
     assert "verify_attestation_vector.py" in windows
     assert 'if ($Tag -like "v0.*" -or $Tag.Contains("-"))' in windows
     assert "gh release create @ReleaseArgs" in windows
+    assert "select_release_assets.py" in local
+    assert "select_release_assets.py" in windows
+
+
+def test_release_asset_selection_excludes_unsigned_desktop_packages(tmp_path):
+    names = (
+        "proofline_evidence-2.0.2-py3-none-any.whl",
+        "proofline_evidence-2.0.2.tar.gz",
+        "proofline-web-v2.0.2.tar.gz",
+        "proofline-platform-v2.0.2-darwin-arm64.json",
+        "proofline-desktop-v2.0.2-macos-arm64.dmg",
+        "proofline-desktop-v2.0.2-macos-arm64.json",
+    )
+    for name in names:
+        (tmp_path / name).write_bytes(b"artifact")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/select_release_assets.py",
+            "--dist-dir",
+            str(tmp_path),
+            "--tag",
+            "v2.0.2",
+            "--web-format",
+            "tar.gz",
+            "--platform-slug",
+            "darwin-arm64",
+        ],
+        cwd=repository_root(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.splitlines() == [
+        str(tmp_path / "proofline_evidence-2.0.2-py3-none-any.whl"),
+        str(tmp_path / "proofline_evidence-2.0.2.tar.gz"),
+        str(tmp_path / "proofline-web-v2.0.2.tar.gz"),
+        str(tmp_path / "proofline-platform-v2.0.2-darwin-arm64.json"),
+    ]
 
 
 def test_trusted_publisher_workflow_separates_build_publish_and_public_verification():
@@ -163,8 +252,8 @@ def test_trusted_publisher_workflow_separates_build_publish_and_public_verificat
     assert "name: pypi" in workflow
     assert "id-token: write" in workflow
     assert "pypa/gh-action-pypi-publish@" in workflow
-    assert "proofline_evidence-2.0.1-py3-none-any.whl" in workflow
-    assert "proofline_evidence-2.0.1.tar.gz" in workflow
+    assert "proofline_evidence-2.0.2-py3-none-any.whl" in workflow
+    assert "proofline_evidence-2.0.2.tar.gz" in workflow
     assert "--verify-only" in workflow
     assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
     assert "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c" in workflow

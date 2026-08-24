@@ -4,7 +4,7 @@
 
 ### Choose a path
 
-- Evaluator: [Getting started](getting-started.md), [v2.0.1 release](releases/v2.0.1.md), [real pilot evidence](pilot.md), then [architecture](architecture.md).
+- Evaluator: [Getting started](getting-started.md), [v2.0.2 release](releases/v2.0.2.md), [real pilot evidence](pilot.md), then [architecture](architecture.md).
 - Integrator: [CLI reference](cli-reference.md), [API reference](api-reference.md), and [evidence packages](evidence-packages.md).
 - Operator: [Operations](operations.md), [security](../SECURITY.md), and [release process](release-process.md).
 - Independent verifier: [Evidence packages](evidence-packages.md) and the [Decision Evidence Package specification](../spec/decision-evidence-package/README.md).
@@ -12,7 +12,7 @@
 
 ### Status legend
 
-- Implemented: shipped in Proofline 2.0.1 and backed by code/tests.
+- Implemented: shipped in Proofline 2.0.2 and backed by code/tests.
 - Optional: available only after explicit user configuration or invocation.
 - External state: observed outside the repository and dated at observation time.
 - Synthetic evidence: controlled regression or scale evidence, not hosted/team production evidence.
@@ -24,7 +24,7 @@ English is authoritative. Each public topic then provides complete Vietnamese an
 
 ### Chọn luồng
 
-- Evaluator: [Getting started](getting-started.md), [release v2.0.1](releases/v2.0.1.md), [real pilot evidence](pilot.md), rồi [architecture](architecture.md).
+- Evaluator: [Getting started](getting-started.md), [release v2.0.2](releases/v2.0.2.md), [real pilot evidence](pilot.md), rồi [architecture](architecture.md).
 - Integrator: [CLI reference](cli-reference.md), [API reference](api-reference.md) và [evidence package](evidence-packages.md).
 - Operator: [Operations](operations.md), [security](../SECURITY.md) và [release process](release-process.md).
 - Independent verifier: [Evidence package](evidence-packages.md) và [spec Decision Evidence Package](../spec/decision-evidence-package/README.md).
@@ -32,7 +32,7 @@ English is authoritative. Each public topic then provides complete Vietnamese an
 
 ### Chú giải trạng thái
 
-- Implemented: đã phát hành trong Proofline 2.0.1 và có code/test làm bằng chứng.
+- Implemented: đã phát hành trong Proofline 2.0.2 và có code/test làm bằng chứng.
 - Optional: chỉ có sau khi người dùng cấu hình hoặc gọi rõ ràng.
 - External state: quan sát ngoài repository và có ngày quan sát.
 - Synthetic evidence: bằng chứng hồi quy hoặc scale có kiểm soát, không phải hosted/team production evidence.
@@ -44,7 +44,7 @@ English là bản authoritative. Sau đó mỗi chủ đề công khai có bản
 
 ### 読み方
 
-- Evaluator：[Getting started](getting-started.md)、[v2.0.1 release](releases/v2.0.1.md)、[real pilot evidence](pilot.md)、[architecture](architecture.md)。
+- Evaluator：[Getting started](getting-started.md)、[v2.0.2 release](releases/v2.0.2.md)、[real pilot evidence](pilot.md)、[architecture](architecture.md)。
 - Integrator：[CLI reference](cli-reference.md)、[API reference](api-reference.md)、[evidence package](evidence-packages.md)。
 - Operator：[Operations](operations.md)、[security](../SECURITY.md)、[release process](release-process.md)。
 - Independent verifier：[Evidence package](evidence-packages.md) と [Decision Evidence Package specification](../spec/decision-evidence-package/README.md)。
@@ -52,7 +52,7 @@ English là bản authoritative. Sau đó mỗi chủ đề công khai có bản
 
 ### Status legend
 
-- Implemented：Proofline 2.0.1 で出荷済みで、code/test の裏付けがあります。
+- Implemented：Proofline 2.0.2 で出荷済みで、code/test の裏付けがあります。
 - Optional：user が明示的に設定または実行した場合だけ利用できます。
 - External state：repository 外で観測し、観測日を付けた状態です。
 - Synthetic evidence：制御された regression/scale evidence であり、hosted/team production evidence ではありません。

@@ -11,7 +11,7 @@ description: Review, explain, verify, or compare evidence-backed engineering dec
 
 Resolve all bundled paths relative to this `SKILL.md`. For Decision Evidence Packages and review receipts, use Python 3.11+ with `scripts/proofline_package.py`; it is standard-library-only and does not require a separate checkout, database, network, account, or model credential. Run `python3 scripts/proofline_package.py --help` before an unfamiliar operation.
 
-Signed attestations require an installed Proofline 2.0.1 runtime. The bundled verifier does not verify Ed25519. Run `proofline verify-attestation` only when the user supplies the exact envelope, package, trusted public key, and any bound review receipt. A public key shipped beside an untrusted artifact is not independently trusted.
+Signed attestations require an installed Proofline 2.0.2 runtime. The bundled verifier does not verify Ed25519. Run `proofline verify-attestation` only when the user supplies the exact envelope, package, trusted public key, and any bound review receipt. A public key shipped beside an untrusted artifact is not independently trusted.
 
 ### Workflow
 
@@ -37,7 +37,7 @@ Signed attestations require an installed Proofline 2.0.1 runtime. The bundled ve
 
 Resolve mọi bundled path relative với `SKILL.md` này. Với Decision Evidence Package và review receipt, dùng Python 3.11+ cùng `scripts/proofline_package.py`; script chỉ dùng standard library và không cần checkout riêng, database, network, account hoặc model credential. Chạy `python3 scripts/proofline_package.py --help` trước operation chưa quen.
 
-Signed attestation cần runtime Proofline 2.0.1 đã cài. Bundled verifier không verify Ed25519. Chỉ chạy `proofline verify-attestation` khi người dùng cung cấp exact envelope, package, trusted public key và review receipt được bind nếu có. Public key đi cùng untrusted artifact không phải independently trusted.
+Signed attestation cần runtime Proofline 2.0.2 đã cài. Bundled verifier không verify Ed25519. Chỉ chạy `proofline verify-attestation` khi người dùng cung cấp exact envelope, package, trusted public key và review receipt được bind nếu có. Public key đi cùng untrusted artifact không phải independently trusted.
 
 ### Workflow
 
@@ -63,7 +63,7 @@ Signed attestation cần runtime Proofline 2.0.1 đã cài. Bundled verifier kh�
 
 全 bundled path はこの `SKILL.md` からの相対 path として解決します。Decision Evidence Package と review receipt には Python 3.11+ と `scripts/proofline_package.py` を使います。Standard-library-only で、別 checkout、database、network、account、model credential は不要です。不慣れな operation の前に `python3 scripts/proofline_package.py --help` を実行します。
 
-Signed attestation には installed Proofline 2.0.1 runtime が必要です。Bundled verifier は Ed25519 を検証しません。User が exact envelope、package、trusted public key、bind された review receipt を提供した場合だけ `proofline verify-attestation` を実行します。Untrusted artifact の隣にある public key は independently trusted ではありません。
+Signed attestation には installed Proofline 2.0.2 runtime が必要です。Bundled verifier は Ed25519 を検証しません。User が exact envelope、package、trusted public key、bind された review receipt を提供した場合だけ `proofline verify-attestation` を実行します。Untrusted artifact の隣にある public key は independently trusted ではありません。
 
 ### Workflow
 

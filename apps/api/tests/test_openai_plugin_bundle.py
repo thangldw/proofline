@@ -96,7 +96,7 @@ def test_plugin_documents_signed_attestation_boundary_without_private_keys() -> 
 
     assert "proofline verify-attestation" in combined
     assert "trusted public key" in combined
-    assert "Proofline 2.0.1" in combined
+    assert "Proofline 2.0.2" in combined
     assert "bundled verifier does not verify Ed25519" in combined
     assert "BEGIN PRIVATE KEY" not in combined
 

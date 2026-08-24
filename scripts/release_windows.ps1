@@ -72,10 +72,13 @@ try {
   & $SmokePython -m pip install --quiet $Wheel.FullName
   & $Python scripts/platform_release_receipt.py --proofline $SmokeProofline --python $SmokePython --artifact $Wheel.FullName --expected-version $Tag.TrimStart("v") --qualify-os-keyring --output (Join-Path $ReleaseDir "proofline-platform-$Tag-windows-x64.json")
 
-  $ReleaseAssets = @(
-    Get-ChildItem "$ReleaseDir\proofline_evidence-*"
-    Get-ChildItem "$ReleaseDir\proofline-*"
-  )
+  $ReleaseAssetPaths = @(& $Python scripts/select_release_assets.py `
+    --dist-dir $ReleaseDir `
+    --tag $Tag `
+    --web-format zip `
+    --platform-slug windows-x64)
+  if ($LASTEXITCODE -ne 0) { throw "Release asset selection failed" }
+  $ReleaseAssets = @($ReleaseAssetPaths | ForEach-Object { Get-Item $_ })
   $ChecksumPath = Join-Path $ReleaseDir "SHA256SUMS"
   $ReleaseAssets | ForEach-Object {
     $Hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
