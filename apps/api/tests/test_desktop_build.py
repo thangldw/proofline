@@ -1,6 +1,7 @@
 import runpy
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,9 +14,9 @@ macos_release_qualification = runpy.run_path(SCRIPTS / "desktop_release_receipt.
 ]
 sys.path.insert(0, str(SCRIPTS))
 try:
-    windows_release_qualification = runpy.run_path(SCRIPTS / "windows_desktop_receipt.py")[
-        "windows_release_qualification"
-    ]
+    windows_receipt_namespace = runpy.run_path(SCRIPTS / "windows_desktop_receipt.py")
+    windows_release_qualification = windows_receipt_namespace["windows_release_qualification"]
+    authenticode_status = windows_receipt_namespace["authenticode_status"]
 finally:
     sys.path.remove(str(SCRIPTS))
 
@@ -65,3 +66,26 @@ def test_windows_release_qualification_requires_valid_authenticode_everywhere():
     )
     with pytest.raises(RuntimeError, match="windows_release_qualification_failed"):
         windows_release_qualification(release_grade=True, statuses=["Valid", "NotSigned"])
+
+
+def test_authenticode_probe_prefers_runner_powershell(monkeypatch, tmp_path):
+    invocations = []
+
+    monkeypatch.setattr(
+        windows_receipt_namespace["shutil"],
+        "which",
+        lambda candidate: (
+            "C:/Program Files/PowerShell/7/pwsh.exe"
+            if candidate == "pwsh"
+            else "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+        ),
+    )
+
+    def fake_run(command, **kwargs):
+        invocations.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout="NotSigned\n", stderr="")
+
+    monkeypatch.setattr(windows_receipt_namespace["subprocess"], "run", fake_run)
+
+    assert authenticode_status(tmp_path / "proofline.exe") == "NotSigned"
+    assert invocations[0][0][0].endswith("pwsh.exe")
