@@ -36,7 +36,15 @@ test("allows inert standards namespaces and React production diagnostics", () =>
     'const svgNamespace = "http://www.w3.org/2000/svg";',
     'const xlinkNamespace = "http://www.w3.org/1999/xlink";',
     'const decoder = "https://reactjs.org/docs/error-decoder.html?invariant=31";',
+    'const react19Prefix = "https://react.dev/errors/";',
+    'const react19Decoder = "https://react.dev/errors/31?args[]=object";',
   ].join("\n");
 
   assert.deepEqual(findDisallowedUrls(text), []);
+});
+
+test("keeps non-diagnostic React URLs and lookalike hosts blocked", () => {
+  for (const url of ["https://react.dev/api/collect", "https://react.dev/errors/31/more", "https://react.dev.evil.test/errors/31", "http://react.dev/errors/31", "https://react.dev:8443/errors/31"]) {
+    assert.equal(findDisallowedUrls(`fetch("${url}")`).length, 1, url);
+  }
 });

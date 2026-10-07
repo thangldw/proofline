@@ -4,7 +4,7 @@
 
 ### Requirements and install
 
-Use Python 3.11 or newer, `uv`, Node.js 20 or newer, and npm. Repository development uses an isolated virtual environment; it does not require a global `proofline` install.
+Use Python 3.11 or newer, `uv`, Node.js 22.22.2 (or compatible 24.15+/26+), and npm. Repository development uses an isolated virtual environment; it does not require a global `proofline` install.
 
 ```bash
 git clone https://github.com/thangldw/proofline
@@ -39,7 +39,7 @@ Next: [architecture](architecture.md), [decision lifecycle](decision-lifecycle.m
 
 ### Yêu cầu và cài đặt
 
-Dùng Python 3.11 trở lên, `uv`, Node.js 20 trở lên và npm. Development từ repository dùng virtual environment độc lập; không cần cài global `proofline`.
+Dùng Python 3.11 trở lên, `uv`, Node.js 22.22.2 (hoặc bản tương thích 24.15+/26+) và npm. Development từ repository dùng virtual environment độc lập; không cần cài global `proofline`.
 
 ```bash
 git clone https://github.com/thangldw/proofline
@@ -74,7 +74,7 @@ Tiếp theo: [architecture](architecture.md), [decision lifecycle](decision-life
 
 ### 要件と install
 
-Python 3.11 以上、`uv`、Node.js 20 以上、npm を使います。Repository development は独立 virtual environment を使い、global `proofline` install は不要です。
+Python 3.11 以上、`uv`、Node.js 22.22.2（互換の 24.15+/26+ も可）、npm を使います。Repository development は独立 virtual environment を使い、global `proofline` install は不要です。
 
 ```bash
 git clone https://github.com/thangldw/proofline
