@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Align development and CI Node.js with jsdom 30 requirements.
 - Upgrade React/ReactDOM and their types together with the Vite/React-plugin/jsdom toolchain; deduplicate the workspace runtime.
 - Preserve spacing in navigation accessible names and recognize the narrow React 19 production diagnostic URL path in the static egress check.
 - Rebuild the packaged web bundle from the upgraded toolchain.
