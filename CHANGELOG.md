@@ -1,5 +1,11 @@
 # Proofline changelog
 
+## Unreleased
+
+- Upgrade React/ReactDOM and their types together with the Vite/React-plugin/jsdom toolchain; deduplicate the workspace runtime.
+- Preserve spacing in navigation accessible names and recognize the narrow React 19 production diagnostic URL path in the static egress check.
+- Rebuild the packaged web bundle from the upgraded toolchain.
+
 ## [2.0.2] - 2026-08-24
 
 ## [2.0.1] - 2026-08-24

@@ -413,7 +413,7 @@ function Nav({
       onClick={onClick}
     >
       {icon}
-      <span>{children}</span>
+      <span>{children}</span>{" "}
       {count !== undefined && <b>{count}</b>}
     </button>
   );
