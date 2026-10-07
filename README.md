@@ -4,6 +4,8 @@
 
 ## English
 
+Product introduction: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Latest published release: [v2.0.2](https://github.com/thangldw/proofline/releases/tag/v2.0.2). Main may contain later source or documentation changes; they do not replace the published artifact or its recorded verification.
+
 Proofline is a local-first engineering decision memory that binds decisions to immutable source versions and exact citation spans. When a requirement changes, deterministic checks mark the affected evidence for review without rewriting the historical decision.
 
 ### Five-minute path
@@ -41,6 +43,8 @@ See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [term
 
 ## Tiếng Việt
 
+Trang giới thiệu: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Release đã phát hành mới nhất: [v2.0.2](https://github.com/thangldw/proofline/releases/tag/v2.0.2). Main có thể chứa source hoặc tài liệu mới hơn; chúng không thay thế artifact đã phát hành hay evidence kiểm chứng của artifact.
+
 Proofline là bộ nhớ quyết định kỹ thuật local-first, liên kết decision với phiên bản nguồn bất biến và exact citation span. Khi requirement thay đổi, kiểm tra xác định đánh dấu evidence bị ảnh hưởng để review mà không viết lại decision lịch sử.
 
 ### Luồng dưới năm phút
@@ -77,6 +81,8 @@ Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submi
 Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md) và [MIT License](LICENSE).
 
 ## 日本語
+
+紹介ページ: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/)。最新の公開 release は [v2.0.2](https://github.com/thangldw/proofline/releases/tag/v2.0.2) です。Main の新しい source/documentation change は公開 artifact やその検証記録を置換しません。
 
 Proofline は、decision を不変の source version と正確な citation span に結び付ける local-first の engineering decision memory です。Requirement が変わると、決定的検査が影響を受けた evidence を review 対象にし、過去の decision 自体は書き換えません。
 
