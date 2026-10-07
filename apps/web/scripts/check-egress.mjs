@@ -20,6 +20,10 @@ function isApprovedAbsoluteUrl(rawUrl) {
     const url = new URL(rawUrl);
     if (LOOPBACK_HOSTS.has(url.hostname)) return true;
     if (url.hostname === "www.w3.org") return true;
+    if (
+      url.protocol === "https:" && url.host === "react.dev" &&
+      !url.username && !url.password && /^\/errors\/(?:[0-9]+)?$/u.test(url.pathname)
+    ) return true;
     return (
       url.hostname === "reactjs.org" &&
       url.pathname === "/docs/error-decoder.html"
