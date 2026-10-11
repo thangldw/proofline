@@ -26,7 +26,7 @@ jobs:
       - run: python -m twine check dist/*
       - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.2-py3-none-any.whl --expected-version 2.0.2
       - run: python scripts/qualify_python_artifact.py --artifact dist/proofline_evidence-2.0.2.tar.gz --expected-version 2.0.2
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: proofline-evidence-2.0.2-dist
           path: dist/*
