@@ -61,9 +61,9 @@ def test_default_decision_policy_and_ci_contract_are_committed():
     assert ".venv/bin/python -m build --outdir dist" in workflow
     assert ".venv/bin/python scripts/verify_release_artifacts.py" in workflow
     assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in workflow
-    assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in workflow
-    assert "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020" in workflow
-    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0" in workflow
+    assert "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1" in workflow
+    assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in workflow
 
 
 def test_ci_can_verify_an_explicit_immutable_ref():
