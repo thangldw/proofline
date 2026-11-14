@@ -8,6 +8,6 @@
   },
   "homepage": "https://github.com/thangldw/proofline",
   "repository": "https://github.com/thangldw/proofline",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["engineering-decisions", "adr", "evidence", "provenance"]
 }

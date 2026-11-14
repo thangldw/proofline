@@ -13,7 +13,7 @@ Decision Evidence Package (DEP) is an implementation-neutral format carrying one
 
 Media are canonical JSON or a deterministic ZIP containing exactly one stored, uncompressed `evidence.json` entry. Semantic verification recomputes source content, citation spans, node hashes, ordered Merkle nodes, and `root_hash`; JSON Schema alone is insufficient. Verification needs no Proofline database, credential, network, or AI provider.
 
-The root proves package integrity and lineage only. It does not prove source truth, source authenticity, reviewer identity, authorization, trusted time, or revocation. The specification, schema, and vectors use the repository's [MIT License](../../LICENSE).
+The root proves package integrity and lineage only. It does not prove source truth, source authenticity, reviewer identity, authorization, trusted time, or revocation. The specification, schema, and vectors use the repository's [Apache License 2.0](../../LICENSE).
 
 ## Tiếng Việt
 
@@ -28,7 +28,7 @@ Decision Evidence Package (DEP) là format trung lập implementation, mang mộ
 
 Media là canonical JSON hoặc deterministic ZIP chứa đúng một entry stored, uncompressed tên `evidence.json`. Semantic verification recompute source content, citation span, node hash, ordered Merkle node và `root_hash`; chỉ JSON Schema là chưa đủ. Verification không cần Proofline database, credential, network hoặc AI provider.
 
-Root chỉ chứng minh package integrity và lineage. Nó không chứng minh source truth, source authenticity, reviewer identity, authorization, trusted time hoặc revocation. Specification, schema và vector dùng [MIT License](../../LICENSE) của repository.
+Root chỉ chứng minh package integrity và lineage. Nó không chứng minh source truth, source authenticity, reviewer identity, authorization, trusted time hoặc revocation. Specification, schema và vector dùng [Apache License 2.0](../../LICENSE) của repository.
 
 ## 日本語
 
@@ -43,4 +43,4 @@ Decision Evidence Package (DEP) は、一つの engineering memory artifact、�
 
 Media は canonical JSON、または stored/uncompressed の `evidence.json` entry を一つだけ含む deterministic ZIP です。Semantic verification は source content、citation span、node hash、ordered Merkle node、`root_hash` を再計算します。JSON Schema だけでは不十分です。Verification に Proofline database、credential、network、AI provider は不要です。
 
-Root が証明するのは package integrity と lineage だけです。Source truth、source authenticity、reviewer identity、authorization、trusted time、revocation は証明しません。Specification、schema、vector は repository の [MIT License](../../LICENSE) に従います。
+Root が証明するのは package integrity と lineage だけです。Source truth、source authenticity、reviewer identity、authorization、trusted time、revocation は証明しません。Specification、schema、vector は repository の [Apache License 2.0](../../LICENSE) に従います。
