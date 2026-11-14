@@ -7,7 +7,7 @@
     "url": "https://github.com/thangldw"
   },
   "homepage": "https://github.com/thangldw/proofline",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["engineering-decisions", "adr", "evidence", "provenance"],
   "skills": "./skills/",
   "interface": {

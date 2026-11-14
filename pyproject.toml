@@ -4,7 +4,7 @@ version = "2.0.2"
 description = "Evidence-first engineering decision memory"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{name = "Thang Luu"}]
 keywords = ["engineering", "knowledge", "provenance", "retrieval", "local-first"]
