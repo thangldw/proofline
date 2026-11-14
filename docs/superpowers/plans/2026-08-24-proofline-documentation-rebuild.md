@@ -135,7 +135,7 @@ Write complete English, Vietnamese, and Japanese sections in each file. `README.
 
 - [ ] **Step 3: Rewrite policies without weakening boundaries**
 
-Each policy includes scope, local data behavior, optional provider behavior, key handling, incident/contact path, limitations, and English precedence. Preserve the MIT license reference and existing contact URLs; do not introduce warranties, hosted service promises, or organization identity claims.
+Each policy includes scope, local data behavior, optional provider behavior, key handling, incident/contact path, limitations, and English precedence. Preserve the Apache-2.0 license reference and existing contact URLs; do not introduce warranties, hosted service promises, or organization identity claims.
 
 - [ ] **Step 4: Create the documentation hub and getting-started guide**
 
