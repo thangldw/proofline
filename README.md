@@ -39,7 +39,7 @@ Start with the [documentation hub](docs/README.md), [getting started](docs/getti
 
 Proofline is also packaged as a local skills plugin. The [OpenAI plugin submission record](docs/submission/openai-plugin.md) separates repository facts from dated external publication observations. The recorded [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) does not imply that the repository can independently confirm the currently public version; this project does not claim a hosted connector.
 
-See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md), and the [MIT License](LICENSE).
+See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md), and the [Apache License 2.0](LICENSE).
 
 ## Tiếng Việt
 
@@ -78,7 +78,7 @@ Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/ge
 
 Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submission OpenAI plugin](docs/submission/openai-plugin.md) tách repository fact khỏi quan sát external publication có ngày. [URL OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) đã ghi không có nghĩa repository có thể tự xác nhận version đang public; project này không claim hosted connector.
 
-Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md) và [MIT License](LICENSE).
+Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [terms](TERMS.md), [contributing](CONTRIBUTING.md) và [Apache License 2.0](LICENSE).
 
 ## 日本語
 
@@ -117,4 +117,4 @@ Demo は使い捨て workspace を作成し、引用済み requirement を変更
 
 Proofline は local skills plugin としても packaging されています。[OpenAI plugin submission record](docs/submission/openai-plugin.md) は repository fact と日付付き external publication observation を分離します。記録済み [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) は、repository が現在の public version を独立確認できることを意味しません。この project は hosted connector を提供すると主張しません。
 
-[Privacy](PRIVACY.md)、[security](SECURITY.md)、[support](SUPPORT.md)、[terms](TERMS.md)、[contributing](CONTRIBUTING.md)、[MIT License](LICENSE) も参照してください。
+[Privacy](PRIVACY.md)、[security](SECURITY.md)、[support](SUPPORT.md)、[terms](TERMS.md)、[contributing](CONTRIBUTING.md)、[Apache License 2.0](LICENSE) も参照してください。

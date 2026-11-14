@@ -4,7 +4,7 @@ Last updated: 2026-08-24
 
 ## English
 
-Proofline is provided under the [MIT License](LICENSE). It preserves and verifies evidence provenance; it does not guarantee that a source is true, a citation is sufficient, or an engineering decision is correct, current, safe, or compliant.
+Proofline is provided under the [Apache License 2.0](LICENSE). It preserves and verifies evidence provenance; it does not guarantee that a source is true, a citation is sufficient, or an engineering decision is correct, current, safe, or compliant.
 
 A valid root hash establishes package integrity. A valid signed attestation establishes integrity and private-key control only relative to the trusted public key supplied by the verifier. Neither establishes legal identity, trusted time, authorization, revocation status, source truth, decision quality, or artifact safety.
 
@@ -12,7 +12,7 @@ Users are responsible for authorization to process source material, access contr
 
 ## Tiếng Việt
 
-Proofline được cung cấp theo [MIT License](LICENSE). Hệ thống giữ và verify evidence provenance; không bảo đảm source là đúng, citation là đủ hoặc engineering decision là đúng, còn hiện hành, an toàn hay compliant.
+Proofline được cung cấp theo [Apache License 2.0](LICENSE). Hệ thống giữ và verify evidence provenance; không bảo đảm source là đúng, citation là đủ hoặc engineering decision là đúng, còn hiện hành, an toàn hay compliant.
 
 Root hash hợp lệ thiết lập package integrity. Signed attestation hợp lệ chỉ thiết lập integrity và quyền kiểm soát private key tương ứng với trusted public key do verifier cung cấp. Không nội dung nào trong hai loại này thiết lập legal identity, trusted time, authorization, revocation status, source truth, decision quality hoặc artifact safety.
 
@@ -20,7 +20,7 @@ Người dùng chịu trách nhiệm về authorization để xử lý source ma
 
 ## 日本語
 
-Proofline は [MIT License](LICENSE) に基づき提供されます。Evidence provenance を保持・検証しますが、source の真実性、citation の十分性、engineering decision の正確性・現行性・安全性・compliance は保証しません。
+Proofline は [Apache License 2.0](LICENSE) に基づき提供されます。Evidence provenance を保持・検証しますが、source の真実性、citation の十分性、engineering decision の正確性・現行性・安全性・compliance は保証しません。
 
 有効な root hash は package integrity を確立します。有効な signed attestation は verifier が指定した trusted public key に対する integrity と private-key control だけを確立します。どちらも legal identity、trusted time、authorization、revocation status、source truth、decision quality、artifact safety を確立しません。
 
