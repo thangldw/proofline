@@ -1,6 +1,6 @@
 import json
 
-import proofline.api as api_module
+import proofline.provider_runtime as provider_module
 from proofline.model_gateway import (
     FakeGenerationProvider,
     GenerationResult,
@@ -153,7 +153,7 @@ def test_generalized_model_endpoint_and_decision_compatibility_filter(client, mo
             }
         )
     )
-    monkeypatch.setattr(api_module, "build_generation_provider", lambda _settings: provider)
+    monkeypatch.setattr(provider_module, "build_generation_provider", lambda _settings: provider)
 
     rejected_legacy = client.post(f"/api/v1/sources/{created['id']}/extract-decisions")
     assert rejected_legacy.status_code == 502
@@ -175,7 +175,7 @@ def test_generalized_model_endpoint_and_decision_compatibility_filter(client, mo
         )
     )
     monkeypatch.setattr(
-        api_module,
+        provider_module,
         "build_generation_provider",
         lambda _settings: decision_only_provider,
     )
@@ -208,7 +208,7 @@ def test_provider_failure_run_lineage_is_inspectable_and_source_remains_searchab
     provider = ScriptedGenerationProvider(
         ["not valid JSON", ProviderRequestError("safe provider failure")]
     )
-    monkeypatch.setattr(api_module, "build_generation_provider", lambda _settings: provider)
+    monkeypatch.setattr(provider_module, "build_generation_provider", lambda _settings: provider)
 
     failed = client.post(f"/api/v1/sources/{source['id']}/extract-memories")
 
@@ -263,7 +263,9 @@ def test_provider_failure_run_lineage_is_inspectable_and_source_remains_searchab
             )
         ]
     )
-    monkeypatch.setattr(api_module, "build_generation_provider", lambda _settings: retry_provider)
+    monkeypatch.setattr(
+        provider_module, "build_generation_provider", lambda _settings: retry_provider
+    )
     retried = client.post(
         f"/api/v1/model/runs/{last_run_id}/retry",
         json={"source_id": source["id"], "operation": "extract_memories"},

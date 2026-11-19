@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Moved the model, extraction, answers/search and action-proposal routes out of `api.py` (1362 to 763 lines). Route modules now build providers through `proofline.provider_runtime.build_generation_provider`, a single call-time seam; tests patch that instead of `proofline.api`. OpenAPI is unchanged.
+
 - Split `portability.py` into `portable_schema`, `portable_validation` and `portable_verify` (public API re-exported), and moved the notes, studio/study-card and decision-relation routes out of `api.py` into their own routers. The OpenAPI surface (70 operations) is unchanged.
 
 - Fixed all remaining mypy errors and removed the module ratchet; every module under `apps/api/proofline` is now type-checked in `make check`. Unreachable missing-row cases now raise explicit errors instead of `AttributeError`.

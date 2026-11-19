@@ -284,7 +284,9 @@ def test_round_trip_preserves_study_proposals_and_studio(client, session, tmp_pa
             }
         )
     )
-    monkeypatch.setattr("proofline.api.build_generation_provider", lambda _settings: provider)
+    monkeypatch.setattr(
+        "proofline.provider_runtime.build_generation_provider", lambda _settings: provider
+    )
     proposal = client.post(
         "/api/v1/action-proposals", json={"question": "How should retries work?"}
     ).json()

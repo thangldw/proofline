@@ -21,7 +21,7 @@ from .schemas import (
     DecisionTimelineRead,
 )
 
-router = APIRouter()
+router: APIRouter = APIRouter()
 
 
 @router.post(

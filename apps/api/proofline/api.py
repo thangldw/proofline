@@ -1,25 +1,14 @@
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from . import secret_store
-from .config import get_settings, load_provider_config, provider_config_path, save_provider_config
+from .config import get_settings
 from .database import get_session
-from .embeddings import hybrid_search, index_current_embeddings
-from .extraction import (
-    CandidateExtractionError,
-    extract_decision_candidates,
-    extract_memory_candidates,
-)
 from .folder_scanning import FolderScanError
 from .git_ingestion import GitIngestionError, import_git_repository
-from .grounding import EvidenceIntegrityError, GroundingValidationError, answer_question
 from .ingestion import (
     IngestionConflict,
     IngestionExecutionError,
@@ -31,42 +20,24 @@ from .ingestion import (
     run_ingestion_job,
     source_deletion_impact,
 )
-from .model_gateway import (
-    EmbeddingValidationError,
-    ProviderConfigurationError,
-    ProviderRequestError,
-    StructuredOutputError,
-    build_embedding_provider,
-    build_generation_provider,
-)
 from .models import (
     DEFAULT_WORKSPACE_ID,
-    ActionProposal,
     AuditEvent,
     Chunk,
     Decision,
     Evidence,
     GitRepository,
     IngestionJob,
-    ModelRun,
-    ProposalCitation,
     Source,
     SourceVersion,
     Workspace,
     utc_now,
 )
 from .notes import parse_note_links, parse_note_tags
-from .reranking import DeterministicTokenReranker
 from .schemas import (
-    ActionProposalCreate,
-    ActionProposalRead,
-    ActionProposalReview,
-    AnswerRequest,
-    AnswerResponse,
     AuditEventRead,
     DecisionRead,
     DecisionUpdate,
-    EmbeddingIndexResponse,
     FolderScanRequest,
     FolderScanResponse,
     FolderWatchStatus,
@@ -77,15 +48,8 @@ from .schemas import (
     MemoryKind,
     MemoryRead,
     MemoryUpdate,
-    ModelRunRead,
-    ModelRunRetryRequest,
-    ModelRunRetryResponse,
     NoteRead,
     Overview,
-    ProviderConfigurationRead,
-    ProviderConfigurationUpdate,
-    ProviderStatus,
-    SearchResponse,
     SourceCreate,
     SourceDeletionImpactRead,
     SourceRead,
@@ -93,10 +57,9 @@ from .schemas import (
     SourceVersionRead,
     WorkspaceCreate,
     WorkspaceRead,
-    normalize_retrieval_filters,
 )
 
-router = APIRouter(prefix="/api/v1")
+router: APIRouter = APIRouter(prefix="/api/v1")
 
 
 def resolve_workspace_id(
@@ -529,289 +492,6 @@ def retry_job(
         ) from exc
 
 
-@router.get("/model/provider", response_model=ProviderStatus)
-def model_provider_status(check_health: bool = False) -> ProviderStatus:
-    settings = get_settings()
-    try:
-        provider = build_generation_provider(settings)
-    except ProviderConfigurationError:
-        return ProviderStatus(
-            configured=False,
-            remote_egress_allowed=settings.allow_remote_ai,
-            error_code="provider_configuration_invalid",
-            mode="degraded",
-        )
-    if provider is None:
-        return ProviderStatus(
-            configured=False,
-            remote_egress_allowed=settings.allow_remote_ai,
-            error_code="provider_disabled",
-            mode="disabled",
-        )
-    capabilities = provider.capabilities()
-    healthy = provider.health() if check_health else None
-    return ProviderStatus(
-        configured=True,
-        provider_id=provider.id,
-        model_id=provider.model,
-        generation=capabilities.generation,
-        structured_output=capabilities.structured_output,
-        remote_egress_allowed=settings.allow_remote_ai,
-        healthy=healthy,
-        mode="ready" if healthy else "degraded" if healthy is False else "unchecked",
-    )
-
-
-@router.get("/model/embedding-provider", response_model=ProviderStatus)
-def embedding_provider_status(check_health: bool = False) -> ProviderStatus:
-    settings = get_settings()
-    try:
-        provider = build_embedding_provider(settings)
-    except ProviderConfigurationError:
-        return ProviderStatus(
-            configured=False,
-            remote_egress_allowed=settings.allow_remote_ai,
-            error_code="embedding_provider_configuration_invalid",
-            mode="degraded",
-        )
-    if provider is None:
-        return ProviderStatus(
-            configured=False,
-            remote_egress_allowed=settings.allow_remote_ai,
-            error_code="embedding_provider_disabled",
-            mode="disabled",
-        )
-    healthy = provider.health() if check_health else None
-    return ProviderStatus(
-        configured=True,
-        provider_id=provider.id,
-        model_id=provider.model,
-        generation=False,
-        structured_output=False,
-        embedding=True,
-        remote_egress_allowed=settings.allow_remote_ai,
-        healthy=healthy,
-        mode="ready" if healthy else "degraded" if healthy is False else "unchecked",
-    )
-
-
-def provider_configuration_read() -> ProviderConfigurationRead:
-    settings = get_settings()
-    return ProviderConfigurationRead(
-        ai_provider=settings.ai_provider,
-        ai_base_url=settings.ai_base_url,
-        ai_model=settings.ai_model,
-        ai_api_key_configured=bool(settings.ai_api_key),
-        embedding_provider=settings.embedding_provider,
-        embedding_base_url=settings.embedding_base_url,
-        embedding_model=settings.embedding_model,
-        embedding_api_key_configured=bool(settings.embedding_api_key),
-        allow_remote_ai=settings.allow_remote_ai,
-        secret_storage=secret_store.provider_secret_storage_kind(),
-    )
-
-
-@router.get("/model/configuration", response_model=ProviderConfigurationRead)
-def get_provider_configuration() -> ProviderConfigurationRead:
-    return provider_configuration_read()
-
-
-@router.put("/model/configuration", response_model=ProviderConfigurationRead)
-def update_provider_configuration(
-    payload: ProviderConfigurationUpdate,
-) -> ProviderConfigurationRead:
-    existing = load_provider_config()
-    values = payload.model_dump(exclude={"ai_api_key", "embedding_api_key"})
-    platform_secrets = secret_store.get_provider_secret_store(provider_config_path())
-    if platform_secrets is not None:
-        return _update_provider_configuration_with_secret_store(
-            payload, existing, values, platform_secrets
-        )
-    for field in ("ai_api_key", "embedding_api_key"):
-        supplied = getattr(payload, field)
-        if supplied is not None:
-            if supplied:
-                values[field] = supplied
-            else:
-                existing.pop(field, None)
-        elif field in existing:
-            values[field] = existing[field]
-    candidate = existing | values
-    save_provider_config(candidate)
-    try:
-        settings = get_settings()
-        build_generation_provider(settings)
-        build_embedding_provider(settings)
-    except ProviderConfigurationError as exc:
-        save_provider_config(existing)
-        raise HTTPException(status_code=422, detail="Provider configuration is invalid") from exc
-    return provider_configuration_read()
-
-
-def _update_provider_configuration_with_secret_store(
-    payload: ProviderConfigurationUpdate,
-    existing: dict,
-    values: dict,
-    platform_secrets: secret_store.ProviderSecretStore,
-) -> ProviderConfigurationRead:
-    fields = ("ai_api_key", "embedding_api_key")
-    try:
-        previous_secrets = {field: platform_secrets.get(field) for field in fields}
-    except secret_store.ProviderSecretStoreError as exc:
-        raise HTTPException(status_code=503, detail="OS keyring is unavailable") from exc
-    candidate = existing | values
-    try:
-        for field in fields:
-            supplied = getattr(payload, field)
-            if supplied is not None:
-                if supplied:
-                    platform_secrets.set(field, supplied)
-                else:
-                    platform_secrets.delete(field)
-            elif previous_secrets[field] is None and existing.get(field):
-                platform_secrets.set(field, existing[field])
-            candidate.pop(field, None)
-        save_provider_config(candidate)
-        settings = get_settings()
-        build_generation_provider(settings)
-        build_embedding_provider(settings)
-    except (ProviderConfigurationError, secret_store.ProviderSecretStoreError) as exc:
-        save_provider_config(existing)
-        _restore_provider_secrets(platform_secrets, previous_secrets)
-        if isinstance(exc, secret_store.ProviderSecretStoreError):
-            raise HTTPException(status_code=503, detail="OS keyring is unavailable") from exc
-        raise HTTPException(status_code=422, detail="Provider configuration is invalid") from exc
-    return provider_configuration_read()
-
-
-def _restore_provider_secrets(
-    platform_secrets: secret_store.ProviderSecretStore,
-    previous: dict[str, str | None],
-) -> None:
-    for field, value in previous.items():
-        if value is None:
-            platform_secrets.delete(field)
-        else:
-            platform_secrets.set(field, value)
-
-
-@router.get("/model/reranking-provider", response_model=ProviderStatus)
-def reranking_provider_status() -> ProviderStatus:
-    return ProviderStatus(
-        configured=False,
-        reranking=False,
-        mode="disabled",
-        error_code="reranking_provider_disabled",
-    )
-
-
-@router.post("/model/embeddings/index", response_model=EmbeddingIndexResponse)
-def index_embeddings(
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> EmbeddingIndexResponse:
-    try:
-        provider = build_embedding_provider(get_settings())
-        if provider is None:
-            raise HTTPException(status_code=409, detail="Embedding provider is disabled")
-        report = index_current_embeddings(session, provider, workspace_id=workspace_id)
-    except ProviderConfigurationError as exc:
-        raise HTTPException(
-            status_code=409, detail="Embedding provider configuration is invalid"
-        ) from exc
-    except (ProviderRequestError, EmbeddingValidationError) as exc:
-        raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
-    return EmbeddingIndexResponse(
-        indexed=report.indexed,
-        skipped=report.skipped,
-        model_run_ids=report.model_run_ids,
-    )
-
-
-@router.get("/model/runs", response_model=list[ModelRunRead])
-def list_model_runs(
-    run_status: str | None = Query(default=None, alias="status"),
-    operation: str | None = None,
-    provider_id: str | None = None,
-    parent_run_id: str | None = None,
-    limit: int = Query(default=50, ge=1, le=200),
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[ModelRun]:
-    query = select(ModelRun).where(ModelRun.workspace_id == workspace_id)
-    if run_status:
-        query = query.where(ModelRun.status == run_status)
-    if operation:
-        query = query.where(ModelRun.operation == operation)
-    if provider_id:
-        query = query.where(ModelRun.provider_id == provider_id)
-    if parent_run_id:
-        query = query.where(ModelRun.parent_run_id == parent_run_id)
-    return list(session.scalars(query.order_by(ModelRun.created_at.desc()).limit(limit)).all())
-
-
-@router.post("/model/runs/{run_id}/retry", response_model=ModelRunRetryResponse)
-def retry_model_run(
-    run_id: str,
-    payload: ModelRunRetryRequest,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> ModelRunRetryResponse:
-    parent = session.get(ModelRun, run_id)
-    if not parent or parent.workspace_id != workspace_id:
-        raise HTTPException(status_code=404, detail="Model run not found")
-    if parent.status not in {"failed", "dead_letter"}:
-        raise HTTPException(status_code=409, detail="Only failed model runs can be retried")
-    source = session.get(Source, payload.source_id)
-    if not source or source.workspace_id != workspace_id or not source.current_version_id:
-        raise HTTPException(status_code=404, detail="Source not found")
-    version = session.get(SourceVersion, source.current_version_id)
-    if not version or version.content_hash not in parent.input_hashes:
-        raise HTTPException(
-            status_code=409,
-            detail="Retry source revision does not match the original immutable input",
-        )
-    try:
-        provider = build_generation_provider(get_settings())
-        if provider is None:
-            raise HTTPException(status_code=409, detail="AI provider is disabled")
-        if provider.id != parent.provider_id or provider.model != parent.model_id:
-            raise HTTPException(
-                status_code=409,
-                detail="Configured provider must match the failed run; fallback is disabled",
-            )
-        memories, run = extract_memory_candidates(
-            session, source, provider, retry_parent_run_id=parent.id
-        )
-    except ProviderConfigurationError as exc:
-        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
-        retry_run_id = getattr(exc, "run_id", None)
-        raise HTTPException(
-            status_code=502,
-            detail="Model-run retry failed and remains inspectable",
-            headers={"X-Proofline-Model-Run-ID": retry_run_id} if retry_run_id else None,
-        ) from exc
-    return ModelRunRetryResponse(
-        parent_run_id=parent.id,
-        model_run_id=run.id,
-        status=run.status,
-        memory_count=len(memories),
-    )
-
-
-@router.get("/model/runs/{run_id}", response_model=ModelRunRead)
-def get_model_run(
-    run_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> ModelRun:
-    run = session.get(ModelRun, run_id)
-    if not run or run.workspace_id != workspace_id:
-        raise HTTPException(status_code=404, detail="Model run not found")
-    return run
-
-
 @router.get("/sources/{source_id}")
 def get_source(
     source_id: str,
@@ -865,62 +545,6 @@ def list_source_versions(
             .order_by(SourceVersion.created_at.desc())
         ).all()
     )
-
-
-@router.post("/sources/{source_id}/extract-decisions", response_model=list[DecisionRead])
-def extract_source_decisions(
-    source_id: str,
-    response: Response,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[DecisionRead]:
-    source = get_workspace_source(session, source_id, workspace_id)
-    try:
-        provider = build_generation_provider(get_settings())
-        if provider is None:
-            raise HTTPException(status_code=409, detail="AI provider is disabled")
-        decisions, run = extract_decision_candidates(session, source, provider)
-    except ProviderConfigurationError as exc:
-        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
-        run_id = getattr(exc, "run_id", None)
-        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
-        raise HTTPException(
-            status_code=502,
-            detail="model output could not produce grounded decision candidates",
-            headers=headers,
-        ) from exc
-    response.headers["X-Proofline-Model-Run-ID"] = run.id
-    return [decision_to_read(decision, source.title) for decision in decisions]
-
-
-@router.post("/sources/{source_id}/extract-memories", response_model=list[MemoryRead])
-def extract_source_memories(
-    source_id: str,
-    response: Response,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[MemoryRead]:
-    source = get_workspace_source(session, source_id, workspace_id)
-    try:
-        provider = build_generation_provider(get_settings())
-        if provider is None:
-            raise HTTPException(status_code=409, detail="AI provider is disabled")
-        memories, run = extract_memory_candidates(session, source, provider)
-    except ProviderConfigurationError as exc:
-        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (ProviderRequestError, StructuredOutputError, CandidateExtractionError) as exc:
-        run_id = getattr(exc, "run_id", None)
-        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
-        raise HTTPException(
-            status_code=502,
-            detail="model output could not produce grounded memory candidates",
-            headers=headers,
-        ) from exc
-    response.headers["X-Proofline-Model-Run-ID"] = run.id
-    return [
-        MemoryRead(**decision_to_read(memory, source.title).model_dump()) for memory in memories
-    ]
 
 
 @router.get(
@@ -1118,240 +742,13 @@ def list_audit_events(
     return list(session.scalars(query).all())
 
 
-@router.get("/search", response_model=SearchResponse)
-def search(
-    q: str = Query(min_length=2, max_length=500),
-    limit: int = Query(default=10, ge=1, le=50),
-    max_per_source: int = Query(default=2, ge=1, le=50),
-    min_semantic_score: float = Query(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        allow_inf_nan=False,
-    ),
-    hybrid: bool = True,
-    rerank: bool = False,
-    source_ids: list[str] | None = Query(default=None, alias="source_id"),
-    ingested_from: datetime | None = Query(default=None),
-    ingested_before: datetime | None = Query(default=None),
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> SearchResponse:
-    try:
-        source_ids, ingested_from, ingested_before = normalize_retrieval_filters(
-            source_ids, ingested_from, ingested_before
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    try:
-        embedding_provider = build_embedding_provider(get_settings()) if hybrid else None
-    except ProviderConfigurationError as exc:
-        raise HTTPException(
-            status_code=409, detail="Embedding provider configuration is invalid"
-        ) from exc
-    try:
-        hits = hybrid_search(
-            session,
-            q,
-            embedding_provider,
-            limit,
-            max_per_source=max_per_source,
-            min_semantic_score=min_semantic_score,
-            source_ids=source_ids,
-            ingested_from=ingested_from,
-            ingested_before=ingested_before,
-            reranker=DeterministicTokenReranker() if rerank else None,
-            workspace_id=workspace_id,
-        )
-    except (ProviderRequestError, EmbeddingValidationError) as exc:
-        raise HTTPException(status_code=502, detail="Embedding provider request failed") from exc
-    return SearchResponse(query=q, hits=hits)
-
-
-@router.post("/answers", response_model=AnswerResponse)
-def create_answer(
-    payload: AnswerRequest,
-    response: Response,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> AnswerResponse:
-    try:
-        settings = get_settings()
-        provider = build_generation_provider(settings)
-        embedding_provider = build_embedding_provider(settings)
-        answer = answer_question(
-            session,
-            payload.question,
-            provider,
-            embedding_provider,
-            payload.limit,
-            payload.max_per_source,
-            payload.min_semantic_score,
-            payload.source_ids,
-            payload.ingested_from,
-            payload.ingested_before,
-            reranker=DeterministicTokenReranker() if payload.rerank else None,
-            workspace_id=workspace_id,
-        )
-    except ProviderConfigurationError as exc:
-        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (
-        ProviderRequestError,
-        EmbeddingValidationError,
-        StructuredOutputError,
-        GroundingValidationError,
-    ) as exc:
-        run_id = getattr(exc, "run_id", None)
-        headers = {"X-Proofline-Model-Run-ID": run_id} if run_id else None
-        raise HTTPException(
-            status_code=502,
-            detail="model output could not produce a grounded answer",
-            headers=headers,
-        ) from exc
-    except EvidenceIntegrityError as exc:
-        raise HTTPException(status_code=500, detail="evidence integrity validation failed") from exc
-    if answer.model_run_id:
-        response.headers["X-Proofline-Model-Run-ID"] = answer.model_run_id
-    return answer
-
-
-@router.post(
-    "/action-proposals", response_model=ActionProposalRead, status_code=status.HTTP_201_CREATED
-)
-def create_action_proposal(
-    payload: ActionProposalCreate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> ActionProposal:
-    try:
-        settings = get_settings()
-        answer = answer_question(
-            session,
-            payload.question,
-            build_generation_provider(settings),
-            build_embedding_provider(settings),
-            payload.limit,
-            payload.max_per_source,
-            payload.min_semantic_score,
-            payload.source_ids,
-            payload.ingested_from,
-            payload.ingested_before,
-            reranker=DeterministicTokenReranker() if payload.rerank else None,
-            workspace_id=workspace_id,
-        )
-    except ProviderConfigurationError as exc:
-        raise HTTPException(status_code=409, detail="AI provider configuration is invalid") from exc
-    except (
-        ProviderRequestError,
-        EmbeddingValidationError,
-        StructuredOutputError,
-        GroundingValidationError,
-    ) as exc:
-        raise HTTPException(status_code=502, detail="grounded proposal generation failed") from exc
-    except EvidenceIntegrityError as exc:
-        raise HTTPException(status_code=500, detail="evidence integrity validation failed") from exc
-    if answer.status != "grounded" or answer.model_run_id is None:
-        raise HTTPException(
-            status_code=422 if answer.status == "insufficient_evidence" else 409,
-            detail=(
-                "Insufficient evidence for an action proposal"
-                if answer.status == "insufficient_evidence"
-                else "A generation provider is required for action proposals"
-            ),
-        )
-    proposal = ActionProposal(
-        workspace_id=workspace_id,
-        goal=payload.question,
-        body=answer.answer,
-        status="candidate",
-        model_run_id=answer.model_run_id,
-    )
-    for citation in answer.citations:
-        proposal.citations.append(
-            ProposalCitation(
-                source_id=citation.source_id,
-                source_version_id=citation.source_version_id,
-                chunk_id=citation.evidence_id,
-                source_title=citation.source_title,
-                quote=citation.content,
-                quote_hash=hashlib.sha256(citation.content.encode("utf-8")).hexdigest(),
-                start_offset=citation.start_offset,
-                end_offset=citation.end_offset,
-                start_line=citation.start_line,
-                end_line=citation.end_line,
-            )
-        )
-    session.add(proposal)
-    session.flush()
-    session.add(
-        AuditEvent(
-            workspace_id=workspace_id,
-            actor="model",
-            action="action_proposal.created",
-            object_type="action_proposal",
-            object_id=proposal.id,
-            before_json={},
-            after_json={"status": "candidate", "model_run_id": proposal.model_run_id},
-        )
-    )
-    session.commit()
-    session.refresh(proposal)
-    return proposal
-
-
-@router.get("/action-proposals", response_model=list[ActionProposalRead])
-def list_action_proposals(
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[ActionProposal]:
-    return list(
-        session.scalars(
-            select(ActionProposal)
-            .where(ActionProposal.workspace_id == workspace_id)
-            .options(selectinload(ActionProposal.citations))
-            .order_by(ActionProposal.created_at.desc())
-        ).all()
-    )
-
-
-@router.patch("/action-proposals/{proposal_id}", response_model=ActionProposalRead)
-def review_action_proposal(
-    proposal_id: str,
-    payload: ActionProposalReview,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> ActionProposal:
-    proposal = session.scalar(
-        select(ActionProposal)
-        .where(ActionProposal.id == proposal_id, ActionProposal.workspace_id == workspace_id)
-        .options(selectinload(ActionProposal.citations))
-    )
-    if proposal is None:
-        raise HTTPException(status_code=404, detail="Action proposal not found")
-    if proposal.status != "candidate":
-        raise HTTPException(status_code=409, detail="Action proposal was already reviewed")
-    before = proposal.status
-    proposal.status = payload.status
-    proposal.updated_at = utc_now()
-    session.add(
-        AuditEvent(
-            workspace_id=workspace_id,
-            actor="local_user",
-            action="action_proposal.reviewed",
-            object_type="action_proposal",
-            object_id=proposal.id,
-            before_json={"status": before},
-            after_json={"status": proposal.status},
-        )
-    )
-    session.commit()
-    session.refresh(proposal)
-    return proposal
-
-
+from .action_proposals_api import router as action_proposals_router  # noqa: E402
+from .answers_api import router as answers_router  # noqa: E402
 from .decision_impact_api import router as decision_impact_router  # noqa: E402
 from .decision_relations_api import router as decision_relations_router  # noqa: E402
 from .decision_review_api import router as decision_review_router  # noqa: E402
+from .extraction_api import router as extraction_router  # noqa: E402
+from .model_api import router as model_router  # noqa: E402
 from .notes_api import router as notes_router  # noqa: E402
 from .studio_api import router as studio_router  # noqa: E402
 
@@ -1360,3 +757,7 @@ router.include_router(notes_router)
 router.include_router(studio_router)
 router.include_router(decision_relations_router)
 router.include_router(decision_impact_router)
+router.include_router(action_proposals_router)
+router.include_router(answers_router)
+router.include_router(extraction_router)
+router.include_router(model_router)

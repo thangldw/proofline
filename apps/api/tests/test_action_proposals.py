@@ -28,7 +28,8 @@ def test_action_proposal_is_grounded_candidate_and_requires_review(client, sessi
     ).json()
     chunk = session.scalar(select(Chunk).where(Chunk.source_id == source["id"]))
     monkeypatch.setattr(
-        "proofline.api.build_generation_provider", lambda _settings: grounded_provider(chunk.id)
+        "proofline.provider_runtime.build_generation_provider",
+        lambda _settings: grounded_provider(chunk.id),
     )
 
     created = client.post(
@@ -104,7 +105,9 @@ def test_source_deletion_removes_entire_multi_source_proposal(client, session, m
             }
         )
     )
-    monkeypatch.setattr("proofline.api.build_generation_provider", lambda _settings: provider)
+    monkeypatch.setattr(
+        "proofline.provider_runtime.build_generation_provider", lambda _settings: provider
+    )
     client.post("/api/v1/action-proposals", json={"question": "How should retries work?"}).json()
     impact = client.get(f"/api/v1/sources/{first['id']}/deletion-impact").json()
     assert impact["action_proposals"] == 1
