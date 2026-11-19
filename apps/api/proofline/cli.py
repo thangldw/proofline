@@ -49,6 +49,7 @@ from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
 from .decision_why import DecisionWhyError, why
+from .doctor import run_doctor
 from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
@@ -1004,6 +1005,27 @@ def _cmd_health_trend(args: argparse.Namespace, parser: argparse.ArgumentParser)
             print(f"{point.taken_at[:10]}  {ratio} {point.stale_percent:>5}%  {bar}")
 
 
+def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            checks = run_doctor(engine, session, policy_path=args.policy)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    failed = [item for item in checks if item.status == "fail"]
+    if args.format == "json":
+        print(
+            json.dumps(
+                {"ok": not failed, "checks": [item.model_dump() for item in checks]},
+                sort_keys=True,
+            )
+        )
+    else:
+        for item in checks:
+            print(f"[{item.status:<4}] {item.name}: {item.detail}")
+    if failed:
+        raise SystemExit(1)
+
+
 def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         result = run_stale_decision_demo(args.output_dir, force=args.force)
@@ -1294,6 +1316,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     health_trend.add_argument("--limit", type=int, default=30)
     health_trend.add_argument("--format", choices=("text", "json", "markdown"), default="text")
+    doctor = subcommands.add_parser(
+        "doctor", help="Read-only overview: migrations, integrity, policy, reviews, snapshots"
+    )
+    doctor.add_argument("--policy", type=Path)
+    doctor.add_argument("--format", choices=("text", "json"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
@@ -1354,6 +1381,7 @@ def main(argv: list[str] | None = None) -> None:
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
         "blame": _cmd_blame,
+        "doctor": _cmd_doctor,
         "snapshot-health": _cmd_snapshot_health,
         "health-trend": _cmd_health_trend,
         "export-adr": _cmd_export_adr,

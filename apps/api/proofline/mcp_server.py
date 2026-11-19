@@ -19,6 +19,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import __version__
 from .database import SessionLocal, engine
 from .decision_blame import DecisionBlameError, blame
+from .decision_conflicts import find_conflict_candidates
+from .decision_expiry import check_expiry
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_why import DecisionWhyError, why
@@ -36,6 +38,33 @@ MAX_TARGET_CHARS = 300
 TITLE_KEYS = ("root_decision_title", "impacted_decision_title")
 
 TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "check_expiry",
+        "description": (
+            "List approved decisions past their `Review by:` date (today, UTC), optionally also "
+            "those due within `warn_within_days`. Titles only if the operator enabled them."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"warn_within_days": {"type": "integer", "minimum": 0, "maximum": 3650}},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "find_conflicts",
+        "description": (
+            "List pairs of approved decisions that may contradict each other (shared title "
+            "words, different statements). Candidates for a person to judge, not verdicts. "
+            "Shared words are title text and appear only if titles are enabled."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "min_similarity": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+            },
+            "additionalProperties": False,
+        },
+    },
     {
         "name": "why_decision",
         "description": (
@@ -263,7 +292,46 @@ def _tool_why_decision(arguments: dict[str, Any], disclosure: Disclosure) -> Any
     return {"answer_count": len(documents), "answers": documents}
 
 
+def _tool_check_expiry(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    warn = arguments.get("warn_within_days", 0)
+    if set(arguments) - {"warn_within_days"}:
+        raise ToolError("arguments_invalid")
+    if isinstance(warn, bool) or not isinstance(warn, int) or not 0 <= warn <= 3650:
+        raise ToolError("arguments_invalid")
+    with SessionLocal() as session:
+        findings = check_expiry(session, as_of=utc_now().date(), warn_within_days=warn)
+    dump = (
+        (lambda item: item.model_dump())
+        if disclosure.titles
+        else (lambda item: item.content_free_model_dump())
+    )
+    return {"finding_count": len(findings), "findings": [dump(item) for item in findings]}
+
+
+def _tool_find_conflicts(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    similarity = arguments.get("min_similarity", 0.5)
+    if set(arguments) - {"min_similarity"}:
+        raise ToolError("arguments_invalid")
+    if (
+        isinstance(similarity, bool)
+        or not isinstance(similarity, int | float)
+        or not 0 < similarity <= 1
+    ):
+        raise ToolError("arguments_invalid")
+    with SessionLocal() as session:
+        found = find_conflict_candidates(session, min_similarity=float(similarity))
+    documents = []
+    for item in found:
+        document = item.model_dump()
+        if not disclosure.titles:
+            document.pop("shared_terms")
+        documents.append(document)
+    return {"candidate_count": len(documents), "candidates": documents}
+
+
 HANDLERS: dict[str, Callable[[dict[str, Any], Disclosure], Any]] = {
+    "check_expiry": _tool_check_expiry,
+    "find_conflicts": _tool_find_conflicts,
     "why_decision": _tool_why_decision,
     "blame_location": _tool_blame_location,
     "check_decisions": _tool_check_decisions,

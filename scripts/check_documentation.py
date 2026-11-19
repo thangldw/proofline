@@ -28,7 +28,7 @@ REQUIRED_TRILINGUAL = (
     "docs/pr-gate.md",
     "docs/mcp.md",
     "docs/roadmap.md",
-    "docs/releases/v2.7.0.md",
+    "docs/releases/v2.8.0.md",
     "docs/submission/openai-plugin.md",
     "skills/manage-evidence-decisions/SKILL.md",
     "skills/manage-evidence-decisions/references/commands.md",

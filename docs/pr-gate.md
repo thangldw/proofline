@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: thangldw/proofline@v2.7.0
+      - uses: thangldw/proofline@v2.8.0
         with:
           path: docs
           snapshot: .proofline/decisions.json
@@ -29,6 +29,8 @@ jobs:
 
 The action runs `proofline import`, `proofline sync`, and `proofline check-decisions`, writes a SARIF file, and exits non-zero when findings match the `fail_on` list in `proofline.toml`. Pin the action to a full commit SHA in production.
 
+Two more optional checks run in the same step and fail it independently: `check-expiry: "true"` fails when an approved decision is past its `Review by:` date, and `code-refs: "src docs"` (space-separated paths in your checkout) fails when a `proofline-decision: <id>` marker points at a missing, unapproved or stale decision.
+
 Optional pull-request comment: set `comment: "true"` and grant `pull-requests: write` to have the action create or update one content-free comment (decision ids, line ranges, reasons, downstream impact counts; no titles or quotes). It only runs on `pull_request` events and is skipped otherwise.
 
 ```yaml
@@ -36,7 +38,7 @@ permissions:
   contents: read
   pull-requests: write
 ...
-      - uses: thangldw/proofline@v2.7.0
+      - uses: thangldw/proofline@v2.8.0
         with:
           comment: "true"
           # path, snapshot, uri-root as above
@@ -56,6 +58,8 @@ Làm fail pull request khi tài liệu mà decision đã duyệt trích dẫn b�
 
 Action chạy `proofline import`, `proofline sync` và `proofline check-decisions`, ghi file SARIF và thoát khác 0 khi finding khớp danh sách `fail_on` trong `proofline.toml`. Ở production hãy pin action theo full commit SHA.
 
+Hai kiểm tra tùy chọn khác chạy trong cùng step và làm step fail độc lập: `check-expiry: "true"` fail khi decision đã duyệt quá hạn `Review by:`, và `code-refs: "src docs"` (các đường dẫn cách nhau bởi dấu cách) fail khi marker `proofline-decision: <id>` trỏ tới decision không tồn tại, chưa duyệt hoặc stale.
+
 Comment tùy chọn: đặt `comment: "true"` và cấp `pull-requests: write` để action tạo hoặc cập nhật một comment không chứa nội dung (id decision, dải dòng, lý do, số decision bị ảnh hưởng; không có title hay quote). Chỉ chạy với sự kiện `pull_request`.
 
 Quy mô: với 10.000 file Markdown tổng hợp, `proofline sync` lần đầu mất khoảng 51 s, re-sync không đổi khoảng 2,2 s, re-sync đổi 1% khoảng 2,8 s, `check-decisions` khoảng 0,4 s. Tái hiện bằng `python scripts/benchmark_workspace.py --documents 10000`.
@@ -71,6 +75,8 @@ Trust boundary: snapshot chỉ là file thường trong repository. Ai sửa đ�
 3. English 節の workflow を追加します。
 
 Action は `proofline import`、`proofline sync`、`proofline check-decisions` を実行し、SARIF file を出力し、`proofline.toml` の `fail_on` に該当する finding があれば non-zero で終了します。Production では action を full commit SHA に pin してください。
+
+任意の 2 つの検査が同じ step で独立して失敗します: `check-expiry: "true"` は承認済み decision が `Review by:` を過ぎると失敗し、`code-refs: "src docs"` (空白区切りの path) は `proofline-decision: <id>` marker が存在しない・未承認・stale の decision を指すと失敗します。
 
 Comment (任意): `comment: "true"` を設定し `pull-requests: write` を付与すると、内容を含まない comment (decision id、行範囲、理由、影響件数。title や quote なし) を 1 件作成または更新します。`pull_request` event でのみ動作します。
 

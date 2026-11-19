@@ -17,10 +17,16 @@ inputs:
     default: ""
   proofline-version:
     description: Exact proofline-evidence version to install from PyPI.
-    default: "2.7.0"
+    default: "2.8.0"
   sarif-output:
     description: Where to write the SARIF report.
     default: proofline-decision-health.sarif
+  check-expiry:
+    description: Also fail when an approved decision is past its Review by date.
+    default: "false"
+  code-refs:
+    description: Space-separated paths to scan for proofline-decision markers in code. Empty skips the scan.
+    default: ""
   comment:
     description: Post or update one content-free summary comment on the pull request. Needs the pull-requests write permission.
     default: "false"
@@ -52,6 +58,8 @@ runs:
         PL_URI_ROOT: ${{ inputs.uri-root }}
         PL_POLICY: ${{ inputs.policy }}
         PL_SARIF: ${{ inputs.sarif-output }}
+        PL_EXPIRY: ${{ inputs.check-expiry }}
+        PL_CODE_REFS: ${{ inputs.code-refs }}
       run: |
         set -uo pipefail
         proofline import "$PL_SNAPSHOT"
@@ -62,7 +70,19 @@ runs:
         echo "sarif-file=$PL_SARIF" >> "$GITHUB_OUTPUT"
         proofline check-decisions --format json --output "$RUNNER_TEMP/pl-decisions.json" "${policy_args[@]}"
         proofline check-impacts --format json --output "$RUNNER_TEMP/pl-impacts.json"
+        status=0
         proofline check-decisions "${policy_args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+        if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+        if [ "$PL_EXPIRY" = "true" ]; then
+          proofline check-expiry | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+        fi
+        if [ -n "$PL_CODE_REFS" ]; then
+          read -r -a ref_paths <<< "$PL_CODE_REFS"
+          proofline check-code-refs "${ref_paths[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+        fi
+        exit "$status"
     - name: Comment on the pull request
       if: always() && inputs.comment == 'true'
       shell: bash

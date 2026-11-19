@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.8.0] - 2026-11-19
+
+- Added `proofline doctor`, the read-only `check_expiry` and `find_conflicts` MCP tools, and the action inputs `check-expiry` and `code-refs`. No schema migration.
+
 ## [2.7.0] - 2026-11-19
 
 - Added `proofline snapshot-health` and `proofline health-trend` (counts-only history of how many approved decisions are stale). Migration 24 adds the `decision_health_snapshots` table; existing tables and export formats are unchanged. Measured WAL mode for faster first sync and recorded the trade-off in the roadmap instead of applying it.
