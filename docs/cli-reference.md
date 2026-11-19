@@ -16,6 +16,7 @@ Run `proofline COMMAND --help` for the exact option schema. Commands return zero
 | Recovery | `backup`, `verify-backup`, `restore-backup`, `verify-integrity` | Create/verify SQLite backup, atomically restore with rollback output, or check live provenance. |
 | Decision lookup | `blame` | `proofline blame docs/adr.md:42` lists approved decisions anchored at that file or line, with anchor state and current line span. |
 | Decision lookup | `why` | `proofline why "why SQLite?"` returns matching approved decisions with citation and a warning when the citation is stale. Deterministic term matching; no generated prose. |
+| Decision trend | `snapshot-health`, `health-trend` | `snapshot-health` records counts only (approved, stale, moved, changed, ambiguous, deleted; never text) per workspace; run it on a schedule. `health-trend` prints the series as text bars, JSON or a Markdown table. |
 | Decision export | `export-adr` | `export-adr --output-dir adr/` writes one numbered Markdown ADR per approved decision (status, source line span, rationale, quoted evidence, citation health). Refuses to overwrite without `--force`. |
 | Code links | `check-code-refs` | Scans files for `proofline-decision: <id or 8+ char prefix>` and exits 1 for references that are missing, ambiguous, unapproved or stale. Skips `.git`, `node_modules`, `.venv`. |
 | Conflict candidates | `find-conflicts` | Lists approved decision pairs with overlapping title words but different statements and no relation. Candidates for a person to judge, not verdicts. |
