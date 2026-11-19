@@ -42,6 +42,7 @@ from .decision_graph import build_graph, render_dot, render_mermaid
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_import import AdrImportError, import_adrs
+from .decision_notify import NotifyError, send_expiry_notification
 from .decision_policy import (
     DecisionPolicyError,
     load_decision_policy,
@@ -1087,6 +1088,40 @@ def _cmd_policy_schema(args: argparse.Namespace, parser: argparse.ArgumentParser
     print(render_policy_schema(), end="")
 
 
+def _cmd_notify(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    except ValueError:
+        _decision_check_failed("as_of_invalid")
+    try:
+        with SessionLocal() as session:
+            findings = check_expiry(session, as_of=as_of, warn_within_days=args.warn_within)
+        result = send_expiry_notification(
+            args.webhook,
+            findings,
+            as_of=as_of.isoformat(),
+            style=args.style,
+            always=args.always,
+        )
+    except NotifyError as exc:
+        _decision_check_failed(exc.code)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(
+        json.dumps(
+            {
+                "sent": result.sent,
+                "overdue": result.overdue,
+                "due_soon": result.due_soon,
+                "status": result.status,
+            },
+            sort_keys=True,
+        )
+    )
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1447,6 +1482,14 @@ def main(argv: list[str] | None = None) -> None:
     subcommands.add_parser(
         "policy-schema", help="Print the JSON Schema for proofline.toml (editor validation)"
     )
+    notify = subcommands.add_parser(
+        "notify", help="POST a content-free review-expiry alert to a webhook (id and counts only)"
+    )
+    notify.add_argument("--webhook", required=True, help="https URL (http only for loopback)")
+    notify.add_argument("--style", choices=("generic", "slack"), default="generic")
+    notify.add_argument("--as-of")
+    notify.add_argument("--warn-within", type=int, default=7, metavar="DAYS")
+    notify.add_argument("--always", action="store_true", help="Send even when nothing is due")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1549,6 +1592,7 @@ def main(argv: list[str] | None = None) -> None:
         "completion": _cmd_completion,
         "graph": _cmd_graph,
         "policy-schema": _cmd_policy_schema,
+        "notify": _cmd_notify,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
