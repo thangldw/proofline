@@ -28,9 +28,10 @@ A team that keeps its database on one machine can run this loop on a schedule:
 3. `proofline check-decisions --explain` for what is stale and the command that fixes it; `proofline rebind` previews and applies the fix with an audited reason.
 4. `proofline check-expiry --warn-within 30` for decisions with a `Review by:` or `Review every:` line that are due; `proofline check-code-refs src/` for code that cites a stale decision.
 5. `proofline find-conflicts` and `proofline suggest-links <id>` as prompts for a person to link or reject; neither changes data.
-6. `proofline health-trend --format markdown` for the weekly report, and `proofline export-adr --output-dir adr/ --force` to refresh readable ADRs.
+6. `proofline report --output health.html` for a shareable page (trend, stale citations, reviews due, possible conflicts; `--no-titles` withholds text), `proofline health-trend --format markdown` for the table alone, and `proofline export-adr --output-dir adr/ --force` to refresh readable ADRs.
+7. `proofline notify --webhook <url>` to post a content-free alert (ids, dates, counts) when reviews are due; it sends nothing when none are.
 
-In CI, the action covers steps 3 and 4 (`check-expiry`, `code-refs`) but not the history in step 1, because its workspace is discarded.
+Outside the schedule, `proofline watch <folder>` re-syncs on every change and `proofline hook install` checks code references before each commit. In CI, the action covers steps 3 and 4 (`check-expiry`, `code-refs`) but not the history in step 1, because its workspace is discarded.
 
 ### Attestation keys
 
@@ -91,9 +92,10 @@ Team giữ database trên một máy có thể chạy vòng lặp này theo lị
 3. `proofline check-decisions --explain` để biết cái gì stale và lệnh sửa; `proofline rebind` xem trước và áp dụng bản sửa kèm lý do được audit.
 4. `proofline check-expiry --warn-within 30` cho decision có dòng `Review by:` hoặc `Review every:` sắp đến hạn; `proofline check-code-refs src/` cho code trích dẫn decision đã stale.
 5. `proofline find-conflicts` và `proofline suggest-links <id>` làm gợi ý để người liên kết hoặc bỏ qua; cả hai không thay đổi dữ liệu.
-6. `proofline health-trend --format markdown` cho báo cáo tuần, và `proofline export-adr --output-dir adr/ --force` để làm mới ADR dễ đọc.
+6. `proofline report --output health.html` cho trang báo cáo chia sẻ được (xu hướng, citation stale, review đến hạn, xung đột có thể có; `--no-titles` ẩn nội dung), `proofline health-trend --format markdown` nếu chỉ cần bảng, và `proofline export-adr --output-dir adr/ --force` để làm mới ADR dễ đọc.
+7. `proofline notify --webhook <url>` để gửi cảnh báo không kèm nội dung (id, ngày, số đếm) khi có review đến hạn; không có gì đến hạn thì không gửi.
 
-Trong CI, action bao phủ bước 3 và 4 (`check-expiry`, `code-refs`) nhưng không có lịch sử của bước 1 vì workspace bị bỏ đi.
+Ngoài lịch, `proofline watch <folder>` đồng bộ lại mỗi khi có thay đổi và `proofline hook install` kiểm tra tham chiếu code trước mỗi commit. Trong CI, action bao phủ bước 3 và 4 (`check-expiry`, `code-refs`) nhưng không có lịch sử của bước 1 vì workspace bị bỏ đi.
 
 ### Attestation key
 
@@ -154,9 +156,10 @@ Bulk ingest 後に `proofline refresh-reviews --policy proofline.toml`、続い�
 3. `proofline check-decisions --explain` で何が stale かと修正コマンドを確認し、`proofline rebind` で監査付きの理由とともに修正をプレビュー・適用します。
 4. `proofline check-expiry --warn-within 30` で `Review by:` または `Review every:` 行を持つ期限間近の decision を、`proofline check-code-refs src/` で stale な decision を引用する code を確認します。
 5. `proofline find-conflicts` と `proofline suggest-links <id>` は、人が関連付けるか却下するかを判断するための提示で、どちらもデータを変更しません。
-6. `proofline health-trend --format markdown` で週次レポートを、`proofline export-adr --output-dir adr/ --force` で読みやすい ADR を更新します。
+6. `proofline report --output health.html` で共有できるページ (推移、stale な引用、期限間近の review、競合の可能性。`--no-titles` で本文を伏せます)、`proofline health-trend --format markdown` で表のみ、`proofline export-adr --output-dir adr/ --force` で読みやすい ADR を更新します。
+7. `proofline notify --webhook <url>` で review の期限が近いときに内容を含まない通知 (id、日付、件数) を送ります。該当がなければ送信しません。
 
-CI では action が手順 3 と 4 (`check-expiry`、`code-refs`) を担いますが、workspace が破棄されるため手順 1 の履歴は残りません。
+定期実行とは別に、`proofline watch <folder>` は変更のたびに再同期し、`proofline hook install` は commit 前に code の参照を確認します。CI では action が手順 3 と 4 (`check-expiry`、`code-refs`) を担いますが、workspace が破棄されるため手順 1 の履歴は残りません。
 
 ### Attestation key
 
