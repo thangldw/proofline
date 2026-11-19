@@ -252,7 +252,6 @@ def _ingest_prepared_file(
             return FolderScanFileResult(
                 relative_path=relative_path,
                 uri=uri,
-                workspace_id=workspace_id,
                 status="unchanged",
                 source_id=existing.id,
                 source_version_id=previous_version_id,

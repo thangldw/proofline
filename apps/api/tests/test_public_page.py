@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_public_docs_are_current_trilingual_and_release_scoped():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    release_notes = (ROOT / "docs/releases/v2.1.0.md").read_text(encoding="utf-8")
+    release_notes = (ROOT / "docs/releases/v2.1.1.md").read_text(encoding="utf-8")
     contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
     evidence_packages = (ROOT / "docs/evidence-packages.md").read_text(encoding="utf-8")
 
@@ -17,10 +17,10 @@ def test_public_docs_are_current_trilingual_and_release_scoped():
         assert language in readme
         assert language in release_notes
     assert "```mermaid" not in readme
-    assert "v2.1.0" in release_notes
-    assert "proofline sync" in release_notes
-    assert "composite GitHub Action" in release_notes
-    assert "not a trusted record" in release_notes
+    assert "v2.1.1" in release_notes
+    assert "mypy" in release_notes
+    assert "python-compat" in release_notes
+    assert "Compatibility and evidence limits" in release_notes
     assert "make test" in contributing
     for target in (
         "docs/getting-started.md",
@@ -37,7 +37,7 @@ def test_public_docs_are_current_trilingual_and_release_scoped():
     assert "trusted public key" in evidence_packages
     assert "transitive impact" in readme.lower()
     assert "single-user" in evidence_packages
-    assert "v2.1.0" in readme
+    assert "v2.1.1" in readme
 
 
 def test_default_decision_policy_and_ci_contract_are_committed():
@@ -56,7 +56,7 @@ def test_default_decision_policy_and_ci_contract_are_committed():
         "verify-attestation",
     ):
         assert required in workflow
-    assert workflow.count("python -m venv .venv") == 5
+    assert workflow.count("python -m venv .venv") == 6
     assert workflow.count(".venv/bin/proofline") == 10
     assert ".venv/bin/python -m build --outdir dist" in workflow
     assert ".venv/bin/python scripts/verify_release_artifacts.py" in workflow
@@ -80,6 +80,7 @@ def test_ci_can_verify_an_explicit_immutable_ref():
     jobs = workflow["jobs"]
     assert set(jobs) == {
         "python-test-and-quality",
+        "python-compat",
         "web-test-build-egress",
         "package-conformance",
         "release-artifacts",

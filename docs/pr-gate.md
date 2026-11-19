@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: thangldw/proofline@v2.1.0
+      - uses: thangldw/proofline@v2.1.1
         with:
           path: docs
           snapshot: .proofline/decisions.json

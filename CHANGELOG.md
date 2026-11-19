@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [2.1.1] - 2026-11-19
+
+- Added mypy to `make check` with a module ratchet, an 88% coverage gate, and a Python 3.12/3.13 `python-compat` CI job.
+- Moved the test client to `httpx2` and removed an ignored `workspace_id` keyword in folder scanning.
+
 ## [2.1.0] - 2026-11-19
 
 - Added `proofline sync`, a headless deterministic folder indexer with a stable `--uri-root`.
