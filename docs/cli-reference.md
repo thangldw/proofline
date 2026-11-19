@@ -16,6 +16,7 @@ Run `proofline COMMAND --help` for the exact option schema. Commands return zero
 | Recovery | `backup`, `verify-backup`, `restore-backup`, `verify-integrity` | Create/verify SQLite backup, atomically restore with rollback output, or check live provenance. |
 | Decision health | `check-decisions`, `refresh-reviews`, `check-impacts` | Run read-only stale/impact CI checks or persist the current review ledger. |
 | Headless sync | `sync` | Index a document folder without a server, under a stable `--uri-root`, so CI can reuse a committed snapshot. See [PR gate](pr-gate.md). |
+| Local MCP | `mcp` | Serve read-only decision checks to a local MCP client over stdio; titles are withheld unless `--include-titles`. See [MCP](mcp.md). |
 | Demo | `demo stale-decision` | Run the self-contained stale-citation story; output directory reuse requires `--force`. |
 
 Common verification examples:
