@@ -33,6 +33,7 @@ from .backup import (
 )
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
+from .decision_asof import AsOfError, decisions_as_of, parse_as_of
 from .decision_blame import DecisionBlameError, blame
 from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
 from .decision_conflicts import find_conflict_candidates, suggest_links
@@ -1173,6 +1174,34 @@ def _cmd_check_enforcement(args: argparse.Namespace, parser: argparse.ArgumentPa
         raise SystemExit(1)
 
 
+def _cmd_asof(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        moment = parse_as_of(args.moment)
+        with SessionLocal() as session:
+            answers = decisions_as_of(session, moment, question=args.question)
+    except AsOfError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        key = "content_free_model_dump" if args.no_titles else "model_dump"
+        print(
+            json.dumps(
+                {"as_of": moment.isoformat(), "decisions": [getattr(a, key)() for a in answers]},
+                sort_keys=True,
+            )
+        )
+        return
+    print(f"Decisions in force at {moment.isoformat(timespec='seconds')} UTC:")
+    if not answers:
+        print("  none")
+    for item in answers:
+        label = item.decision_id[:8] if args.no_titles else item.decision_title
+        flag = "" if item.health == "current" else f"  WARNING: citation {item.health}"
+        versions = f"v{item.cited_version_number}->v{item.version_in_force}"
+        print(f"  {label} [{item.status}] {versions}{flag}")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1554,6 +1583,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     enforcement.add_argument("--root", type=Path, default=Path("."))
     enforcement.add_argument("--format", choices=("text", "json"), default="text")
+    asof = subcommands.add_parser(
+        "asof", help="Show which approved decisions were in force at a past date or time (UTC)"
+    )
+    asof.add_argument("moment", help="YYYY-MM-DD (end of that day) or an ISO datetime")
+    asof.add_argument("question", nargs="?", help="Only decisions matching these words")
+    asof.add_argument("--format", choices=("text", "json"), default="text")
+    asof.add_argument("--no-titles", action="store_true")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1659,6 +1695,7 @@ def main(argv: list[str] | None = None) -> None:
         "policy-schema": _cmd_policy_schema,
         "notify": _cmd_notify,
         "check-enforcement": _cmd_check_enforcement,
+        "asof": _cmd_asof,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,

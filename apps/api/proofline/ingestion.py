@@ -14,6 +14,7 @@ from .decision_enforce import ENFORCE_LINE
 from .decision_expiry import REVIEW_LINE
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .models import (
+    AuditEvent,
     Chunk,
     Decision,
     Evidence,
@@ -351,6 +352,17 @@ def ingest_source(
                 source.content = payload.content
                 source.status = "indexed"
                 source.indexed_at = utc_now()
+                session.add(
+                    AuditEvent(
+                        workspace_id=source.workspace_id,
+                        actor="local_system",
+                        action="source.version_restored",
+                        object_type="source",
+                        object_id=source.id,
+                        before_json={"version_id": source.current_version_id},
+                        after_json={"version_id": prior.id},
+                    )
+                )
                 source.current_version_id = prior.id
                 if commit:
                     session.commit()
