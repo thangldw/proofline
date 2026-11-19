@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split `portability.py` into `portable_schema`, `portable_validation` and `portable_verify` (public API re-exported), and moved the notes, studio/study-card and decision-relation routes out of `api.py` into their own routers. The OpenAPI surface (70 operations) is unchanged.
+
 - Fixed all remaining mypy errors and removed the module ratchet; every module under `apps/api/proofline` is now type-checked in `make check`. Unreachable missing-row cases now raise explicit errors instead of `AttributeError`.
 
 ## [2.2.0] - 2026-11-19

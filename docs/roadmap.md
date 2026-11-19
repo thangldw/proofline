@@ -11,7 +11,6 @@ Items below are intentionally **not implemented**. Each needs something this rep
 | Key revocation | Needs a distribution channel for revocation lists. | A decision on publication and freshness rules. |
 | Semantic change classification | Needs an AI provider; the verdict must stay a human decision, so it can only propose. | A provider and an evaluation set that measures false positives. |
 | Real-team pilot evidence | Needs real team documents and permission to freeze them (`scripts/freeze_pilot_dataset.py` is ready). | A team willing to run the pilot. |
-| Splitting `api.py` and `portability.py` | Tests monkeypatch `proofline.api.*`; a safe split needs those seams moved first. | A dedicated refactor with the seams made explicit. |
 
 ## Tiếng Việt
 
@@ -22,7 +21,6 @@ Các mục dưới đây cố ý **chưa được triển khai**: mỗi mục c�
 - Key revocation: cần kênh phân phối danh sách thu hồi.
 - Phân loại thay đổi ngữ nghĩa: cần AI provider; verdict vẫn là quyết định của người nên chỉ có thể đề xuất.
 - Evidence từ pilot team thật: cần tài liệu thật và quyền đóng băng chúng (`scripts/freeze_pilot_dataset.py` đã sẵn sàng).
-- Tách `api.py` và `portability.py`: test đang monkeypatch `proofline.api.*`; muốn tách an toàn phải chuyển các seam đó trước.
 
 ## 日本語
 
@@ -33,4 +31,3 @@ Các mục dưới đây cố ý **chưa được triển khai**: mỗi mục c�
 - Key revocation: 失効 list の配布経路が必要です。
 - 意味的な変更の分類: AI provider が必要で、判断は人が行うため提案のみ可能です。
 - 実 team の pilot evidence: 実 document とその凍結許可が必要です (`scripts/freeze_pilot_dataset.py` は準備済み)。
-- `api.py` と `portability.py` の分割: test が `proofline.api.*` を monkeypatch するため、先に seam の移動が必要です。
