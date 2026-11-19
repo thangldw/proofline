@@ -1,0 +1,78 @@
+{
+  "$id": "https://github.com/thangldw/proofline/spec/decision-policy/v1/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision_health": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged_is_blocking": {
+          "type": "boolean"
+        },
+        "allow_waiver": {
+          "type": "boolean"
+        },
+        "fail_on": {
+          "description": "Anchor states that make check-decisions fail.",
+          "items": {
+            "enum": [
+              "ambiguous",
+              "changed",
+              "deleted",
+              "moved"
+            ],
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "max_open_age_days": {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "overrides": {
+          "description": "Per-directory fail_on; the longest matching path wins.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "fail_on": {
+                "items": {
+                  "enum": [
+                    "ambiguous",
+                    "changed",
+                    "deleted",
+                    "moved"
+                  ],
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "path": {
+                "pattern": "^(?!.*(^|/)\\.\\.(/|$))/*[^/]+.*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "fail_on"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "version": {
+      "const": 1,
+      "description": "Policy format version."
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "Proofline decision policy",
+  "type": "object"
+}

@@ -77,6 +77,7 @@ from .integrity import IntegrityVerificationError, verify_live_database
 from .mcp_server import serve_stdio
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .models import DecisionReview, SourceVersion, Workspace
+from .policy_schema import render_policy_schema
 from .portability import (
     PortabilityError,
     atomic_write_export,
@@ -1082,6 +1083,10 @@ def _cmd_graph(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
     print(render_dot(graph) if args.format == "dot" else render_mermaid(graph), end="")
 
 
+def _cmd_policy_schema(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    print(render_policy_schema(), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1439,6 +1444,9 @@ def main(argv: list[str] | None = None) -> None:
     graph.add_argument("--no-titles", action="store_true", help="Label nodes with short ids")
     graph.add_argument("--no-conflicts", action="store_true", help="Omit possible-conflict edges")
     graph.add_argument("--include-isolated", action="store_true", help="Also draw unlinked nodes")
+    subcommands.add_parser(
+        "policy-schema", help="Print the JSON Schema for proofline.toml (editor validation)"
+    )
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1540,6 +1548,7 @@ def main(argv: list[str] | None = None) -> None:
         "report": _cmd_report,
         "completion": _cmd_completion,
         "graph": _cmd_graph,
+        "policy-schema": _cmd_policy_schema,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
