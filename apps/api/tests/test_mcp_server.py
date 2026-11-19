@@ -61,6 +61,8 @@ def test_tool_list_is_read_only_and_closed():
         "search_evidence",
         "blame_location",
         "why_decision",
+        "check_expiry",
+        "find_conflicts",
     }
     assert all(tool["inputSchema"]["additionalProperties"] is False for tool in tools)
 
@@ -158,7 +160,7 @@ def test_cli_mcp_speaks_json_rpc_over_a_real_subprocess(tmp_path):
     assert completed.returncode == 0
     replies = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [reply["id"] for reply in replies] == [1, 2]
-    assert len(replies[1]["result"]["tools"]) == 6
+    assert len(replies[1]["result"]["tools"]) == 8
 
 
 JSON_VALUES = st.recursive(
@@ -271,3 +273,30 @@ def test_why_decision_withholds_text_unless_enabled(seeded):
 )
 def test_why_decision_rejects_bad_arguments(arguments):
     assert call("why_decision", arguments)["isError"] is True
+
+
+def test_expiry_and_conflict_tools_withhold_text_unless_titles_are_enabled(seeded):
+    expiry = json.loads(call("check_expiry", {"warn_within_days": 30})["content"][0]["text"])
+    assert expiry["finding_count"] == 0
+    plain = call("find_conflicts", {"min_similarity": 0.05})["content"][0]["text"]
+    assert "shared_terms" not in plain
+    titled = json.loads(
+        call("find_conflicts", {"min_similarity": 0.05}, include_titles=True)["content"][0]["text"]
+    )
+    assert all("shared_terms" in item for item in titled["candidates"])
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("check_expiry", {"warn_within_days": -1}),
+        ("check_expiry", {"warn_within_days": True}),
+        ("check_expiry", {"x": 1}),
+        ("find_conflicts", {"min_similarity": 0}),
+        ("find_conflicts", {"min_similarity": 1.5}),
+        ("find_conflicts", {"min_similarity": "a"}),
+        ("find_conflicts", {"x": 1}),
+    ],
+)
+def test_expiry_and_conflict_tools_reject_bad_arguments(tool, arguments):
+    assert call(tool, arguments)["isError"] is True
