@@ -95,7 +95,7 @@ def import_git_repository(
             failures.append({"path": file_path, "error_code": "git_file_too_large"})
             continue
         try:
-            content = raw.decode("utf-8")
+            content = raw.decode("utf-8") if isinstance(raw, bytes) else raw
         except UnicodeDecodeError:
             failures.append({"path": file_path, "error_code": "git_file_encoding_invalid"})
             continue

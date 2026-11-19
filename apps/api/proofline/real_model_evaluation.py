@@ -42,7 +42,8 @@ from .model_gateway import (
 from .models import Decision, ModelRun
 from .schemas import SourceCreate
 
-REAL_MODEL_SCHEMA = "proofline.real-model-comparison.v1"
+RealModelSchema = Literal["proofline.real-model-comparison.v1"]
+REAL_MODEL_SCHEMA: RealModelSchema = "proofline.real-model-comparison.v1"
 PROMPT_VERSIONS = ("memory-candidate-extraction-v1", "grounded-answer-v1")
 
 
@@ -76,7 +77,7 @@ class RealModelProviderSpec(BaseModel):
 
 
 class RealModelComparisonPlan(BaseModel):
-    schema_version: Literal[REAL_MODEL_SCHEMA]
+    schema_version: RealModelSchema
     extraction_dataset: str = Field(min_length=1)
     grounded_dataset: str = Field(min_length=1)
     providers: list[RealModelProviderSpec] = Field(min_length=2)
@@ -119,7 +120,7 @@ class ProviderPreflightReceipt(BaseModel):
 
 
 class RealModelPreflightReceipt(BaseModel):
-    schema_version: Literal[REAL_MODEL_SCHEMA]
+    schema_version: RealModelSchema
     receipt_kind: Literal["preflight"] = "preflight"
     observed_at: datetime
     proofline_version: str
@@ -169,7 +170,7 @@ class ProviderComparisonResult(BaseModel):
 
 
 class RealModelComparisonReceipt(BaseModel):
-    schema_version: Literal[REAL_MODEL_SCHEMA]
+    schema_version: RealModelSchema
     receipt_kind: Literal["comparison"] = "comparison"
     evidence_class: Literal["real_model", "mock_integration"]
     observed_at: datetime
@@ -239,7 +240,9 @@ def load_real_model_plan(path: Path) -> tuple[RealModelComparisonPlan, bytes]:
     return RealModelComparisonPlan.model_validate_json(raw), raw
 
 
-def _dataset_receipt(plan_path: Path, kind: str, configured_path: str) -> DatasetReceipt:
+def _dataset_receipt(
+    plan_path: Path, kind: Literal["extraction", "grounded_qa"], configured_path: str
+) -> DatasetReceipt:
     path = Path(configured_path).expanduser()
     if not path.is_absolute():
         path = (plan_path.parent / path).resolve()
@@ -341,7 +344,7 @@ def preflight_real_model_plan(
         if not allow_mock:
             raise ValueError("mock preflight requires --allow-mock or an injected provider factory")
         provider_factory = _build_scripted_mock_provider
-    environment = os.environ if environ is None else environ
+    environment = dict(os.environ) if environ is None else environ
     check = health_check or (lambda provider: provider.health())
     datasets = [
         _dataset_receipt(path, "extraction", plan.extraction_dataset),
@@ -619,7 +622,7 @@ def run_real_model_comparison(
     preflight = preflight_real_model_plan(
         path,
         allow_mock=allow_mock,
-        environ=environment,
+        environ=dict(environment),
         health_check=health_check,
         provider_factory=provider_factory,
     )
@@ -665,7 +668,9 @@ def run_real_model_comparison(
                 )
             )
     completed = sum(result.status == "completed" for result in results)
-    status = "completed" if completed == len(results) else "partial" if completed else "failed"
+    status: Literal["completed", "partial", "failed"] = (
+        "completed" if completed == len(results) else "partial" if completed else "failed"
+    )
     mock = plan.providers[0].execution_mode == "mock"
     return RealModelComparisonReceipt(
         schema_version=REAL_MODEL_SCHEMA,

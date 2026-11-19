@@ -9,6 +9,7 @@ import sys
 import tempfile
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
@@ -70,7 +71,7 @@ async def _serve(
     )
     task = asyncio.create_task(server.serve(sockets=[listener]))
     shutdown_task: asyncio.Task[None] | None = None
-    previous_handlers: dict[signal.Signals, object] = {}
+    previous_handlers: dict[signal.Signals, Any] = {}
     try:
         while not server.started and not task.done():
             await asyncio.sleep(0.01)

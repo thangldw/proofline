@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from threading import Lock
+from typing import Literal
 from urllib.parse import quote, unquote, urlparse
 
 from sqlalchemy import delete, insert, select
@@ -274,7 +275,7 @@ def _ingest_prepared_file(
         result = _failed_file(relative_path, "ingestion_error", uri=uri)
         return result.model_copy(update={"job_id": exc.job_id})
 
-    file_status = (
+    file_status: Literal["created", "updated", "unchanged"] = (
         "created"
         if created
         else "unchanged"
@@ -353,7 +354,7 @@ def scan_registered_folder(
     sources_by_uri: dict[str, list[Source]] = {}
     missing_sources_by_hash: dict[str, list[Source]] = {}
     for source in sources:
-        sources_by_uri.setdefault(source.uri, []).append(source)
+        sources_by_uri.setdefault(source.uri or "", []).append(source)
         source_path = _safe_file_uri(source.uri)
         if not source_path or not _is_within(source_path, scan_path):
             continue
@@ -397,7 +398,7 @@ def scan_registered_folder(
         status: sum(item.status == status for item in files)
         for status in ("created", "updated", "unchanged", "renamed", "failed")
     }
-    deletion_mode = "preview_only"
+    deletion_mode: Literal["preview_only", "confirmed_delete"] = "preview_only"
     deleted_count = 0
     confirmed_ids = payload.confirmed_missing_source_ids
     if confirmed_ids is not None:

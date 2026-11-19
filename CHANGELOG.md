@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed all remaining mypy errors and removed the module ratchet; every module under `apps/api/proofline` is now type-checked in `make check`. Unreachable missing-row cases now raise explicit errors instead of `AttributeError`.
+
 ## [2.2.0] - 2026-11-19
 
 - Added `proofline mcp`, a read-only local MCP server over stdio with title-withholding by default (`docs/mcp.md`).

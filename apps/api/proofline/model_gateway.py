@@ -420,6 +420,13 @@ def build_repair_request(request: GenerationRequest, error_code: str) -> Generat
     )
 
 
+def _require_run(session: Session, run_id: str) -> ModelRun:
+    run = session.get(ModelRun, run_id)
+    if run is None:
+        raise ProviderRequestError("model_run_missing", run_id=run_id)
+    return run
+
+
 def _mark_structured_failure(
     session: Session,
     run_id: str,
@@ -427,7 +434,7 @@ def _mark_structured_failure(
     started: float,
     error_code: str,
 ) -> None:
-    invalid = session.get(ModelRun, run_id)
+    invalid = _require_run(session, run_id)
     invalid.status = "failed"
     invalid.validation_status = "invalid"
     invalid.error_code = error_code
@@ -470,7 +477,7 @@ def run_generation(
         result = provider.generate(request)
     except Exception as exc:
         session.rollback()
-        failed = session.get(ModelRun, run.id)
+        failed = _require_run(session, run.id)
         exhausted = isinstance(exc, ProviderRequestError) and exc.retry_exhausted
         failed.status = "dead_letter" if exhausted else "failed"
         failed.error_code = (
@@ -502,7 +509,7 @@ def run_generation(
             _mark_structured_failure(session, run.id, result, started, error_code)
             raise StructuredOutputError(run.id, error_code) from None
 
-    completed = session.get(ModelRun, run.id)
+    completed = _require_run(session, run.id)
     completed.status = "succeeded"
     completed.validation_status = validation_status
     completed.latency_ms = round((time.monotonic() - started) * 1000)
@@ -534,7 +541,7 @@ def run_embedding(
         result = provider.embed(request)
     except Exception as exc:
         session.rollback()
-        failed = session.get(ModelRun, run.id)
+        failed = _require_run(session, run.id)
         exhausted = isinstance(exc, ProviderRequestError) and exc.retry_exhausted
         failed.status = "dead_letter" if exhausted else "failed"
         failed.error_code = (
@@ -562,7 +569,7 @@ def run_embedding(
             for vector in result.vectors
         )
     )
-    completed = session.get(ModelRun, run.id)
+    completed = _require_run(session, run.id)
     completed.latency_ms = round((time.monotonic() - started) * 1000)
     completed.prompt_tokens = result.prompt_tokens
     completed.finished_at = utc_now()

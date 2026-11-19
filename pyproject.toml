@@ -113,29 +113,3 @@ files = ["apps/api/proofline"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
-
-# Ratchet: these modules still carry pre-existing type errors (baseline of 2.1.0). Do not add
-# modules to this list; remove a module once its errors are fixed. New modules are checked.
-[[tool.mypy.overrides]]
-module = [
-  "proofline.api",
-  "proofline.backup",
-  "proofline.cli",
-  "proofline.decision_reviews",
-  "proofline.evaluation",
-  "proofline.evidence_packages",
-  "proofline.extraction",
-  "proofline.folder_scanning",
-  "proofline.git_ingestion",
-  "proofline.grounding",
-  "proofline.ingestion",
-  "proofline.integrity",
-  "proofline.model_gateway",
-  "proofline.pilot_simulation",
-  "proofline.portability",
-  "proofline.portable_import",
-  "proofline.real_model_evaluation",
-  "proofline.server",
-  "proofline.studio",
-]
-ignore_errors = true

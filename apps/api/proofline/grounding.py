@@ -52,6 +52,13 @@ class GroundingValidationError(RuntimeError):
         super().__init__(f"model run {run_id} failed grounding validation")
 
 
+def _source_workspace_id(session: Session, source_id: str) -> str:
+    source = session.get(Source, source_id)
+    if source is None:
+        raise ValueError("source_missing")
+    return source.workspace_id
+
+
 def validate_evidence_spans(session: Session, hits: list[SearchHit]) -> None:
     for hit in hits:
         version = session.get(SourceVersion, hit.source_version_id)
@@ -251,7 +258,7 @@ def answer_question(
             "input_hashes": sorted(
                 version.content_hash for version in versions.values() if version is not None
             ),
-            "workspace_id": session.get(Source, hits[0].source_id).workspace_id,
+            "workspace_id": _source_workspace_id(session, hits[0].source_id),
         }
     )
     hit_by_id = {hit.chunk_id: hit for hit in hits}

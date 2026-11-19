@@ -7,8 +7,9 @@ import sys
 from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
+from typing import Any, NoReturn, cast
 
-from sqlalchemy import select
+from sqlalchemy import Engine, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import __version__
@@ -118,12 +119,12 @@ def seed_demo() -> None:
     print(f"{'Indexed' if created else 'Already indexed'}: {source.title} ({source.id})")
 
 
-def _decision_check_failed(code: str) -> None:
+def _decision_check_failed(code: str) -> NoReturn:
     print(f"decision check failed: {code}", file=sys.stderr)
     raise SystemExit(2)
 
 
-def _impact_check_failed(code: str) -> None:
+def _impact_check_failed(code: str) -> NoReturn:
     print(f"impact check failed: {code}", file=sys.stderr)
     raise SystemExit(2)
 
@@ -167,6 +168,12 @@ def _reject_attestation_output_conflict(
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Subcommand branches reuse these names for unrelated report types.
+    report: Any
+    findings: Any
+    summary: Any
+    finding: Any
+    result: Any
     parser = argparse.ArgumentParser(prog="proofline")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -500,12 +507,12 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(1)
     elif args.command == "eval-real-model":
         try:
-            receipt = run_real_model_comparison(args.plan, allow_mock=args.allow_mock)
-            write_comparison_receipt(args.output, receipt, force=args.force)
+            comparison = run_real_model_comparison(args.plan, allow_mock=args.allow_mock)
+            write_comparison_receipt(args.output, comparison, force=args.force)
         except (FileExistsError, OSError, ValueError) as exc:
             raise SystemExit(f"real-model comparison failed: {type(exc).__name__}") from exc
-        print(receipt.model_dump_json(indent=2))
-        if receipt.status != "completed":
+        print(comparison.model_dump_json(indent=2))
+        if comparison.status != "completed":
             raise SystemExit(1)
     elif args.command == "benchmark":
         try:
@@ -801,7 +808,7 @@ def main(argv: list[str] | None = None) -> None:
         evaluated_at = _parse_impact_as_of(args.as_of)
         try:
             with SessionLocal() as session:
-                verify_live_database(session.get_bind())
+                verify_live_database(cast(Engine, session.get_bind()))
                 workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
                 findings = [
                     finding

@@ -20,6 +20,7 @@ from .model_gateway import (
     GenerationProvider,
     GenerationRequest,
     GenerationResult,
+    ModelCapabilities,
     ProviderRequestError,
     StructuredOutputError,
     parse_structured_content,
@@ -287,6 +288,12 @@ class DatasetScriptedGenerationProvider:
         self.title_by_uri = title_by_uri
         self.call_count = 0
         self.last_emitted_evidence_ids: list[str] = []
+
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities()
+
+    def health(self) -> bool:
+        return True
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         self.call_count += 1
@@ -859,6 +866,7 @@ def _evaluate_grounded_query(
     before_runs = session.scalar(select(func.count()).select_from(ModelRun)) or 0
     answer = None
     error_code = None
+    actual_status: str
     try:
         answer = answer_question(session, query.question, provider, limit=limit)
         actual_status = answer.status
@@ -895,8 +903,8 @@ def _evaluate_grounded_query(
         query_id=query.id,
         expected_status=query.expected_status,
         actual_status=actual_status,
-        expected_statement_kinds=expected_kinds,
-        actual_statement_kinds=actual_kinds,
+        expected_statement_kinds=list[str](expected_kinds),
+        actual_statement_kinds=list[str](actual_kinds),
         statement_kinds_match=actual_kinds == expected_kinds,
         expected_supporting_source_uris=expected_uris,
         resolved_source_uris=resolved_uris,
