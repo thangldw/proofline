@@ -21,6 +21,7 @@ from .database import SessionLocal, engine
 from .decision_blame import DecisionBlameError, blame
 from .decision_conflicts import find_conflict_candidates
 from .decision_expiry import check_expiry
+from .decision_graph import build_graph
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_why import DecisionWhyError, why
@@ -61,6 +62,23 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "min_similarity": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "decision_graph",
+        "description": (
+            "Return the relation graph of approved decisions: node identifiers with a stale "
+            "flag, and edges (`based_on`, `implements`, `supersedes`, ... or "
+            "`possible_conflict`). Node labels are decision titles and appear only if titles "
+            "are enabled."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "include_isolated": {"type": "boolean"},
+                "include_conflicts": {"type": "boolean"},
             },
             "additionalProperties": False,
         },
@@ -329,9 +347,30 @@ def _tool_find_conflicts(arguments: dict[str, Any], disclosure: Disclosure) -> A
     return {"candidate_count": len(documents), "candidates": documents}
 
 
+def _tool_decision_graph(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    if set(arguments) - {"include_isolated", "include_conflicts"} or any(
+        not isinstance(value, bool) for value in arguments.values()
+    ):
+        raise ToolError("arguments_invalid")
+    with SessionLocal() as session:
+        graph = build_graph(
+            session,
+            include_titles=disclosure.titles,
+            include_conflicts=arguments.get("include_conflicts", True),
+            include_isolated=arguments.get("include_isolated", False),
+        )
+    nodes = [
+        {"id": node.id, "stale": node.stale} | ({"title": node.label} if disclosure.titles else {})
+        for node in graph.nodes
+    ]
+    edges = [{"source": e.source, "target": e.target, "kind": e.kind} for e in graph.edges]
+    return {"node_count": len(nodes), "edge_count": len(edges), "nodes": nodes, "edges": edges}
+
+
 HANDLERS: dict[str, Callable[[dict[str, Any], Disclosure], Any]] = {
     "check_expiry": _tool_check_expiry,
     "find_conflicts": _tool_find_conflicts,
+    "decision_graph": _tool_decision_graph,
     "why_decision": _tool_why_decision,
     "blame_location": _tool_blame_location,
     "check_decisions": _tool_check_decisions,

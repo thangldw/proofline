@@ -63,6 +63,7 @@ def test_tool_list_is_read_only_and_closed():
         "why_decision",
         "check_expiry",
         "find_conflicts",
+        "decision_graph",
     }
     assert all(tool["inputSchema"]["additionalProperties"] is False for tool in tools)
 
@@ -160,7 +161,7 @@ def test_cli_mcp_speaks_json_rpc_over_a_real_subprocess(tmp_path):
     assert completed.returncode == 0
     replies = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [reply["id"] for reply in replies] == [1, 2]
-    assert len(replies[1]["result"]["tools"]) == 8
+    assert len(replies[1]["result"]["tools"]) == 9
 
 
 JSON_VALUES = st.recursive(
@@ -300,3 +301,32 @@ def test_expiry_and_conflict_tools_withhold_text_unless_titles_are_enabled(seede
 )
 def test_expiry_and_conflict_tools_reject_bad_arguments(tool, arguments):
     assert call(tool, arguments)["isError"] is True
+
+
+def test_decision_graph_tool_withholds_titles_and_validates_arguments(seeded, session):
+    from proofline.models import DecisionRelation
+
+    decision_id, title = seeded
+    other, _ = ingest_source(
+        session,
+        SourceCreate(title="b", uri="file:///b.md", content="Decision: Adopt Redis for caching."),
+    )
+    second = session.scalar(
+        select(Decision).where(Decision.source_version_id == other.current_version_id)
+    )
+    second.status = "accepted"
+    session.add(
+        DecisionRelation(
+            source_decision_id=second.id, target_decision_id=decision_id, kind="based_on"
+        )
+    )
+    session.commit()
+    plain = call("decision_graph")["content"][0]["text"]
+    body = json.loads(plain)
+    assert body["edge_count"] == 1 and body["edges"][0]["kind"] == "based_on"
+    assert {node["id"] for node in body["nodes"]} == {decision_id, second.id}
+    assert title not in plain and "Redis" not in plain and "title" not in body["nodes"][0]
+    titled = json.loads(call("decision_graph", include_titles=True)["content"][0]["text"])
+    assert all("title" in node for node in titled["nodes"])
+    for bad in ({"x": True}, {"include_isolated": "yes"}):
+        assert call("decision_graph", bad)["isError"] is True

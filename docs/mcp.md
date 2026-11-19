@@ -20,6 +20,7 @@ Register it with a client such as Claude Code or Claude Desktop:
 | `why_decision` | Approved decisions matching a `question` by deterministic term matching, with citation location and health (`current`, `changed`, `moved`, `ambiguous`, `deleted`). Titles with `--include-titles`; cited text and rationale (400 characters max) with `--include-excerpts`. |
 | `check_expiry` | Approved decisions past their `Review by:` date today (UTC); optional `warn_within_days`. Titles only with `--include-titles`. |
 | `find_conflicts` | Candidate contradicting pairs (`min_similarity` 0-1). Shared words are title text, so they appear only with `--include-titles`. |
+| `decision_graph` | Relation graph of approved decisions: node identifiers with a stale flag, edges with their kind (including `possible_conflict`); optional `include_isolated`, `include_conflicts`. Node titles only with `--include-titles`. |
 
 Disclosure: tool results go to whatever model the client uses. Decision titles are therefore omitted unless you start the server with `proofline mcp --include-titles`. Evidence excerpts are returned by `search_evidence` only with `proofline mcp --include-excerpts` (at most 400 characters each); source titles follow `--include-titles`. Citation text from decision checks is never returned. Errors carry a code only, never database content.
 
@@ -31,7 +32,7 @@ Trust boundary: the server reads your local database as you. Any process that ca
 
 Đăng ký với client như Claude Code hoặc Claude Desktop bằng cấu hình JSON ở phần English.
 
-Tool: `check_expiry` (decision quá hạn review), `find_conflicts` (cặp có thể mâu thuẫn; từ chung chỉ có với `--include-titles`), `why_decision` (decision khớp câu hỏi, kèm vị trí trích dẫn và health), `blame_location` (decision đã duyệt neo tại một file/dòng), `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (decision đã duyệt mà evidence trích dẫn không còn unchanged), `check_impacts` (decision bị ảnh hưởng gián tiếp qua `based_on` và `implements`), `list_decisions` (identifier, kind, status; lọc `status` và `limit` 1-100).
+Tool: `check_expiry` (decision quá hạn review), `find_conflicts` (cặp có thể mâu thuẫn; từ chung chỉ có với `--include-titles`), `why_decision` (decision khớp câu hỏi, kèm vị trí trích dẫn và health), `blame_location` (decision đã duyệt neo tại một file/dòng), `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (decision đã duyệt mà evidence trích dẫn không còn unchanged), `decision_graph` (đồ thị quan hệ: id, cờ stale, loại cạnh; title chỉ với `--include-titles`), `check_impacts` (decision bị ảnh hưởng gián tiếp qua `based_on` và `implements`), `list_decisions` (identifier, kind, status; lọc `status` và `limit` 1-100).
 
 Disclosure: kết quả tool đi tới model mà client dùng. Vì vậy title của decision bị bỏ trừ khi bạn chạy `proofline mcp --include-titles`. Citation text không bao giờ được trả về. Lỗi chỉ mang mã, không mang nội dung database.
 
