@@ -14,6 +14,7 @@
 - Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
 - Added the read-only `decision_graph` MCP tool (ids, stale flags and edge kinds; titles only with `--include-titles`).
 - Added executable decisions: `Enforce: forbid|require "text" in <glob>` and `Enforce: require file <glob>` lines, checked by `proofline check-enforcement`. Literal patterns only; rule lines are part of the cited text. No schema migration.
+- Added `proofline code-context`, the reverse of `blame`: the approved decisions touched by a code change (nearby `proofline-decision:` markers, edited cited text, applicable `Enforce:` rules). The action gains `enforce` and `code-context` inputs (default off; they need this release or newer).
 - Added `proofline asof <date|datetime> [question]`, which reconstructs which approved decisions were in force at a past moment and the health of their citations then. Reverting a source to earlier content now records a `source.version_restored` audit event so the timeline stays correct.
 
 ## [2.9.0] - 2026-11-19

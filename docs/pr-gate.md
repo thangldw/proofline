@@ -31,6 +31,8 @@ The action runs `proofline import`, `proofline sync`, and `proofline check-decis
 
 Two more optional checks run in the same step and fail it independently: `check-expiry: "true"` fails when an approved decision is past its `Review by:` date, and `code-refs: "src docs"` (space-separated paths in your checkout) fails when a `proofline-decision: <id>` marker points at a missing, unapproved or stale decision.
 
+Two further inputs need `proofline-version` 2.10.0 or newer: `enforce: "true"` fails when code violates an `Enforce:` rule of an approved decision (`proofline check-enforcement` in the checked-out workspace), and `code-context: "true"` appends, on pull requests, the decisions touched by the change to the job summary (informational; it needs `actions/checkout` with `fetch-depth: 0`).
+
 Optional pull-request comment: set `comment: "true"` and grant `pull-requests: write` to have the action create or update one content-free comment (decision ids, line ranges, reasons, downstream impact counts; no titles or quotes). It only runs on `pull_request` events and is skipped otherwise.
 
 ```yaml
@@ -60,6 +62,8 @@ Action chạy `proofline import`, `proofline sync` và `proofline check-decision
 
 Hai kiểm tra tùy chọn khác chạy trong cùng step và làm step fail độc lập: `check-expiry: "true"` fail khi decision đã duyệt quá hạn `Review by:`, và `code-refs: "src docs"` (các đường dẫn cách nhau bởi dấu cách) fail khi marker `proofline-decision: <id>` trỏ tới decision không tồn tại, chưa duyệt hoặc stale.
 
+Hai input nữa cần `proofline-version` 2.10.0 trở lên: `enforce: "true"` fail khi code vi phạm luật `Enforce:` của decision đã duyệt (`proofline check-enforcement` trong workspace đã checkout), và `code-context: "true"` thêm vào job summary, trên pull request, các decision bị thay đổi chạm tới (chỉ thông tin; cần `actions/checkout` với `fetch-depth: 0`).
+
 Comment tùy chọn: đặt `comment: "true"` và cấp `pull-requests: write` để action tạo hoặc cập nhật một comment không chứa nội dung (id decision, dải dòng, lý do, số decision bị ảnh hưởng; không có title hay quote). Chỉ chạy với sự kiện `pull_request`.
 
 Quy mô: với 10.000 file Markdown tổng hợp, `proofline sync` lần đầu mất khoảng 51 s, re-sync không đổi khoảng 2,2 s, re-sync đổi 1% khoảng 2,8 s, `check-decisions` khoảng 0,4 s. Tái hiện bằng `python scripts/benchmark_workspace.py --documents 10000`.
@@ -77,6 +81,8 @@ Trust boundary: snapshot chỉ là file thường trong repository. Ai sửa đ�
 Action は `proofline import`、`proofline sync`、`proofline check-decisions` を実行し、SARIF file を出力し、`proofline.toml` の `fail_on` に該当する finding があれば non-zero で終了します。Production では action を full commit SHA に pin してください。
 
 任意の 2 つの検査が同じ step で独立して失敗します: `check-expiry: "true"` は承認済み decision が `Review by:` を過ぎると失敗し、`code-refs: "src docs"` (空白区切りの path) は `proofline-decision: <id>` marker が存在しない・未承認・stale の decision を指すと失敗します。
+
+さらに 2 つの input は `proofline-version` 2.10.0 以降が必要です: `enforce: "true"` は code が承認済み decision の `Enforce:` ルールに違反すると失敗し (checkout した workspace で `proofline check-enforcement`)、`code-context: "true"` は pull request で変更が触れた decision を job summary に追記します (情報のみ。`fetch-depth: 0` の `actions/checkout` が必要です)。
 
 Comment (任意): `comment: "true"` を設定し `pull-requests: write` を付与すると、内容を含まない comment (decision id、行範囲、理由、影響件数。title や quote なし) を 1 件作成または更新します。`pull_request` event でのみ動作します。
 
