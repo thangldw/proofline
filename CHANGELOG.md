@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.
+
 - Added `proofline import-adr`, which converts existing Markdown ADRs into files the indexer extracts decisions from. No schema migration.
 - Added `proofline hook install|uninstall`, a git pre-commit hook that runs `check-code-refs` on staged files (and optionally `sync` plus `check-decisions`).
 - Added `proofline report`, a shareable HTML or Markdown health report (trend, stale citations, reviews due, possible conflicts) with an optional `--no-titles` mode.

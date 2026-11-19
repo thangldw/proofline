@@ -337,6 +337,24 @@ def ingest_source(
             current = session.get(SourceVersion, source.current_version_id)
             if current and current.content_hash == digest:
                 return source, False
+            prior = session.scalar(
+                select(SourceVersion).where(
+                    SourceVersion.source_id == source.id, SourceVersion.content_hash == digest
+                )
+            )
+            if prior is not None:
+                # Reverting to content this source already had: versions are immutable and
+                # unique per content, so point back at the existing one instead of duplicating.
+                source.title = payload.title
+                source.kind = payload.kind
+                source.content = payload.content
+                source.status = "indexed"
+                source.indexed_at = utc_now()
+                source.current_version_id = prior.id
+                if commit:
+                    session.commit()
+                    session.refresh(source)
+                return source, False
     if source is None:
         duplicate = (
             session.query(Source)
