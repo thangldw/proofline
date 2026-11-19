@@ -34,7 +34,10 @@ from .backup import (
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .decision_blame import DecisionBlameError, blame
+from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
+from .decision_conflicts import find_conflict_candidates
 from .decision_expiry import check_expiry
+from .decision_export import DecisionExportError, export_adrs
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_policy import (
@@ -628,6 +631,31 @@ def _cmd_blame(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
         print(f"  cited at lines {entry.cited_start_line}-{entry.cited_end_line}")
 
 
+EXPLANATIONS = {
+    "moved": "The cited text still exists but its surroundings changed.",
+    "changed": "The cited text was edited; a close candidate was found.",
+    "ambiguous": "The cited text now appears more than once in the source.",
+    "deleted": "The cited text no longer exists in the source.",
+}
+
+
+def _explain_finding(finding: Any, blocking: bool) -> list[str]:
+    lines = [EXPLANATIONS.get(finding.reason, finding.reason)]
+    lines.append("This blocks the gate." if blocking else "Warning only under the current policy.")
+    if finding.reason in {"moved", "changed"} and finding.candidate_start_line is not None:
+        lines.append(
+            f"Candidate now at lines {finding.candidate_start_line}-{finding.candidate_end_line}. "
+            "Fix: proofline refresh-reviews, then proofline rebind <review-id> "
+            '(preview the diff) and --apply --reason "...".'
+        )
+    elif finding.reason == "ambiguous":
+        lines.append("Fix: make the cited sentence unique in the source, then re-run the check.")
+    else:
+        lines.append("Fix: restore the text, or supersede the decision with a new one.")
+    lines.append(f'Inspect: proofline blame "{finding.source_title}"')
+    return lines
+
+
 def _cmd_check_decisions(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         policy = load_decision_policy(args.policy)
@@ -640,7 +668,9 @@ def _cmd_check_decisions(args: argparse.Namespace, parser: argparse.ArgumentPars
         _decision_check_failed(exc.code)
     except (OSError, SQLAlchemyError):
         _decision_check_failed("database_unavailable")
-    blocking = [finding for finding in findings if finding.reason in policy.fail_on]
+    blocking = [
+        finding for finding in findings if finding.reason in policy.fail_on_for(finding.source_uri)
+    ]
     if args.format == "sarif":
         document = build_decision_health_sarif(findings, policy)
     elif args.format == "json":
@@ -666,6 +696,9 @@ def _cmd_check_decisions(args: argparse.Namespace, parser: argparse.ArgumentPars
         for finding in findings:
             print("Decision requires review")
             print(f"{finding.locator} changed after this decision was approved.")
+            if args.explain:
+                for line in _explain_finding(finding, finding in blocking):
+                    print(f"  {line}")
     else:
         print("All approved decision citations resolve in current sources.")
     if blocking:
@@ -874,6 +907,61 @@ def _cmd_why(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
         print(f"  cited at {item.source_title}:{item.start_line}-{item.end_line}")
         if item.rationale:
             print(f"  because: {item.rationale}")
+
+
+def _cmd_export_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            exported = export_adrs(session, args.output_dir, force=args.force)
+    except (DecisionExportError, DecisionHealthError) as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(json.dumps({"exported": len(exported), "output_dir": str(args.output_dir)}))
+
+
+def _cmd_check_code_refs(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        refs = scan_code_refs(args.paths)
+        with SessionLocal() as session:
+            findings = check_code_refs(session, refs)
+    except (CodeRefError, DecisionHealthError) as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        document = {
+            "valid": not findings,
+            "reference_count": len(refs),
+            "findings": [item.model_dump() for item in findings],
+        }
+        print(json.dumps(document, sort_keys=True))
+    elif not findings:
+        print(f"{len(refs)} decision reference(s) in code are current.")
+    for item in findings if args.format == "text" else []:
+        print(f"{item.path}:{item.line}: {item.reference} -> {item.problem}")
+    if findings:
+        raise SystemExit(1)
+
+
+def _cmd_find_conflicts(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            candidates = find_conflict_candidates(session, min_similarity=args.min_similarity)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(json.dumps({"candidates": [c.model_dump() for c in candidates]}, sort_keys=True))
+        return
+    if not candidates:
+        print("No conflict candidates.")
+    for item in candidates:
+        shared = ", ".join(item.shared_terms)
+        print(f"{item.first_id} <-> {item.second_id}  ({item.similarity}; shared: {shared})")
+    if candidates:
+        print("Candidates only: a person decides whether they truly conflict.")
 
 
 def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -1142,12 +1230,31 @@ def main(argv: list[str] | None = None) -> None:
     why_parser.add_argument("question")
     why_parser.add_argument("--limit", type=int, default=5)
     why_parser.add_argument("--format", choices=("text", "json"), default="text")
+    export_adr = subcommands.add_parser(
+        "export-adr", help="Write one Markdown ADR per approved decision"
+    )
+    export_adr.add_argument("--output-dir", type=Path, required=True)
+    export_adr.add_argument("--force", action="store_true")
+    code_refs = subcommands.add_parser(
+        "check-code-refs",
+        help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
+    )
+    code_refs.add_argument("paths", nargs="+", type=Path)
+    code_refs.add_argument("--format", choices=("text", "json"), default="text")
+    conflicts = subcommands.add_parser(
+        "find-conflicts", help="List approved decisions that may contradict each other"
+    )
+    conflicts.add_argument("--min-similarity", type=float, default=0.5)
+    conflicts.add_argument("--format", choices=("text", "json"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
     )
     check_decisions.add_argument("--format", choices=("text", "json", "sarif"), default="text")
     check_decisions.add_argument("--policy", type=Path)
+    check_decisions.add_argument(
+        "--explain", action="store_true", help="Print the fix command for each finding"
+    )
     check_decisions.add_argument("--output", type=Path)
     refresh_reviews = subcommands.add_parser(
         "refresh-reviews",
@@ -1199,6 +1306,9 @@ def main(argv: list[str] | None = None) -> None:
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
         "blame": _cmd_blame,
+        "export-adr": _cmd_export_adr,
+        "check-code-refs": _cmd_check_code_refs,
+        "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
         "check-expiry": _cmd_check_expiry,
         "rebind": _cmd_rebind,

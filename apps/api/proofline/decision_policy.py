@@ -22,10 +22,49 @@ class DecisionHealthPolicy:
     acknowledged_is_blocking: bool = True
     allow_waiver: bool = True
     max_open_age_days: int = 14
+    overrides: tuple[tuple[str, frozenset[str]], ...] = ()
+
+    def fail_on_for(self, source_uri: str | None) -> frozenset[str]:
+        """States that block for a source: the longest matching directory override, else global."""
+
+        if source_uri is None:
+            return self.fail_on
+        haystack = "/" + source_uri.replace("\\", "/").split("//", 1)[-1].lstrip("/") + "/"
+        best: tuple[str, frozenset[str]] | None = None
+        for path, states in self.overrides:
+            if f"/{path}/" in haystack and (best is None or len(path) > len(best[0])):
+                best = (path, states)
+        return best[1] if best else self.fail_on
 
 
 def _schema_error() -> DecisionPolicyError:
     return DecisionPolicyError("policy_schema_invalid")
+
+
+def _parse_overrides(value: object) -> tuple[tuple[str, frozenset[str]], ...]:
+    if not isinstance(value, list):
+        raise _schema_error()
+    parsed: dict[str, frozenset[str]] = {}
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"path", "fail_on"}:
+            raise _schema_error()
+        path, states = item["path"], item["fail_on"]
+        if (
+            type(path) is not str
+            or not path.strip("/")
+            or ".." in path.split("/")
+            or not isinstance(states, list)
+            or any(
+                type(state) is not str or state not in BLOCKING_ANCHOR_STATES for state in states
+            )
+            or len(states) != len(set(states))
+        ):
+            raise _schema_error()
+        key = path.strip("/")
+        if key in parsed:
+            raise _schema_error()
+        parsed[key] = frozenset(states)
+    return tuple(sorted(parsed.items()))
 
 
 def _parse_policy(document: object) -> DecisionHealthPolicy:
@@ -43,6 +82,7 @@ def _parse_policy(document: object) -> DecisionHealthPolicy:
         "acknowledged_is_blocking",
         "allow_waiver",
         "max_open_age_days",
+        "overrides",
     }:
         raise _schema_error()
 
@@ -50,6 +90,7 @@ def _parse_policy(document: object) -> DecisionHealthPolicy:
     acknowledged_is_blocking = values.get("acknowledged_is_blocking", True)
     allow_waiver = values.get("allow_waiver", True)
     max_open_age_days = values.get("max_open_age_days", 14)
+    overrides = _parse_overrides(values.get("overrides", []))
     if (
         not isinstance(fail_on, list)
         or any(type(value) is not str or value not in BLOCKING_ANCHOR_STATES for value in fail_on)
@@ -65,6 +106,7 @@ def _parse_policy(document: object) -> DecisionHealthPolicy:
         acknowledged_is_blocking=acknowledged_is_blocking,
         allow_waiver=allow_waiver,
         max_open_age_days=max_open_age_days,
+        overrides=overrides,
     )
 
 
@@ -83,14 +125,17 @@ def load_decision_policy(path: Path | None) -> DecisionHealthPolicy:
 
 
 def policy_sha256(policy: DecisionHealthPolicy) -> str:
+    document: dict[str, object] = {
+        "acknowledged_is_blocking": policy.acknowledged_is_blocking,
+        "allow_waiver": policy.allow_waiver,
+        "fail_on": sorted(policy.fail_on),
+        "max_open_age_days": policy.max_open_age_days,
+        "version": policy.version,
+    }
+    if policy.overrides:
+        document["overrides"] = [[path, sorted(states)] for path, states in policy.overrides]
     canonical = json.dumps(
-        {
-            "acknowledged_is_blocking": policy.acknowledged_is_blocking,
-            "allow_waiver": policy.allow_waiver,
-            "fail_on": sorted(policy.fail_on),
-            "max_open_age_days": policy.max_open_age_days,
-            "version": policy.version,
-        },
+        document,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,

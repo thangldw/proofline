@@ -16,9 +16,15 @@ Run `proofline COMMAND --help` for the exact option schema. Commands return zero
 | Recovery | `backup`, `verify-backup`, `restore-backup`, `verify-integrity` | Create/verify SQLite backup, atomically restore with rollback output, or check live provenance. |
 | Decision lookup | `blame` | `proofline blame docs/adr.md:42` lists approved decisions anchored at that file or line, with anchor state and current line span. |
 | Decision lookup | `why` | `proofline why "why SQLite?"` returns matching approved decisions with citation and a warning when the citation is stale. Deterministic term matching; no generated prose. |
+| Decision export | `export-adr` | `export-adr --output-dir adr/` writes one numbered Markdown ADR per approved decision (status, source line span, rationale, quoted evidence, citation health). Refuses to overwrite without `--force`. |
+| Code links | `check-code-refs` | Scans files for `proofline-decision: <id or 8+ char prefix>` and exits 1 for references that are missing, ambiguous, unapproved or stale. Skips `.git`, `node_modules`, `.venv`. |
+| Conflict candidates | `find-conflicts` | Lists approved decision pairs with overlapping title words but different statements and no relation. Candidates for a person to judge, not verdicts. |
 | Decision repair | `rebind` | `rebind` lists pending reviews; `rebind <id>` shows a diff of cited vs current text; `rebind <id> --apply --reason "..."` re-anchors the decision. Ambiguous or candidate-less reviews are refused. |
 | Decision review dates | `check-expiry` | Exit 1 when an approved decision has a `Review by: YYYY-MM-DD` line in its cited text that is in the past (`--as-of`, `--warn-within DAYS`, `--format json`). Changing the date is a reviewed edit: the citation changes, then `rebind` accepts it. |
 | Decision health | `check-decisions`, `refresh-reviews`, `check-impacts` | Run read-only stale/impact CI checks or persist the current review ledger. |
+
+`check-decisions --explain` prints, for each finding, why it fires, whether it blocks under the policy, and the command that fixes it. Directory overrides in `proofline.toml` set a different blocking list per path, for example `overrides = [{path = "notes", fail_on = []}, {path = "docs/adr", fail_on = ["moved", "changed"]}]` under `[decision_health]`; the longest matching directory wins and an override changes the policy hash.
+
 | Headless sync | `sync` | Index a document folder without a server, under a stable `--uri-root`, so CI can reuse a committed snapshot. See [PR gate](pr-gate.md). |
 | Local MCP | `mcp` | Serve read-only decision checks to a local MCP client over stdio; titles and evidence excerpts are withheld unless `--include-titles` / `--include-excerpts`. See [MCP](mcp.md). |
 | Demo | `demo stale-decision` | Run the self-contained stale-citation story; output directory reuse requires `--force`. |
