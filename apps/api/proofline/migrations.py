@@ -713,6 +713,13 @@ def _add_evidence_first_studio(connection: Connection) -> None:
     )
 
 
+def _index_source_uri_lookup(connection: Connection) -> None:
+    """Folder sync and ingestion look sources up by (workspace, uri); avoid full-table scans."""
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_sources_workspace_uri ON sources (workspace_id, uri)"
+    )
+
+
 def _add_decision_review_ledger(connection: Connection) -> None:
     columns = {column["name"] for column in inspect(connection).get_columns("evidence")}
     additions = {
@@ -850,6 +857,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (20, "grounded human-reviewed action proposals", _add_grounded_action_proposals),
     (21, "evidence-first deterministic studio", _add_evidence_first_studio),
     (22, "decision evidence review ledger", _add_decision_review_ledger),
+    (23, "source uri lookup index", _index_source_uri_lookup),
 )
 
 

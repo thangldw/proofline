@@ -2,12 +2,13 @@
 
 ## Unreleased
 
+## [2.3.0] - 2026-11-19
+
+- Added an opt-in content-free pull-request comment to the PR gate action, a read-only `search_evidence` MCP tool (`--include-excerpts`), `verify-attestation --revocations`, and `scripts/benchmark_workspace.py`.
+- Migration 23 indexes `sources(workspace_id, uri)`; no-change folder re-sync on 10,000 files fell from about 16.5 s to 2.2 s.
 - Split the 750-line `cli.main` dispatch into one function per subcommand, removing the `Any` workaround from the mypy cleanup. Raised the coverage gate to 89%.
-
 - Moved the model, extraction, answers/search and action-proposal routes out of `api.py` (1362 to 763 lines). Route modules now build providers through `proofline.provider_runtime.build_generation_provider`, a single call-time seam; tests patch that instead of `proofline.api`. OpenAPI is unchanged.
-
 - Split `portability.py` into `portable_schema`, `portable_validation` and `portable_verify` (public API re-exported), and moved the notes, studio/study-card and decision-relation routes out of `api.py` into their own routers. The OpenAPI surface (70 operations) is unchanged.
-
 - Fixed all remaining mypy errors and removed the module ratchet; every module under `apps/api/proofline` is now type-checked in `make check`. Unreachable missing-row cases now raise explicit errors instead of `AttributeError`.
 
 ## [2.2.0] - 2026-11-19

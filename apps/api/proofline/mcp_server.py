@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import IO, Any
 
 from sqlalchemy import select
@@ -21,14 +22,33 @@ from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .integrity import IntegrityVerificationError, verify_live_database
 from .models import Decision, Workspace, utc_now
+from .retrieval import lexical_search
 
 PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 MAX_LINE_BYTES = 1_000_000
 MAX_LIST_LIMIT = 100
+MAX_QUERY_CHARS = 500
+MAX_EXCERPT_CHARS = 400
 TITLE_KEYS = ("root_decision_title", "impacted_decision_title")
 
 TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "search_evidence",
+        "description": (
+            "Lexical search over current source versions. Returns chunk identifiers and line "
+            "spans; excerpts and source titles are included only if the operator enabled them."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "minLength": 1, "maxLength": MAX_QUERY_CHARS},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
     {
         "name": "check_decisions",
         "description": (
@@ -60,6 +80,14 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
+@dataclass(frozen=True)
+class Disclosure:
+    """What the operator allowed to leave this process toward the client's model."""
+
+    titles: bool = False
+    excerpts: bool = False
+
+
 class ToolError(ValueError):
     def __init__(self, code: str) -> None:
         self.code = code
@@ -70,18 +98,18 @@ def _text(document: Any) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": json.dumps(document, sort_keys=True)}]}
 
 
-def _tool_check_decisions(arguments: dict[str, Any], include_titles: bool) -> Any:
+def _tool_check_decisions(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
     with SessionLocal() as session:
         findings = check_decision_health(session)
     dump = (
         (lambda item: item.model_dump())
-        if include_titles
+        if disclosure.titles
         else (lambda item: item.content_free_model_dump())
     )
     return {"finding_count": len(findings), "findings": [dump(item) for item in findings]}
 
 
-def _tool_check_impacts(arguments: dict[str, Any], include_titles: bool) -> Any:
+def _tool_check_impacts(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
     evaluated_at = utc_now()
     with SessionLocal() as session:
         verify_live_database(engine)
@@ -94,14 +122,14 @@ def _tool_check_impacts(arguments: dict[str, Any], include_titles: bool) -> Any:
             )
         ]
     documents = [item.model_dump() for item in findings]
-    if not include_titles:
+    if not disclosure.titles:
         for document in documents:
             for key in TITLE_KEYS:
                 document.pop(key, None)
     return {"finding_count": len(documents), "findings": documents}
 
 
-def _tool_list_decisions(arguments: dict[str, Any], include_titles: bool) -> Any:
+def _tool_list_decisions(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
     unknown = set(arguments) - {"status", "limit"}
     status = arguments.get("status")
     limit = arguments.get("limit", 50)
@@ -117,16 +145,45 @@ def _tool_list_decisions(arguments: dict[str, Any], include_titles: bool) -> Any
         decisions = []
         for row in rows:
             item: dict[str, Any] = {"id": row.id, "kind": row.kind, "status": row.status}
-            if include_titles:
+            if disclosure.titles:
                 item["title"] = row.title
             decisions.append(item)
     return {"decisions": decisions}
 
 
-HANDLERS: dict[str, Callable[[dict[str, Any], bool], Any]] = {
+def _tool_search_evidence(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    query = arguments.get("query")
+    limit = arguments.get("limit", 5)
+    if set(arguments) - {"query", "limit"} or not isinstance(query, str):
+        raise ToolError("arguments_invalid")
+    if not query.strip() or len(query) > MAX_QUERY_CHARS:
+        raise ToolError("arguments_invalid")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+        raise ToolError("arguments_invalid")
+    with SessionLocal() as session:
+        hits = lexical_search(session, query, limit=limit)
+    results = []
+    for hit in hits:
+        item: dict[str, Any] = {
+            "chunk_id": hit.chunk_id,
+            "source_id": hit.source_id,
+            "source_version_id": hit.source_version_id,
+            "start_line": hit.start_line,
+            "end_line": hit.end_line,
+        }
+        if disclosure.titles:
+            item["source_title"] = hit.source_title
+        if disclosure.excerpts:
+            item["excerpt"] = hit.content[:MAX_EXCERPT_CHARS]
+        results.append(item)
+    return {"result_count": len(results), "results": results}
+
+
+HANDLERS: dict[str, Callable[[dict[str, Any], Disclosure], Any]] = {
     "check_decisions": _tool_check_decisions,
     "check_impacts": _tool_check_impacts,
     "list_decisions": _tool_list_decisions,
+    "search_evidence": _tool_search_evidence,
 }
 
 
@@ -134,7 +191,7 @@ def _error(request_id: Any, code: int, message: str) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
 
-def _call_tool(params: Any, include_titles: bool) -> dict[str, Any]:
+def _call_tool(params: Any, disclosure: Disclosure) -> dict[str, Any]:
     if not isinstance(params, dict) or not isinstance(params.get("name"), str):
         raise ToolError("params_invalid")
     handler = HANDLERS.get(params["name"])
@@ -146,7 +203,7 @@ def _call_tool(params: Any, include_titles: bool) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise ToolError("arguments_invalid")
     try:
-        return _text(handler(arguments, include_titles))
+        return _text(handler(arguments, disclosure))
     except ToolError:
         raise
     except (DecisionHealthError, IntegrityVerificationError) as exc:
@@ -155,7 +212,9 @@ def _call_tool(params: Any, include_titles: bool) -> dict[str, Any]:
         raise ToolError("database_unavailable") from exc
 
 
-def handle_message(message: Any, *, include_titles: bool = False) -> dict[str, Any] | None:
+def handle_message(
+    message: Any, *, include_titles: bool = False, include_excerpts: bool = False
+) -> dict[str, Any] | None:
     """Return the JSON-RPC response for one message, or ``None`` for notifications."""
 
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
@@ -183,7 +242,7 @@ def handle_message(message: Any, *, include_titles: bool = False) -> dict[str, A
         result = {"tools": TOOLS}
     elif method == "tools/call":
         try:
-            result = _call_tool(params, include_titles)
+            result = _call_tool(params, Disclosure(include_titles, include_excerpts))
         except ToolError as exc:
             result = {
                 "isError": True,
@@ -194,7 +253,13 @@ def handle_message(message: Any, *, include_titles: bool = False) -> dict[str, A
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
-def serve_stdio(stdin: IO[str], stdout: IO[str], *, include_titles: bool = False) -> None:
+def serve_stdio(
+    stdin: IO[str],
+    stdout: IO[str],
+    *,
+    include_titles: bool = False,
+    include_excerpts: bool = False,
+) -> None:
     for line in stdin:
         if not line.strip():
             continue
@@ -206,7 +271,9 @@ def serve_stdio(stdin: IO[str], stdout: IO[str], *, include_titles: bool = False
             except json.JSONDecodeError:
                 response = _error(None, -32700, "parse_error")
             else:
-                response = handle_message(message, include_titles=include_titles)
+                response = handle_message(
+                    message, include_titles=include_titles, include_excerpts=include_excerpts
+                )
         if response is not None:
             stdout.write(json.dumps(response, sort_keys=True) + "\n")
             stdout.flush()

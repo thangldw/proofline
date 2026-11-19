@@ -24,10 +24,11 @@ def rpc(method, params=None, request_id=1, **extra):
     return message
 
 
-def call(name, arguments=None, *, include_titles=False):
+def call(name, arguments=None, *, include_titles=False, include_excerpts=False):
     response = mcp_server.handle_message(
         rpc("tools/call", {"name": name, "arguments": arguments or {}}),
         include_titles=include_titles,
+        include_excerpts=include_excerpts,
     )
     assert response is not None
     return response["result"]
@@ -57,6 +58,7 @@ def test_tool_list_is_read_only_and_closed():
         "check_decisions",
         "check_impacts",
         "list_decisions",
+        "search_evidence",
     }
     assert all(tool["inputSchema"]["additionalProperties"] is False for tool in tools)
 
@@ -154,7 +156,7 @@ def test_cli_mcp_speaks_json_rpc_over_a_real_subprocess(tmp_path):
     assert completed.returncode == 0
     replies = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [reply["id"] for reply in replies] == [1, 2]
-    assert len(replies[1]["result"]["tools"]) == 3
+    assert len(replies[1]["result"]["tools"]) == 4
 
 
 JSON_VALUES = st.recursive(
@@ -177,3 +179,40 @@ JSON_VALUES = st.recursive(
 def test_handle_message_never_raises_on_arbitrary_json(message):
     response = mcp_server.handle_message(message)
     assert response is None or response["jsonrpc"] == "2.0"
+
+
+def test_search_evidence_returns_spans_and_discloses_text_only_when_enabled(seeded):
+    arguments = {"query": "NATS network"}
+    plain = call("search_evidence", arguments)["content"][0]["text"]
+    body = json.loads(plain)
+    assert body["result_count"] >= 1
+    first = body["results"][0]
+    assert {"chunk_id", "source_id", "start_line", "end_line"} <= set(first)
+    assert "NATS" not in plain and "adr" not in first.values()
+    assert "excerpt" not in first and "source_title" not in first
+    with_excerpt = json.loads(
+        call("search_evidence", arguments, include_excerpts=True)["content"][0]["text"]
+    )
+    assert "NATS" in with_excerpt["results"][0]["excerpt"]
+    assert len(with_excerpt["results"][0]["excerpt"]) <= mcp_server.MAX_EXCERPT_CHARS
+    titled = json.loads(
+        call("search_evidence", arguments, include_titles=True)["content"][0]["text"]
+    )
+    assert titled["results"][0]["source_title"] == "adr"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {},
+        {"query": ""},
+        {"query": "  "},
+        {"query": 3},
+        {"query": "x" * 501},
+        {"query": "a", "limit": 0},
+        {"query": "a", "limit": 21},
+        {"query": "a", "extra": 1},
+    ],
+)
+def test_search_evidence_rejects_bad_arguments(arguments):
+    assert call("search_evidence", arguments)["isError"] is True
