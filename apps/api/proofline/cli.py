@@ -33,6 +33,7 @@ from .backup import (
 )
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
+from .decision_blame import DecisionBlameError, blame
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_policy import (
@@ -589,6 +590,41 @@ def _cmd_verify_integrity(args: argparse.Namespace, parser: argparse.ArgumentPar
     print(json.dumps(report, sort_keys=True))
 
 
+def _cmd_blame(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    target: str = args.target
+    line: int | None = args.line
+    head, sep, tail = target.rpartition(":")
+    if line is None and sep and tail.isdigit() and head:
+        target, line = head, int(tail)
+    try:
+        with SessionLocal() as session:
+            entries = blame(session, target, line)
+    except DecisionBlameError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(
+            json.dumps(
+                {"target": target, "line": line, "entries": [e.model_dump() for e in entries]},
+                sort_keys=True,
+            )
+        )
+        return
+    if not entries:
+        print("No approved decision is anchored here.")
+        return
+    for entry in entries:
+        where = (
+            f"{entry.current_start_line}-{entry.current_end_line}"
+            if entry.current_start_line is not None
+            else "no longer present"
+        )
+        print(f"[{entry.state}] {entry.decision_title} ({entry.decision_id})")
+        print(f"  status {entry.decision_status}; now at lines {where}")
+        print(f"  cited at lines {entry.cited_start_line}-{entry.cited_end_line}")
+
+
 def _cmd_check_decisions(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         policy = load_decision_policy(args.policy)
@@ -970,6 +1006,12 @@ def main(argv: list[str] | None = None) -> None:
     subcommands.add_parser(
         "verify-integrity", help="Verify live SQLite provenance without changing it"
     )
+    blame_parser = subcommands.add_parser(
+        "blame", help="Show the approved decisions anchored at a file or file:line"
+    )
+    blame_parser.add_argument("target", help="Source path, URI or title, optionally with :LINE")
+    blame_parser.add_argument("--line", type=int)
+    blame_parser.add_argument("--format", choices=("text", "json"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
@@ -1026,6 +1068,7 @@ def main(argv: list[str] | None = None) -> None:
         "verify-backup": _cmd_verify_backup,
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
+        "blame": _cmd_blame,
         "check-decisions": _cmd_check_decisions,
         "check-impacts": _cmd_check_impacts,
         "refresh-reviews": _cmd_refresh_reviews,

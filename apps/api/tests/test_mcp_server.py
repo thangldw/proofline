@@ -59,6 +59,7 @@ def test_tool_list_is_read_only_and_closed():
         "check_impacts",
         "list_decisions",
         "search_evidence",
+        "blame_location",
     }
     assert all(tool["inputSchema"]["additionalProperties"] is False for tool in tools)
 
@@ -156,7 +157,7 @@ def test_cli_mcp_speaks_json_rpc_over_a_real_subprocess(tmp_path):
     assert completed.returncode == 0
     replies = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [reply["id"] for reply in replies] == [1, 2]
-    assert len(replies[1]["result"]["tools"]) == 4
+    assert len(replies[1]["result"]["tools"]) == 5
 
 
 JSON_VALUES = st.recursive(
@@ -216,3 +217,24 @@ def test_search_evidence_returns_spans_and_discloses_text_only_when_enabled(seed
 )
 def test_search_evidence_rejects_bad_arguments(arguments):
     assert call("search_evidence", arguments)["isError"] is True
+
+
+def test_blame_location_is_content_free_unless_titles_are_enabled(seeded):
+    decision_id, title = seeded
+    plain = call("blame_location", {"target": "adr.md"})["content"][0]["text"]
+    assert title not in plain
+    body = json.loads(plain)
+    assert body["entry_count"] >= 0
+    titled = json.loads(
+        call("blame_location", {"target": "adr.md"}, include_titles=True)["content"][0]["text"]
+    )
+    assert all("decision_title" in item for item in titled["entries"])
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [{}, {"target": ""}, {"target": 3}, {"target": "a", "line": 0}, {"target": "a", "line": True}]
+    + [{"target": "a", "extra": 1}, {"target": "x" * 301}],
+)
+def test_blame_location_rejects_bad_arguments(arguments):
+    assert call("blame_location", arguments)["isError"] is True

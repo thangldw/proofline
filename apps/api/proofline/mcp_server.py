@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from . import __version__
 from .database import SessionLocal, engine
+from .decision_blame import DecisionBlameError, blame
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .integrity import IntegrityVerificationError, verify_live_database
@@ -30,9 +31,26 @@ MAX_LINE_BYTES = 1_000_000
 MAX_LIST_LIMIT = 100
 MAX_QUERY_CHARS = 500
 MAX_EXCERPT_CHARS = 400
+MAX_TARGET_CHARS = 300
 TITLE_KEYS = ("root_decision_title", "impacted_decision_title")
 
 TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "blame_location",
+        "description": (
+            "List approved decisions anchored at a source path (optionally one line of its current "
+            "version), with their anchor state and current line span. Titles only if enabled."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {"type": "string", "minLength": 1, "maxLength": MAX_TARGET_CHARS},
+                "line": {"type": "integer", "minimum": 1},
+            },
+            "required": ["target"],
+            "additionalProperties": False,
+        },
+    },
     {
         "name": "search_evidence",
         "description": (
@@ -179,7 +197,30 @@ def _tool_search_evidence(arguments: dict[str, Any], disclosure: Disclosure) -> 
     return {"result_count": len(results), "results": results}
 
 
+def _tool_blame_location(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    target = arguments.get("target")
+    line = arguments.get("line")
+    if set(arguments) - {"target", "line"} or not isinstance(target, str):
+        raise ToolError("arguments_invalid")
+    if not target.strip() or len(target) > MAX_TARGET_CHARS:
+        raise ToolError("arguments_invalid")
+    if line is not None and (isinstance(line, bool) or not isinstance(line, int) or line < 1):
+        raise ToolError("arguments_invalid")
+    try:
+        with SessionLocal() as session:
+            entries = blame(session, target, line)
+    except DecisionBlameError as exc:
+        raise ToolError(exc.code) from exc
+    dump = (
+        (lambda item: item.model_dump())
+        if disclosure.titles
+        else (lambda item: item.content_free_model_dump())
+    )
+    return {"entry_count": len(entries), "entries": [dump(item) for item in entries]}
+
+
 HANDLERS: dict[str, Callable[[dict[str, Any], Disclosure], Any]] = {
+    "blame_location": _tool_blame_location,
     "check_decisions": _tool_check_decisions,
     "check_impacts": _tool_check_impacts,
     "list_decisions": _tool_list_decisions,

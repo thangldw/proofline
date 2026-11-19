@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.4.0] - 2026-11-19
+
+- Added `proofline blame <path>[:line]` and the read-only `blame_location` MCP tool: which approved decisions are anchored at a file or line, with anchor state and current span.
+
 ## [2.3.0] - 2026-11-19
 
 - Added an opt-in content-free pull-request comment to the PR gate action, a read-only `search_evidence` MCP tool (`--include-excerpts`), `verify-attestation --revocations`, and `scripts/benchmark_workspace.py`.

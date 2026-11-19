@@ -17,7 +17,7 @@ inputs:
     default: ""
   proofline-version:
     description: Exact proofline-evidence version to install from PyPI.
-    default: "2.3.0"
+    default: "2.4.0"
   sarif-output:
     description: Where to write the SARIF report.
     default: proofline-decision-health.sarif

@@ -14,6 +14,7 @@ Run `proofline COMMAND --help` for the exact option schema. Commands return zero
 | Review receipt | `export-review-receipt`, `verify-review-receipt` | Bind a persisted review to a verified DEP and verify the receipt offline. |
 | Attestation | `generate-attestation-key`, `attest`, `verify-attestation` | Generate a local Ed25519 keypair, sign exact verified subjects, or verify against a trusted public key and an optional `--revocations` list. |
 | Recovery | `backup`, `verify-backup`, `restore-backup`, `verify-integrity` | Create/verify SQLite backup, atomically restore with rollback output, or check live provenance. |
+| Decision lookup | `blame` | `proofline blame docs/adr.md:42` lists approved decisions anchored at that file or line, with anchor state and current line span. |
 | Decision health | `check-decisions`, `refresh-reviews`, `check-impacts` | Run read-only stale/impact CI checks or persist the current review ledger. |
 | Headless sync | `sync` | Index a document folder without a server, under a stable `--uri-root`, so CI can reuse a committed snapshot. See [PR gate](pr-gate.md). |
 | Local MCP | `mcp` | Serve read-only decision checks to a local MCP client over stdio; titles and evidence excerpts are withheld unless `--include-titles` / `--include-excerpts`. See [MCP](mcp.md). |
