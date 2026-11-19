@@ -102,6 +102,7 @@ from .review_receipts import (
 from .sarif import build_decision_health_sarif, build_decision_impact_sarif
 from .schemas import SourceCreate
 from .server import run_server
+from .shell_completion import render_completion
 from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
 from .workspace_sync import WorkspaceSyncError, sync_folder
 
@@ -1062,6 +1063,10 @@ def _cmd_report(args: argparse.Namespace, parser: argparse.ArgumentParser) -> No
     print(json.dumps({"output": str(args.output), "format": args.format}))
 
 
+def _cmd_completion(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    print(render_completion(parser, args.shell), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1408,6 +1413,10 @@ def main(argv: list[str] | None = None) -> None:
     report.add_argument(
         "--no-titles", action="store_true", help="Withhold decision titles and source names"
     )
+    completion = subcommands.add_parser(
+        "completion", help="Print a shell completion script (eval it or save it)"
+    )
+    completion.add_argument("shell", choices=("bash", "zsh", "fish"))
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1507,6 +1516,7 @@ def main(argv: list[str] | None = None) -> None:
         "import-adr": _cmd_import_adr,
         "hook": _cmd_hook,
         "report": _cmd_report,
+        "completion": _cmd_completion,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
