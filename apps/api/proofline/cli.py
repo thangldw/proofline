@@ -36,6 +36,7 @@ from .database import SessionLocal, engine, initialize_database
 from .decision_blame import DecisionBlameError, blame
 from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
 from .decision_conflicts import find_conflict_candidates, suggest_links
+from .decision_enforce import EnforceError, check_enforcement
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
 from .decision_graph import build_graph, render_dot, render_mermaid
@@ -1145,6 +1146,33 @@ def _cmd_watch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Non
         raise SystemExit("watch failed: database_unavailable") from exc
 
 
+def _cmd_check_enforcement(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            findings = check_enforcement(session, args.root)
+    except EnforceError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        document = {
+            "valid": not findings,
+            "findings": [item.content_free_model_dump() for item in findings],
+        }
+        print(json.dumps(document, sort_keys=True))
+    else:
+        for item in findings:
+            where = item.path if item.line is None else f"{item.path}:{item.line}"
+            print(
+                f"decision {item.decision_id[:8]} rule {item.rule_index} {item.problem}: ", end=""
+            )
+            print(f"{item.rule}" + (f" (at {where})" if where else ""))
+        if not findings:
+            print("All enforced decisions hold.")
+    if findings:
+        raise SystemExit(1)
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1520,6 +1548,12 @@ def main(argv: list[str] | None = None) -> None:
     notify.add_argument("--as-of")
     notify.add_argument("--warn-within", type=int, default=7, metavar="DAYS")
     notify.add_argument("--always", action="store_true", help="Send even when nothing is due")
+    enforcement = subcommands.add_parser(
+        "check-enforcement",
+        help="Fail when code violates an `Enforce:` rule of an approved decision",
+    )
+    enforcement.add_argument("--root", type=Path, default=Path("."))
+    enforcement.add_argument("--format", choices=("text", "json"), default="text")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1624,6 +1658,7 @@ def main(argv: list[str] | None = None) -> None:
         "graph": _cmd_graph,
         "policy-schema": _cmd_policy_schema,
         "notify": _cmd_notify,
+        "check-enforcement": _cmd_check_enforcement,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
