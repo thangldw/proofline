@@ -38,6 +38,7 @@ from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
 from .decision_conflicts import find_conflict_candidates, suggest_links
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
+from .decision_graph import build_graph, render_dot, render_mermaid
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_import import AdrImportError, import_adrs
@@ -1067,6 +1068,20 @@ def _cmd_completion(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     print(render_completion(parser, args.shell), end="")
 
 
+def _cmd_graph(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            graph = build_graph(
+                session,
+                include_titles=not args.no_titles,
+                include_conflicts=not args.no_conflicts,
+                include_isolated=args.include_isolated,
+            )
+    except (DecisionHealthError, OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(render_dot(graph) if args.format == "dot" else render_mermaid(graph), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1417,6 +1432,13 @@ def main(argv: list[str] | None = None) -> None:
         "completion", help="Print a shell completion script (eval it or save it)"
     )
     completion.add_argument("shell", choices=("bash", "zsh", "fish"))
+    graph = subcommands.add_parser(
+        "graph", help="Print the decision relation graph as Mermaid or Graphviz DOT"
+    )
+    graph.add_argument("--format", choices=("mermaid", "dot"), default="mermaid")
+    graph.add_argument("--no-titles", action="store_true", help="Label nodes with short ids")
+    graph.add_argument("--no-conflicts", action="store_true", help="Omit possible-conflict edges")
+    graph.add_argument("--include-isolated", action="store_true", help="Also draw unlinked nodes")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1517,6 +1539,7 @@ def main(argv: list[str] | None = None) -> None:
         "hook": _cmd_hook,
         "report": _cmd_report,
         "completion": _cmd_completion,
+        "graph": _cmd_graph,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
