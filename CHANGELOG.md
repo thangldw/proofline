@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.2.0] - 2026-11-19
+
+- Added `proofline mcp`, a read-only local MCP server over stdio with title-withholding by default (`docs/mcp.md`).
+
 ## [2.1.2] - 2026-11-19
 
 - Added Hypothesis property tests for transitive impact and stale-versus-moved detection.

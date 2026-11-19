@@ -4,7 +4,7 @@
 
 ## English
 
-Product introduction: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Latest published release: [v2.1.2](https://github.com/thangldw/proofline/releases/tag/v2.1.2). Main may contain later source or documentation changes; they do not replace the published artifact or its recorded verification.
+Product introduction: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Latest published release: [v2.2.0](https://github.com/thangldw/proofline/releases/tag/v2.2.0). Main may contain later source or documentation changes; they do not replace the published artifact or its recorded verification.
 
 Proofline is a local-first engineering decision memory that binds decisions to immutable source versions and exact citation spans. When a requirement changes, deterministic checks mark the affected evidence for review without rewriting the historical decision.
 
@@ -35,7 +35,7 @@ Published scale figures are synthetic regression evidence, not team or hosted-pr
 
 ### Documentation and releases
 
-Start with the [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/operations.md), and [v2.1.2 release notes](docs/releases/v2.1.2.md).
+Start with the [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/operations.md), and [v2.2.0 release notes](docs/releases/v2.2.0.md).
 
 Proofline is also packaged as a local skills plugin. The [OpenAI plugin submission record](docs/submission/openai-plugin.md) separates repository facts from dated external publication observations. The recorded [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) does not imply that the repository can independently confirm the currently public version; this project does not claim a hosted connector.
 
@@ -43,7 +43,7 @@ See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [term
 
 ## Tiếng Việt
 
-Trang giới thiệu: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Release đã phát hành mới nhất: [v2.1.2](https://github.com/thangldw/proofline/releases/tag/v2.1.2). Main có thể chứa source hoặc tài liệu mới hơn; chúng không thay thế artifact đã phát hành hay evidence kiểm chứng của artifact.
+Trang giới thiệu: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Release đã phát hành mới nhất: [v2.2.0](https://github.com/thangldw/proofline/releases/tag/v2.2.0). Main có thể chứa source hoặc tài liệu mới hơn; chúng không thay thế artifact đã phát hành hay evidence kiểm chứng của artifact.
 
 Proofline là bộ nhớ quyết định kỹ thuật local-first, liên kết decision với phiên bản nguồn bất biến và exact citation span. Khi requirement thay đổi, kiểm tra xác định đánh dấu evidence bị ảnh hưởng để review mà không viết lại decision lịch sử.
 
@@ -74,7 +74,7 @@ Các số liệu scale đã công bố là bằng chứng hồi quy synthetic, k
 
 ### Tài liệu và release
 
-Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [định dạng evidence package](docs/evidence-packages.md), [operations](docs/operations.md) và [release note v2.1.2](docs/releases/v2.1.2.md).
+Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [định dạng evidence package](docs/evidence-packages.md), [operations](docs/operations.md) và [release note v2.2.0](docs/releases/v2.2.0.md).
 
 Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submission OpenAI plugin](docs/submission/openai-plugin.md) tách repository fact khỏi quan sát external publication có ngày. [URL OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) đã ghi không có nghĩa repository có thể tự xác nhận version đang public; project này không claim hosted connector.
 
@@ -82,7 +82,7 @@ Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [term
 
 ## 日本語
 
-紹介ページ: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/)。最新の公開 release は [v2.1.2](https://github.com/thangldw/proofline/releases/tag/v2.1.2) です。Main の新しい source/documentation change は公開 artifact やその検証記録を置換しません。
+紹介ページ: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/)。最新の公開 release は [v2.2.0](https://github.com/thangldw/proofline/releases/tag/v2.2.0) です。Main の新しい source/documentation change は公開 artifact やその検証記録を置換しません。
 
 Proofline は、decision を不変の source version と正確な citation span に結び付ける local-first の engineering decision memory です。Requirement が変わると、決定的検査が影響を受けた evidence を review 対象にし、過去の decision 自体は書き換えません。
 
@@ -113,7 +113,7 @@ Demo は使い捨て workspace を作成し、引用済み requirement を変更
 
 ### 文書と release
 
-[Documentation hub](docs/README.md)、[getting started](docs/getting-started.md)、[architecture](docs/architecture.md)、[decision lifecycle](docs/decision-lifecycle.md)、[evidence package format](docs/evidence-packages.md)、[operations](docs/operations.md)、[v2.1.2 release note](docs/releases/v2.1.2.md) を参照してください。
+[Documentation hub](docs/README.md)、[getting started](docs/getting-started.md)、[architecture](docs/architecture.md)、[decision lifecycle](docs/decision-lifecycle.md)、[evidence package format](docs/evidence-packages.md)、[operations](docs/operations.md)、[v2.2.0 release note](docs/releases/v2.2.0.md) を参照してください。
 
 Proofline は local skills plugin としても packaging されています。[OpenAI plugin submission record](docs/submission/openai-plugin.md) は repository fact と日付付き external publication observation を分離します。記録済み [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) は、repository が現在の public version を独立確認できることを意味しません。この project は hosted connector を提供すると主張しません。
 

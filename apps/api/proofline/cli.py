@@ -59,6 +59,7 @@ from .evidence_packages import (
 )
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
+from .mcp_server import serve_stdio
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .models import DecisionReview, SourceVersion, Workspace
 from .portability import (
@@ -215,6 +216,15 @@ def main(argv: list[str] | None = None) -> None:
         "--log-level", choices=("critical", "error", "warning", "info"), default="warning"
     )
     subcommands.add_parser("seed", help="Index the bundled example decision")
+    mcp = subcommands.add_parser(
+        "mcp",
+        help="Serve read-only decision checks to a local MCP client over stdio",
+    )
+    mcp.add_argument(
+        "--include-titles",
+        action="store_true",
+        help="Include decision titles in tool results (they reach the client's model)",
+    )
     sync = subcommands.add_parser(
         "sync",
         help="Index a document folder headlessly (for CI) under a stable file URI root",
@@ -425,6 +435,9 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(f"launch failed: {type(exc).__name__}") from exc
     elif args.command == "seed":
         seed_demo()
+    elif args.command == "mcp":
+        initialize_database()
+        serve_stdio(sys.stdin, sys.stdout, include_titles=args.include_titles)
     elif args.command == "sync":
         try:
             initialize_database()
