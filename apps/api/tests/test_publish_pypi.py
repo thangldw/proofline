@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -138,7 +139,7 @@ def test_verify_only_never_attempts_an_upload(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(
         publish_pypi,
         "qualify_public_install",
-        lambda version: qualify_calls.append(version),
+        lambda version, *_args: qualify_calls.append(version),
     )
 
     publish_pypi.main(
@@ -158,3 +159,37 @@ def test_verify_only_never_attempts_an_upload(tmp_path: Path, monkeypatch, capsy
     assert wait_calls == [("2.0.0", (wheel, sdist), 7)]
     assert qualify_calls == ["2.0.0"]
     assert '"status": "published_and_verified"' in capsys.readouterr().out
+
+
+def test_public_install_retries_until_the_simple_index_serves_the_release(monkeypatch):
+    attempts = {"install": 0}
+
+    def fake_run(command, *, cwd, env):
+        if "install" in command:
+            attempts["install"] += 1
+            if attempts["install"] < 3:
+                raise subprocess.CalledProcessError(1, command)
+        stdout = "proofline 2.0.0\n" if command[-1] == "--version" else ""
+        return SimpleNamespace(stdout=stdout)
+
+    sleeps = []
+    monkeypatch.setattr(publish_pypi, "_run_smoke", fake_run)
+    monkeypatch.setattr(publish_pypi.time, "sleep", sleeps.append)
+
+    publish_pypi.qualify_public_install("2.0.0", timeout_seconds=300)
+
+    assert attempts["install"] == 3
+    assert sleeps == [5, 5]
+
+
+def test_public_install_gives_up_after_the_deadline(monkeypatch):
+    def fake_run(command, *, cwd, env):
+        if "install" in command:
+            raise subprocess.CalledProcessError(1, command)
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(publish_pypi, "_run_smoke", fake_run)
+    monkeypatch.setattr(publish_pypi.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        publish_pypi.qualify_public_install("2.0.0", timeout_seconds=0)

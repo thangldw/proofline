@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [2.1.2] - 2026-11-19
+
+- Added Hypothesis property tests for transitive impact and stale-versus-moved detection.
+- Made the PyPI publish verifier retry the clean install until the simple index serves the release.
+
 ## [2.1.1] - 2026-11-19
 
 - Added mypy to `make check` with a module ratchet, an 88% coverage gate, and a Python 3.12/3.13 `python-compat` CI job.

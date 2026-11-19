@@ -136,7 +136,22 @@ def _run_smoke(
     )
 
 
-def qualify_public_install(version: str) -> None:
+def _install_with_retry(
+    command: list[str], *, cwd: Path, env: dict[str, str], timeout_seconds: int
+) -> None:
+    """The JSON API shows a release before the /simple/ index serves it; retry until visible."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            _run_smoke(command, cwd=cwd, env=env)
+            return
+        except subprocess.CalledProcessError:
+            if time.monotonic() >= deadline:
+                raise
+        time.sleep(5)
+
+
+def qualify_public_install(version: str, timeout_seconds: int = 300) -> None:
     with tempfile.TemporaryDirectory(prefix="proofline-pypi-verify-") as temporary:
         root = Path(temporary)
         venv = root / "venv"
@@ -151,7 +166,7 @@ def qualify_public_install(version: str) -> None:
         else:
             python = venv / "bin/python"
             proofline = venv / "bin/proofline"
-        _run_smoke(
+        _install_with_retry(
             [
                 str(python),
                 "-m",
@@ -165,6 +180,7 @@ def qualify_public_install(version: str) -> None:
             ],
             cwd=root,
             env=env,
+            timeout_seconds=timeout_seconds,
         )
         observed = _run_smoke([str(proofline), "--version"], cwd=root, env=env)
         if observed.stdout.strip() != f"proofline {version}":
@@ -209,7 +225,7 @@ def main(argv: list[str] | None = None) -> None:
                 ]
             )
     wait_for_public_release(args.version, artifacts, args.timeout_seconds)
-    qualify_public_install(args.version)
+    qualify_public_install(args.version, args.timeout_seconds)
     print(
         json.dumps(
             {
