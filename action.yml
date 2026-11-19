@@ -27,6 +27,12 @@ inputs:
   code-refs:
     description: Space-separated paths to scan for proofline-decision markers in code. Empty skips the scan.
     default: ""
+  enforce:
+    description: Also fail when code violates an `Enforce:` rule of an approved decision (check-enforcement). Needs proofline-version 2.10.0 or newer.
+    default: "false"
+  code-context:
+    description: On pull requests, append the approved decisions touched by the change (code references, edited documents, applicable rules) to the job summary. Informational; needs fetch-depth 0 and proofline-version 2.10.0 or newer.
+    default: "false"
   comment:
     description: Post or update one content-free summary comment on the pull request. Needs the pull-requests write permission.
     default: "false"
@@ -60,6 +66,9 @@ runs:
         PL_SARIF: ${{ inputs.sarif-output }}
         PL_EXPIRY: ${{ inputs.check-expiry }}
         PL_CODE_REFS: ${{ inputs.code-refs }}
+        PL_ENFORCE: ${{ inputs.enforce }}
+        PL_CONTEXT: ${{ inputs.code-context }}
+        PL_BASE_REF: ${{ github.base_ref }}
       run: |
         set -uo pipefail
         proofline import "$PL_SNAPSHOT"
@@ -81,6 +90,13 @@ runs:
           read -r -a ref_paths <<< "$PL_CODE_REFS"
           proofline check-code-refs "${ref_paths[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+        fi
+        if [ "$PL_ENFORCE" = "true" ]; then
+          proofline check-enforcement | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+        fi
+        if [ "$PL_CONTEXT" = "true" ] && [ -n "$PL_BASE_REF" ]; then
+          proofline code-context --base "origin/$PL_BASE_REF" | tee -a "$GITHUB_STEP_SUMMARY" || true
         fi
         exit "$status"
     - name: Comment on the pull request

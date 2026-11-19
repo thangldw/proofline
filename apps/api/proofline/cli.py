@@ -37,6 +37,15 @@ from .decision_asof import AsOfError, decisions_as_of, parse_as_of
 from .decision_blame import DecisionBlameError, blame
 from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
 from .decision_conflicts import find_conflict_candidates, suggest_links
+from .decision_context import (
+    ContextError,
+    build_context,
+    git_diff,
+    parse_unified_diff,
+)
+from .decision_context import (
+    render_markdown as render_context_markdown,
+)
 from .decision_enforce import EnforceError, check_enforcement
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
@@ -1202,6 +1211,39 @@ def _cmd_asof(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None
         print(f"  {label} [{item.status}] {versions}{flag}")
 
 
+def _cmd_code_context(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.diff_file is not None:
+            diff = (
+                sys.stdin.read()
+                if str(args.diff_file) == "-"
+                else args.diff_file.read_text(encoding="utf-8")
+            )
+        elif args.base:
+            diff = git_diff(args.root, args.base)
+        else:
+            _decision_check_failed("diff_source_required")
+        with SessionLocal() as session:
+            items = build_context(session, args.root, parse_unified_diff(diff), radius=args.radius)
+    except ContextError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, UnicodeError, SQLAlchemyError):
+        _decision_check_failed("context_unavailable")
+    attention = [item for item in items if item.needs_attention]
+    if args.format == "json":
+        key = "model_dump" if args.include_titles else "content_free_model_dump"
+        print(
+            json.dumps(
+                {"items": [getattr(i, key)() for i in items], "attention": len(attention)},
+                sort_keys=True,
+            )
+        )
+    else:
+        print(render_context_markdown(items, include_titles=args.include_titles), end="")
+    if args.fail_on_attention and attention:
+        raise SystemExit(1)
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1590,6 +1632,21 @@ def main(argv: list[str] | None = None) -> None:
     asof.add_argument("question", nargs="?", help="Only decisions matching these words")
     asof.add_argument("--format", choices=("text", "json"), default="text")
     asof.add_argument("--no-titles", action="store_true")
+    context = subcommands.add_parser(
+        "code-context",
+        help="List approved decisions touched by a code change (code refs, edited docs, rules)",
+    )
+    context.add_argument("--base", help="Git ref to diff against (uses `<base>...HEAD`)")
+    context.add_argument("--diff-file", type=Path, help="Unified diff (-U0) file, or - for stdin")
+    context.add_argument("--root", type=Path, default=Path("."))
+    context.add_argument("--radius", type=int, default=10, help="Lines around a change to scan")
+    context.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    context.add_argument("--include-titles", action="store_true")
+    context.add_argument(
+        "--fail-on-attention",
+        action="store_true",
+        help="Exit 1 when a touched decision is stale or a rule is violated",
+    )
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1696,6 +1753,7 @@ def main(argv: list[str] | None = None) -> None:
         "notify": _cmd_notify,
         "check-enforcement": _cmd_check_enforcement,
         "asof": _cmd_asof,
+        "code-context": _cmd_code_context,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
