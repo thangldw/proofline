@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import uuid
-from datetime import datetime, timedelta
-from typing import Literal, cast
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
@@ -33,7 +31,6 @@ from .ingestion import (
     run_ingestion_job,
     source_deletion_impact,
 )
-from .learning import extract_study_pairs, next_interval
 from .model_gateway import (
     EmbeddingValidationError,
     ProviderConfigurationError,
@@ -48,7 +45,6 @@ from .models import (
     AuditEvent,
     Chunk,
     Decision,
-    DecisionRelation,
     Evidence,
     GitRepository,
     IngestionJob,
@@ -56,10 +52,6 @@ from .models import (
     ProposalCitation,
     Source,
     SourceVersion,
-    StudioArtifact,
-    StudioCitation,
-    StudyCard,
-    StudyReview,
     Workspace,
     utc_now,
 )
@@ -73,10 +65,6 @@ from .schemas import (
     AnswerResponse,
     AuditEventRead,
     DecisionRead,
-    DecisionRelationCandidateRead,
-    DecisionRelationCreate,
-    DecisionRelationRead,
-    DecisionTimelineRead,
     DecisionUpdate,
     EmbeddingIndexResponse,
     FolderScanRequest,
@@ -92,10 +80,7 @@ from .schemas import (
     ModelRunRead,
     ModelRunRetryRequest,
     ModelRunRetryResponse,
-    NoteBacklinkRead,
-    NoteCreate,
     NoteRead,
-    NoteUpdate,
     Overview,
     ProviderConfigurationRead,
     ProviderConfigurationUpdate,
@@ -106,18 +91,10 @@ from .schemas import (
     SourceRead,
     SourceVersionContentRead,
     SourceVersionRead,
-    StudioArtifactCreate,
-    StudioArtifactRead,
-    StudioCitationRead,
-    StudyCardRead,
-    StudyReviewCreate,
-    StudyReviewRead,
     WorkspaceCreate,
     WorkspaceRead,
     normalize_retrieval_filters,
 )
-from .studio import StudioKind, build_studio_draft
-from .studio_exports import StudioExportError, build_studio_export
 
 router = APIRouter(prefix="/api/v1")
 
@@ -475,425 +452,6 @@ def remove_git_repository(
 @router.get("/folder-watch", response_model=FolderWatchStatus)
 def folder_watch_status(request: Request) -> FolderWatchStatus:
     return FolderWatchStatus.model_validate(request.app.state.folder_watcher.snapshot())
-
-
-def _workspace_notes(session: Session, workspace_id: str) -> list[Source]:
-    return list(
-        session.scalars(
-            select(Source)
-            .where(Source.workspace_id == workspace_id, Source.kind == "note")
-            .options(selectinload(Source.versions))
-            .order_by(Source.indexed_at.desc())
-        ).all()
-    )
-
-
-@router.post("/notes", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
-def create_note(
-    payload: NoteCreate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> NoteRead:
-    source, _, _ = run_ingestion_job(
-        session,
-        SourceCreate(
-            title=payload.title,
-            content=payload.content,
-            kind="note",
-            uri=f"note://{uuid.uuid4()}",
-            workspace_id=workspace_id,
-        ),
-    )
-    notes = _workspace_notes(session, workspace_id)
-    hydrated = next(note for note in notes if note.id == source.id)
-    return note_to_read(hydrated, notes)
-
-
-@router.get("/notes", response_model=list[NoteRead])
-def list_notes(
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[NoteRead]:
-    notes = _workspace_notes(session, workspace_id)
-    return [note_to_read(note, notes) for note in notes]
-
-
-@router.get("/notes/{note_id}", response_model=NoteRead)
-def get_note(
-    note_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> NoteRead:
-    notes = _workspace_notes(session, workspace_id)
-    note = next((item for item in notes if item.id == note_id), None)
-    if note is None:
-        raise HTTPException(status_code=404, detail="Note not found")
-    return note_to_read(note, notes)
-
-
-@router.put("/notes/{note_id}", response_model=NoteRead)
-def update_note(
-    note_id: str,
-    payload: NoteUpdate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> NoteRead:
-    note = get_workspace_source(session, note_id, workspace_id)
-    if note.kind != "note":
-        raise HTTPException(status_code=404, detail="Note not found")
-    current = session.get(SourceVersion, note.current_version_id)
-    if current is not None and current.content == payload.content:
-        if note.title != payload.title:
-            note.title = payload.title
-            session.commit()
-        notes = _workspace_notes(session, workspace_id)
-        hydrated = next(item for item in notes if item.id == note.id)
-        return note_to_read(hydrated, notes)
-    source, _, _ = run_ingestion_job(
-        session,
-        SourceCreate(
-            title=payload.title,
-            content=payload.content,
-            kind="note",
-            uri=note.uri,
-            workspace_id=workspace_id,
-        ),
-    )
-    notes = _workspace_notes(session, workspace_id)
-    hydrated = next(item for item in notes if item.id == source.id)
-    return note_to_read(hydrated, notes)
-
-
-@router.get("/notes/{note_id}/backlinks", response_model=list[NoteBacklinkRead])
-def list_note_backlinks(
-    note_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[NoteBacklinkRead]:
-    target = get_workspace_source(session, note_id, workspace_id)
-    if target.kind != "note":
-        raise HTTPException(status_code=404, detail="Note not found")
-    notes = _workspace_notes(session, workspace_id)
-    same_title = [note for note in notes if note.title.casefold() == target.title.casefold()]
-    if len(same_title) != 1:
-        return []
-    backlinks: list[NoteBacklinkRead] = []
-    for source in notes:
-        for link in parse_note_links(source.content):
-            if link.target_title.casefold() != target.title.casefold():
-                continue
-            backlinks.append(
-                NoteBacklinkRead(
-                    **link.model_copy(update={"resolved_source_id": target.id}).model_dump(),
-                    source_id=source.id,
-                    source_version_id=source.current_version_id or "",
-                    source_title=source.title,
-                )
-            )
-    return backlinks
-
-
-def study_card_to_read(card: StudyCard, source_title: str | None = None) -> StudyCardRead:
-    return StudyCardRead.model_validate(card).model_copy(update={"source_title": source_title})
-
-
-def studio_artifact_to_read(artifact: StudioArtifact, source_title: str) -> StudioArtifactRead:
-    return StudioArtifactRead(
-        id=artifact.id,
-        workspace_id=artifact.workspace_id,
-        source_id=artifact.source_id,
-        source_version_id=artifact.source_version_id,
-        source_title=source_title,
-        kind=cast(StudioKind, artifact.kind),
-        title=artifact.title,
-        content=artifact.content_json,
-        status=cast(Literal["ready"], artifact.status),
-        generation_method=artifact.generation_method,
-        created_at=artifact.created_at,
-        updated_at=artifact.updated_at,
-        citations=[
-            StudioCitationRead(
-                id=citation.id,
-                source_id=citation.source_id,
-                source_version_id=citation.source_version_id,
-                source_title=source_title,
-                ordinal=citation.ordinal,
-                quote=citation.quote,
-                quote_hash=citation.quote_hash,
-                start_offset=citation.start_offset,
-                end_offset=citation.end_offset,
-                start_line=citation.start_line,
-                end_line=citation.end_line,
-            )
-            for citation in sorted(artifact.citations, key=lambda item: item.ordinal)
-        ],
-    )
-
-
-@router.post(
-    "/studio-artifacts",
-    response_model=StudioArtifactRead,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_studio_artifact(
-    payload: StudioArtifactCreate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> StudioArtifactRead:
-    source = get_workspace_source(session, payload.source_id, workspace_id)
-    version = session.get(SourceVersion, source.current_version_id)
-    if version is None:
-        raise HTTPException(status_code=409, detail="Source has no current immutable version")
-    try:
-        draft = build_studio_draft(payload.kind, source.title, version.content)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    artifact = session.scalar(
-        select(StudioArtifact)
-        .where(
-            StudioArtifact.source_version_id == version.id,
-            StudioArtifact.kind == payload.kind,
-        )
-        .options(selectinload(StudioArtifact.citations))
-    )
-    if artifact is None:
-        artifact = StudioArtifact(
-            workspace_id=workspace_id,
-            source_id=source.id,
-            source_version_id=version.id,
-            kind=payload.kind,
-            title=draft.title,
-            content_json=draft.content,
-            status="ready",
-            generation_method="deterministic-v1",
-        )
-        session.add(artifact)
-    else:
-        return studio_artifact_to_read(artifact, source.title)
-    for ordinal, citation in enumerate(draft.citations):
-        artifact.citations.append(
-            StudioCitation(
-                source_id=source.id,
-                source_version_id=version.id,
-                ordinal=ordinal,
-                quote=citation.text,
-                quote_hash=citation.quote_hash,
-                start_offset=citation.start_offset,
-                end_offset=citation.end_offset,
-                start_line=citation.start_line,
-                end_line=citation.end_line,
-            )
-        )
-    session.commit()
-    session.refresh(artifact)
-    return studio_artifact_to_read(artifact, source.title)
-
-
-@router.get("/studio-artifacts", response_model=list[StudioArtifactRead])
-def list_studio_artifacts(
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[StudioArtifactRead]:
-    rows = session.execute(
-        select(StudioArtifact, Source.title)
-        .join(Source, Source.id == StudioArtifact.source_id)
-        .where(StudioArtifact.workspace_id == workspace_id)
-        .options(selectinload(StudioArtifact.citations))
-        .order_by(StudioArtifact.updated_at.desc(), StudioArtifact.id)
-    ).all()
-    return [studio_artifact_to_read(artifact, title) for artifact, title in rows]
-
-
-@router.get("/studio-artifacts/{artifact_id}", response_model=StudioArtifactRead)
-def get_studio_artifact(
-    artifact_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> StudioArtifactRead:
-    row = session.execute(
-        select(StudioArtifact, Source.title)
-        .join(Source, Source.id == StudioArtifact.source_id)
-        .where(
-            StudioArtifact.id == artifact_id,
-            StudioArtifact.workspace_id == workspace_id,
-        )
-        .options(selectinload(StudioArtifact.citations))
-    ).one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Studio artifact not found")
-    return studio_artifact_to_read(*row)
-
-
-@router.get("/studio-artifacts/{artifact_id}/download")
-def download_studio_artifact(
-    artifact_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> Response:
-    row = session.execute(
-        select(StudioArtifact, Source.title, SourceVersion)
-        .join(Source, Source.id == StudioArtifact.source_id)
-        .join(SourceVersion, SourceVersion.id == StudioArtifact.source_version_id)
-        .where(
-            StudioArtifact.id == artifact_id,
-            StudioArtifact.workspace_id == workspace_id,
-        )
-        .options(selectinload(StudioArtifact.citations))
-    ).one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Studio artifact not found")
-    artifact, source_title, version = row
-    try:
-        exported = build_studio_export(artifact, version, source_title)
-    except StudioExportError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return Response(
-        content=exported.content,
-        media_type=exported.media_type,
-        headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'},
-    )
-
-
-@router.delete("/studio-artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_studio_artifact(
-    artifact_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> Response:
-    artifact = session.scalar(
-        select(StudioArtifact).where(
-            StudioArtifact.id == artifact_id,
-            StudioArtifact.workspace_id == workspace_id,
-        )
-    )
-    if artifact is None:
-        raise HTTPException(status_code=404, detail="Studio artifact not found")
-    session.delete(artifact)
-    session.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post("/sources/{source_id}/study-cards", response_model=list[StudyCardRead])
-def create_study_cards(
-    source_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[StudyCardRead]:
-    source = get_workspace_source(session, source_id, workspace_id)
-    version = session.get(SourceVersion, source.current_version_id)
-    if version is None:
-        raise HTTPException(status_code=409, detail="Source has no current immutable version")
-    pairs = extract_study_pairs(version.content)
-    if not pairs:
-        raise HTTPException(
-            status_code=422,
-            detail="No deterministic study pairs found; use adjacent Q: and A: lines",
-        )
-    session.query(StudyCard).filter(
-        StudyCard.source_id == source.id,
-        StudyCard.source_version_id != version.id,
-        StudyCard.state != "superseded",
-    ).update({"state": "superseded", "updated_at": utc_now()})
-    existing = {
-        (card.start_offset, card.end_offset): card
-        for card in session.scalars(
-            select(StudyCard).where(StudyCard.source_version_id == version.id)
-        ).all()
-    }
-    cards: list[StudyCard] = []
-    for pair in pairs:
-        card = existing.get((pair.start_offset, pair.end_offset))
-        if card is None:
-            card = StudyCard(
-                workspace_id=workspace_id,
-                source_id=source.id,
-                source_version_id=version.id,
-                question=pair.question,
-                answer=pair.answer,
-                quote_hash=pair.quote_hash,
-                start_offset=pair.start_offset,
-                end_offset=pair.end_offset,
-                start_line=pair.start_line,
-                end_line=pair.end_line,
-                state="new",
-                interval_days=0,
-                due_at=utc_now(),
-            )
-            session.add(card)
-        cards.append(card)
-    session.commit()
-    for card in cards:
-        session.refresh(card)
-    return [study_card_to_read(card, source.title) for card in cards]
-
-
-@router.get("/study-cards", response_model=list[StudyCardRead])
-def list_study_cards(
-    include_superseded: bool = False,
-    due_only: bool = False,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[StudyCardRead]:
-    query = (
-        select(StudyCard, Source.title)
-        .join(Source, Source.id == StudyCard.source_id)
-        .where(StudyCard.workspace_id == workspace_id)
-        .order_by(StudyCard.due_at, StudyCard.created_at)
-    )
-    if not include_superseded:
-        query = query.where(StudyCard.state != "superseded")
-    if due_only:
-        query = query.where(StudyCard.due_at <= utc_now())
-    return [study_card_to_read(card, title) for card, title in session.execute(query).all()]
-
-
-@router.get("/study-cards/{card_id}/reviews", response_model=list[StudyReviewRead])
-def list_study_reviews(
-    card_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[StudyReview]:
-    card = session.get(StudyCard, card_id)
-    if card is None or card.workspace_id != workspace_id:
-        raise HTTPException(status_code=404, detail="Study card not found")
-    return list(
-        session.scalars(
-            select(StudyReview)
-            .where(StudyReview.card_id == card_id)
-            .order_by(StudyReview.reviewed_at, StudyReview.id)
-        ).all()
-    )
-
-
-@router.post("/study-cards/{card_id}/reviews", response_model=StudyReviewRead)
-def review_study_card(
-    card_id: str,
-    payload: StudyReviewCreate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> StudyReview:
-    card = session.get(StudyCard, card_id)
-    if card is None or card.workspace_id != workspace_id:
-        raise HTTPException(status_code=404, detail="Study card not found")
-    if card.state == "superseded":
-        raise HTTPException(status_code=409, detail="Superseded study card cannot be reviewed")
-    reviewed_at = utc_now()
-    interval = next_interval(payload.rating, card.interval_days)
-    review = StudyReview(
-        card_id=card.id,
-        rating=payload.rating,
-        previous_interval_days=card.interval_days,
-        next_interval_days=interval,
-        reviewed_at=reviewed_at,
-    )
-    card.interval_days = interval
-    card.state = "learning" if payload.rating == "again" else "review"
-    card.due_at = reviewed_at + timedelta(days=interval)
-    card.updated_at = reviewed_at
-    session.add(review)
-    session.commit()
-    session.refresh(review)
-    return review
 
 
 @router.get("/sources", response_model=list[SourceRead])
@@ -1539,190 +1097,6 @@ def update_decision(
     )
 
 
-@router.post(
-    "/decision-relations",
-    response_model=DecisionRelationRead,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_decision_relation(
-    payload: DecisionRelationCreate,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> DecisionRelation:
-    decisions = {
-        decision.id: decision
-        for decision in session.scalars(
-            select(Decision)
-            .join(Source)
-            .where(
-                Decision.id.in_([payload.source_decision_id, payload.target_decision_id]),
-                Decision.kind == "decision",
-                Source.workspace_id == workspace_id,
-            )
-        ).all()
-    }
-    if len(decisions) != 2:
-        raise HTTPException(status_code=404, detail="One or more decisions were not found")
-    relation = DecisionRelation(**payload.model_dump(), created_by="local_user")
-    session.add(relation)
-    now = payload.valid_from or utc_now()
-    if payload.kind == "supersedes":
-        source = decisions[payload.source_decision_id]
-        target = decisions[payload.target_decision_id]
-        source_before = decision_snapshot(source)
-        target_before = decision_snapshot(target)
-        source.valid_from = source.valid_from or now
-        target.valid_to = now
-        target.status = "obsolete"
-        session.add_all(
-            [
-                AuditEvent(
-                    workspace_id=workspace_id,
-                    actor="local_user",
-                    action="decision.supersedes",
-                    object_type="decision",
-                    object_id=source.id,
-                    before_json=source_before,
-                    after_json=decision_snapshot(source),
-                ),
-                AuditEvent(
-                    workspace_id=workspace_id,
-                    actor="local_user",
-                    action="decision.superseded",
-                    object_type="decision",
-                    object_id=target.id,
-                    before_json=target_before,
-                    after_json=decision_snapshot(target),
-                ),
-            ]
-        )
-    try:
-        session.commit()
-    except IntegrityError as exc:
-        session.rollback()
-        raise HTTPException(status_code=409, detail="Decision relation already exists") from exc
-    session.refresh(relation)
-    return relation
-
-
-@router.get("/decision-relations", response_model=list[DecisionRelationRead])
-def list_decision_relations(
-    decision_id: str | None = None,
-    relation_kind: str | None = Query(default=None, alias="kind"),
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[DecisionRelation]:
-    workspace_decisions = (
-        select(Decision.id).join(Source).where(Source.workspace_id == workspace_id)
-    )
-    query = (
-        select(DecisionRelation)
-        .where(
-            DecisionRelation.source_decision_id.in_(workspace_decisions),
-            DecisionRelation.target_decision_id.in_(workspace_decisions),
-        )
-        .order_by(DecisionRelation.created_at, DecisionRelation.id)
-    )
-    if decision_id:
-        query = query.where(
-            (DecisionRelation.source_decision_id == decision_id)
-            | (DecisionRelation.target_decision_id == decision_id)
-        )
-    if relation_kind:
-        query = query.where(DecisionRelation.kind == relation_kind)
-    return list(session.scalars(query).all())
-
-
-@router.get("/decisions/{decision_id}/timeline", response_model=DecisionTimelineRead)
-def get_decision_timeline(
-    decision_id: str,
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> DecisionTimelineRead:
-    decision = session.scalar(
-        select(Decision)
-        .join(Source)
-        .where(Decision.id == decision_id, Decision.kind == "decision")
-        .where(Source.workspace_id == workspace_id)
-        .options(selectinload(Decision.evidence))
-    )
-    if not decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
-    incoming = list(
-        session.scalars(
-            select(DecisionRelation)
-            .where(DecisionRelation.target_decision_id == decision_id)
-            .order_by(DecisionRelation.created_at, DecisionRelation.id)
-        ).all()
-    )
-    outgoing = list(
-        session.scalars(
-            select(DecisionRelation)
-            .where(DecisionRelation.source_decision_id == decision_id)
-            .order_by(DecisionRelation.created_at, DecisionRelation.id)
-        ).all()
-    )
-    title = session.scalar(select(Source.title).where(Source.id == decision.source_id))
-    return DecisionTimelineRead(
-        decision=decision_to_read(decision, title),
-        incoming=[DecisionRelationRead.model_validate(item) for item in incoming],
-        outgoing=[DecisionRelationRead.model_validate(item) for item in outgoing],
-    )
-
-
-@router.get("/decision-relation-candidates", response_model=list[DecisionRelationCandidateRead])
-def list_decision_relation_candidates(
-    workspace_id: str = Depends(resolve_workspace_id),
-    session: Session = Depends(get_session),
-) -> list[DecisionRelationCandidateRead]:
-    candidates: list[DecisionRelationCandidateRead] = []
-    workspace_decisions = (
-        select(Decision.id).join(Source).where(Source.workspace_id == workspace_id)
-    )
-    relations = session.scalars(
-        select(DecisionRelation).where(
-            DecisionRelation.kind == "contradicts",
-            DecisionRelation.source_decision_id.in_(workspace_decisions),
-            DecisionRelation.target_decision_id.in_(workspace_decisions),
-        )
-    ).all()
-    for relation in relations:
-        decisions = [
-            session.get(Decision, relation.source_decision_id),
-            session.get(Decision, relation.target_decision_id),
-        ]
-        if all(decision and decision.status != "obsolete" for decision in decisions):
-            candidates.append(
-                DecisionRelationCandidateRead(
-                    kind="contradiction",
-                    decision_ids=[relation.source_decision_id, relation.target_decision_id],
-                    relation_id=relation.id,
-                    reason="Both contradictory decisions are still non-obsolete; review required.",
-                )
-            )
-    now = utc_now().replace(tzinfo=None)
-    stale = session.scalars(
-        select(Decision)
-        .join(Source)
-        .where(
-            Decision.kind == "decision",
-            Source.workspace_id == workspace_id,
-            Decision.status.in_(["active", "accepted"]),
-            Decision.valid_to.is_not(None),
-            Decision.valid_to <= now,
-        )
-    ).all()
-    candidates.extend(
-        DecisionRelationCandidateRead(
-            kind="stale",
-            decision_ids=[decision.id],
-            reason="Decision validity has ended but its review status is still current.",
-        )
-        for decision in stale
-    )
-    return candidates
-
-
 @router.get("/audit-events", response_model=list[AuditEventRead])
 def list_audit_events(
     object_type: str | None = None,
@@ -1976,7 +1350,13 @@ def review_action_proposal(
 
 
 from .decision_impact_api import router as decision_impact_router  # noqa: E402
+from .decision_relations_api import router as decision_relations_router  # noqa: E402
 from .decision_review_api import router as decision_review_router  # noqa: E402
+from .notes_api import router as notes_router  # noqa: E402
+from .studio_api import router as studio_router  # noqa: E402
 
 router.include_router(decision_review_router)
+router.include_router(notes_router)
+router.include_router(studio_router)
+router.include_router(decision_relations_router)
 router.include_router(decision_impact_router)
