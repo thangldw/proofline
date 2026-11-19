@@ -30,7 +30,7 @@ from .schemas import (
 from .studio import StudioKind, build_studio_draft
 from .studio_exports import StudioExportError, build_studio_export
 
-router = APIRouter()
+router: APIRouter = APIRouter()
 
 
 def study_card_to_read(card: StudyCard, source_title: str | None = None) -> StudyCardRead:

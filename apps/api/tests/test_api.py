@@ -300,7 +300,7 @@ def test_model_provider_health_check_reports_provider_result(client, monkeypatch
             return self.healthy
 
     monkeypatch.setattr(
-        "proofline.api.build_generation_provider", lambda _settings: HealthProvider()
+        "proofline.provider_runtime.build_generation_provider", lambda _settings: HealthProvider()
     )
 
     unchecked = client.get("/api/v1/model/provider").json()

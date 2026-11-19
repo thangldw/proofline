@@ -24,7 +24,7 @@ from .schemas import (
     SourceCreate,
 )
 
-router = APIRouter()
+router: APIRouter = APIRouter()
 
 
 def _workspace_notes(session: Session, workspace_id: str) -> list[Source]:
