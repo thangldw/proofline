@@ -69,6 +69,7 @@ from .evidence_packages import (
     explain_decision_package,
     load_and_verify_package,
 )
+from .git_hook import HookError, install_hook, uninstall_hook
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
 from .mcp_server import serve_stdio
@@ -941,6 +942,19 @@ def _cmd_import_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     print(json.dumps(document, sort_keys=True))
 
 
+def _cmd_hook(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.hook_action == "install":
+            result = install_hook(args.repo, with_decisions=args.with_decisions, force=args.force)
+        else:
+            result = uninstall_hook(args.repo)
+    except HookError as exc:
+        _decision_check_failed(exc.code)
+    except OSError:
+        _decision_check_failed("hook_unwritable")
+    print(json.dumps({"action": result.action, "path": str(result.path)}))
+
+
 def _cmd_check_code_refs(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         refs = scan_code_refs(args.paths)
@@ -1347,6 +1361,20 @@ def main(argv: list[str] | None = None) -> None:
     import_adr.add_argument("adr_dir", type=Path)
     import_adr.add_argument("--output-dir", type=Path, required=True)
     import_adr.add_argument("--force", action="store_true")
+    hook = subcommands.add_parser(
+        "hook", help="Install or remove a git pre-commit hook that runs the decision checks"
+    )
+    hook_actions = hook.add_subparsers(dest="hook_action", required=True)
+    hook_install = hook_actions.add_parser("install", help="Write .git/hooks/pre-commit")
+    hook_install.add_argument("--repo", type=Path, default=Path("."))
+    hook_install.add_argument(
+        "--with-decisions",
+        action="store_true",
+        help="Also run `sync` and `check-decisions` (slower; indexes the working tree)",
+    )
+    hook_install.add_argument("--force", action="store_true")
+    hook_uninstall = hook_actions.add_parser("uninstall", help="Remove a hook Proofline wrote")
+    hook_uninstall.add_argument("--repo", type=Path, default=Path("."))
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1444,6 +1472,7 @@ def main(argv: list[str] | None = None) -> None:
         "health-trend": _cmd_health_trend,
         "export-adr": _cmd_export_adr,
         "import-adr": _cmd_import_adr,
+        "hook": _cmd_hook,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
