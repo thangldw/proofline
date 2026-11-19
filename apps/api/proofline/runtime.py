@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 
 def default_app_data_dir(
     *,
     platform_name: str | None = None,
-    environment: dict[str, str] | None = None,
+    environment: Mapping[str, str] | None = None,
     home: Path | None = None,
 ) -> Path:
     platform_name = platform_name or sys.platform

@@ -21,7 +21,7 @@ embed:
 	.venv/bin/proofline embed
 
 test:
-	.venv/bin/pytest -q
+	.venv/bin/pytest -q --cov --cov-report=term
 	npm run test:web
 
 eval:
@@ -80,6 +80,7 @@ benchmark-decision-reviews:
 check:
 	.venv/bin/ruff check .
 	.venv/bin/ruff format --check .
+	.venv/bin/mypy
 	npm run build:web
 	.venv/bin/python scripts/sync_web_bundle.py --check
 	$(MAKE) eval
