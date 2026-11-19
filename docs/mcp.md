@@ -16,6 +16,7 @@ Register it with a client such as Claude Code or Claude Desktop:
 | `check_impacts` | Decisions transitively impacted, through `based_on` and `implements`, by a decision awaiting review. |
 | `list_decisions` | Decision identifiers, kind and status; optional `status` filter and `limit` (1-100). |
 | `search_evidence` | Lexical search over current source versions: chunk and source identifiers with line spans. `query` (max 500 characters), `limit` (1-20). |
+| `blame_location` | Approved decisions anchored at a source path (suffix, URI or title), optionally one `line` of its current version: anchor state and current line span. Titles only with `--include-titles`. |
 
 Disclosure: tool results go to whatever model the client uses. Decision titles are therefore omitted unless you start the server with `proofline mcp --include-titles`. Evidence excerpts are returned by `search_evidence` only with `proofline mcp --include-excerpts` (at most 400 characters each); source titles follow `--include-titles`. Citation text from decision checks is never returned. Errors carry a code only, never database content.
 
@@ -27,7 +28,7 @@ Trust boundary: the server reads your local database as you. Any process that ca
 
 Đăng ký với client như Claude Code hoặc Claude Desktop bằng cấu hình JSON ở phần English.
 
-Tool: `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (decision đã duyệt mà evidence trích dẫn không còn unchanged), `check_impacts` (decision bị ảnh hưởng gián tiếp qua `based_on` và `implements`), `list_decisions` (identifier, kind, status; lọc `status` và `limit` 1-100).
+Tool: `blame_location` (decision đã duyệt neo tại một file/dòng), `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (decision đã duyệt mà evidence trích dẫn không còn unchanged), `check_impacts` (decision bị ảnh hưởng gián tiếp qua `based_on` và `implements`), `list_decisions` (identifier, kind, status; lọc `status` và `limit` 1-100).
 
 Disclosure: kết quả tool đi tới model mà client dùng. Vì vậy title của decision bị bỏ trừ khi bạn chạy `proofline mcp --include-titles`. Citation text không bao giờ được trả về. Lỗi chỉ mang mã, không mang nội dung database.
 
@@ -39,7 +40,7 @@ Trust boundary: server đọc database local với quyền của bạn. Tiến t
 
 Claude Code や Claude Desktop などの client への登録は English 節の JSON 設定を使います。
 
-Tool: `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (引用 evidence が unchanged でなくなった承認済み decision)、`check_impacts` (`based_on` と `implements` を通じて間接的に影響を受ける decision)、`list_decisions` (identifier、kind、status。`status` filter と `limit` 1-100)。
+Tool: `blame_location` (decision đã duyệt neo tại một file/dòng), `search_evidence` (tìm kiếm lexical, chỉ trả identifier và dòng; `--include-excerpts` mới thêm trích đoạn tối đa 400 ký tự, title theo `--include-titles`), `check_decisions` (引用 evidence が unchanged でなくなった承認済み decision)、`check_impacts` (`based_on` と `implements` を通じて間接的に影響を受ける decision)、`list_decisions` (identifier、kind、status。`status` filter と `limit` 1-100)。
 
 Disclosure: tool の結果は client が使う model に渡ります。そのため decision の title は `proofline mcp --include-titles` で起動しない限り省かれます。Citation text は返しません。Error は code のみで database の内容を含みません。
 
