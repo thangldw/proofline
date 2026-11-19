@@ -103,7 +103,7 @@ ignore = ["B008"]
 source = ["apps/api/proofline"]
 
 [tool.coverage.report]
-fail_under = 88
+fail_under = 89
 show_missing = false
 skip_covered = true
 

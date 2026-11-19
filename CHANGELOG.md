@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split the 750-line `cli.main` dispatch into one function per subcommand, removing the `Any` workaround from the mypy cleanup. Raised the coverage gate to 89%.
+
 - Moved the model, extraction, answers/search and action-proposal routes out of `api.py` (1362 to 763 lines). Route modules now build providers through `proofline.provider_runtime.build_generation_provider`, a single call-time seam; tests patch that instead of `proofline.api`. OpenAPI is unchanged.
 
 - Split `portability.py` into `portable_schema`, `portable_validation` and `portable_verify` (public API re-exported), and moved the notes, studio/study-card and decision-relation routes out of `api.py` into their own routers. The OpenAPI surface (70 operations) is unchanged.

@@ -167,13 +167,580 @@ def _reject_attestation_output_conflict(
         raise AttestationError("output_conflict")
 
 
+def _cmd_serve(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.no_web:
+        os.environ["PROOFLINE_DISABLE_WEB"] = "true"
+    if args.web_dir is not None:
+        web_dir = args.web_dir.expanduser().resolve()
+        if not (web_dir / "index.html").is_file():
+            parser.error("--web-dir must contain index.html")
+        os.environ["PROOFLINE_WEB_DIR"] = str(web_dir)
+    try:
+        run_server(
+            args.host,
+            args.port,
+            ready_file=args.ready_file,
+            shutdown_file=args.shutdown_file,
+            log_level=args.log_level,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SystemExit(f"serve failed: {type(exc).__name__}") from exc
+
+
+def _cmd_launch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    data_dir = Path(os.environ.get("PROOFLINE_HOME", Path.cwd() / ".proofline"))
+    try:
+        run_server(
+            "127.0.0.1",
+            args.port,
+            ready_file=data_dir / "proofline-ready.json",
+            log_level=args.log_level,
+            open_browser=not args.no_browser,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SystemExit(f"launch failed: {type(exc).__name__}") from exc
+
+
+def _cmd_seed(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    seed_demo()
+
+
+def _cmd_mcp(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    serve_stdio(sys.stdin, sys.stdout, include_titles=args.include_titles)
+
+
+def _cmd_sync(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        initialize_database()
+        with SessionLocal() as session:
+            summary = sync_folder(session, args.path, uri_root=args.uri_root)
+    except WorkspaceSyncError as exc:
+        raise SystemExit(f"sync failed: {exc.code}") from exc
+    except (OSError, SQLAlchemyError) as exc:
+        raise SystemExit("sync failed: database_unavailable") from exc
+    if args.format == "json":
+        print(json.dumps(summary.model_dump(), sort_keys=True))
+    else:
+        print(
+            f"Synced: {summary.created} created, {summary.updated} updated, "
+            f"{summary.unchanged} unchanged, {len(summary.failed)} failed"
+        )
+    if summary.failed:
+        raise SystemExit(1)
+
+
+def _cmd_eval(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    report = evaluate_dataset(args.dataset, args.k)
+    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+    if (
+        report.recall_at_k < args.min_recall
+        or report.ndcg_at_k < args.min_ndcg
+        or report.expected_empty_accuracy < args.min_expected_empty_accuracy
+    ):
+        raise SystemExit(1)
+
+
+def _cmd_eval_grounded(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    report = evaluate_grounded_dataset(args.dataset, args.limit)
+    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+    if not grounded_report_meets_thresholds(
+        report,
+        min_citation_resolution=args.min_citation_resolution,
+        min_citation_precision=args.min_citation_precision,
+        min_grounded_success=args.min_grounded_success,
+        min_status_accuracy=args.min_status_accuracy,
+    ):
+        raise SystemExit(1)
+
+
+def _cmd_eval_extraction(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    report = evaluate_extraction_dataset(args.dataset)
+    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+    if not extraction_report_meets_thresholds(
+        report,
+        min_precision=args.min_precision,
+        min_recall=args.min_recall,
+        min_f1=args.min_f1,
+        min_evidence_resolution=args.min_evidence_resolution,
+        min_expected_evidence_accuracy=args.min_expected_evidence_accuracy,
+        min_negative_source_accuracy=args.min_negative_source_accuracy,
+    ):
+        raise SystemExit(1)
+
+
+def _cmd_eval_real_model_preflight(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
+    try:
+        receipt = preflight_real_model_plan(args.plan, allow_mock=args.allow_mock)
+        write_preflight_receipt(args.output, receipt, force=args.force)
+    except (FileExistsError, OSError, ValueError) as exc:
+        raise SystemExit(f"real-model preflight failed: {type(exc).__name__}") from exc
+    print(receipt.model_dump_json(indent=2))
+    if receipt.status != "ready":
+        raise SystemExit(1)
+
+
+def _cmd_eval_real_model(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        comparison = run_real_model_comparison(args.plan, allow_mock=args.allow_mock)
+        write_comparison_receipt(args.output, comparison, force=args.force)
+    except (FileExistsError, OSError, ValueError) as exc:
+        raise SystemExit(f"real-model comparison failed: {type(exc).__name__}") from exc
+    print(comparison.model_dump_json(indent=2))
+    if comparison.status != "completed":
+        raise SystemExit(1)
+
+
+def _cmd_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        report = benchmark_lexical_search(args.sources, args.queries, args.limit)
+    except ValueError as exc:
+        parser.error(str(exc))
+    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+
+
+def _cmd_embed(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        provider = build_embedding_provider(get_settings())
+    except ProviderConfigurationError as exc:
+        raise SystemExit(str(exc)) from exc
+    if provider is None:
+        raise SystemExit("embedding provider is disabled")
+    with SessionLocal() as session:
+        report = index_current_embeddings(session, provider)
+    print(
+        json.dumps(
+            {
+                "indexed": report.indexed,
+                "skipped": report.skipped,
+                "model_run_ids": report.model_run_ids,
+            },
+            indent=2,
+        )
+    )
+
+
+def _cmd_export(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        with SessionLocal() as session, session.begin():
+            document = build_portable_export(session)
+        atomic_write_export(args.output, document, force=args.force)
+    except PortabilityError as exc:
+        raise SystemExit(f"export failed: {exc.code}") from exc
+    print(
+        json.dumps(
+            {
+                "schema": document["manifest"]["schema"],
+                "payload_sha256": document["manifest"]["payload_sha256"],
+                "counts": document["manifest"]["counts"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+def _cmd_verify_export(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        counts = load_and_verify_export(args.path)
+    except PortabilityError as exc:
+        raise SystemExit(f"export verification failed: {exc.code}") from exc
+    print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
+
+
+def _cmd_export_package(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        if (
+            args.html_report is not None
+            and args.output.expanduser().resolve() == args.html_report.expanduser().resolve()
+        ):
+            raise EvidencePackageError("report_output_conflicts_with_package")
+        with SessionLocal() as session:
+            document = build_decision_package(session, args.artifact_id)
+        atomic_write_package(args.output, document, force=args.force)
+        if args.html_report is not None:
+            atomic_write_html_report(args.html_report, document, force=args.force)
+    except EvidencePackageError as exc:
+        raise SystemExit(f"package export failed: {exc.code}") from exc
+    print(
+        json.dumps(
+            {
+                "schema": document["manifest"]["schema"],
+                "root_hash": document["manifest"]["root_hash"],
+                "artifact_id": document["payload"]["artifact"]["id"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+def _cmd_verify_package(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        _document, report = load_and_verify_package(args.path)
+    except EvidencePackageError as exc:
+        raise SystemExit(f"package verification failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_export_review_receipt(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        _package, package_report = load_and_verify_package(args.package)
+        with SessionLocal() as session:
+            review = session.get(DecisionReview, args.review_id)
+            if review is None:
+                raise ReviewReceiptError("review_not_found")
+            if package_report["artifact_id"] != review.decision_id:
+                raise ReviewReceiptError("package_artifact_mismatch")
+            cited = session.get(SourceVersion, review.cited_source_version_id)
+            current = session.get(SourceVersion, review.current_source_version_id)
+            if cited is None or current is None:
+                raise ReviewReceiptError("source_version_not_found")
+            document = build_review_receipt(
+                review,
+                package_report["root_hash"],
+                cited_content_sha256=cited.content_hash,
+                current_content_sha256=current.content_hash,
+            )
+        atomic_write_export(args.output, document)
+    except (EvidencePackageError, PortabilityError, ReviewReceiptError) as exc:
+        raise SystemExit(f"review receipt export failed: {exc.code}") from exc
+    print(
+        json.dumps(
+            {
+                "schema": document["schema"],
+                "review_id": document["review_id"],
+                "receipt_hash": document["receipt_hash"],
+                "dep_root_hash": document["dep_root_hash"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
+def _cmd_verify_review_receipt(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        _document, report = load_and_verify_review_receipt(args.path)
+    except ReviewReceiptError as exc:
+        raise SystemExit(f"review receipt verification failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_generate_attestation_key(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
+    try:
+        report = generate_attestation_keypair(
+            args.private_key,
+            args.public_key,
+            force=args.force,
+        )
+    except AttestationError as exc:
+        raise SystemExit(f"attestation key generation failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_attest(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        _reject_attestation_output_conflict(
+            args.output,
+            package=args.package,
+            private_key=args.private_key,
+            review_receipt=args.review_receipt,
+        )
+        _package, package_report = load_and_verify_package(args.package)
+        review_report = None
+        if args.review_receipt is not None:
+            _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
+        private_key = load_attestation_private_key(args.private_key)
+        document = build_signed_attestation(
+            package_report=package_report,
+            review_report=review_report,
+            private_key=private_key,
+            issued_at=_parse_attestation_time(args.issued_at),
+        )
+        atomic_write_attestation(args.output, document, force=args.force)
+        report = verify_signed_attestation(document, private_key.public_key())
+    except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
+        raise SystemExit(f"attestation failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_verify_attestation(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        _package, package_report = load_and_verify_package(args.package)
+        review_report = None
+        if args.review_receipt is not None:
+            _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
+        public_key = load_attestation_public_key(args.public_key)
+        document, report = load_and_verify_attestation(
+            args.path,
+            public_key,
+            package_report=package_report,
+            review_report=review_report,
+        )
+        if document["statement"]["review_receipt"] is not None and review_report is None:
+            raise AttestationError("review_subject_required")
+    except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
+        raise SystemExit(f"attestation verification failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_explain(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        with SessionLocal() as session:
+            document = build_decision_package(session, args.artifact_id)
+        report = explain_decision_package(document)
+    except EvidencePackageError as exc:
+        raise SystemExit(f"artifact explanation failed: {exc.code}") from exc
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+
+
+def _cmd_diff(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        before, _before_report = load_and_verify_package(args.before)
+        after, _after_report = load_and_verify_package(args.after)
+        report = diff_decision_packages(before, after)
+    except EvidencePackageError as exc:
+        raise SystemExit(f"package diff failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_import(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    initialize_database()
+    try:
+        document = load_verified_import(args.path)
+        with SessionLocal() as session:
+            if args.preview_merge:
+                report = preview_portable_merge(session, document)
+            elif args.merge:
+                if not args.preview_sha256:
+                    raise PortabilityError("merge_preview_required")
+                with session.begin():
+                    report = merge_portable_export(
+                        session,
+                        document,
+                        expected_preview_sha256=args.preview_sha256,
+                    )
+            else:
+                with session.begin():
+                    report = import_portable_export(session, document)
+    except PortabilityError as exc:
+        raise SystemExit(f"import failed: {exc.code}") from exc
+    print(json.dumps({"valid": True, **report}, sort_keys=True))
+
+
+def _cmd_backup(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if engine.dialect.name != "sqlite":
+        raise SystemExit("backup failed: sqlite_required")
+    initialize_database()
+    try:
+        report = create_sqlite_backup(engine, args.output, force=args.force)
+    except BackupError as exc:
+        raise SystemExit(f"backup failed: {exc.code}") from exc
+    print(json.dumps({"valid": True, **report}, sort_keys=True))
+
+
+def _cmd_verify_backup(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        report = verify_sqlite_backup(args.path)
+    except BackupError as exc:
+        raise SystemExit(f"backup verification failed: {exc.code}") from exc
+    print(json.dumps({"valid": True, **report}, sort_keys=True))
+
+
+def _cmd_restore_backup(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if engine.dialect.name != "sqlite" or not engine.url.database:
+        raise SystemExit("backup restore failed: sqlite_file_required")
+    if engine.url.database == ":memory:":
+        raise SystemExit("backup restore failed: sqlite_file_required")
+    engine.dispose()
+    try:
+        report = restore_sqlite_backup(
+            args.path,
+            Path(engine.url.database),
+            rollback_output=args.rollback_output,
+        )
+    except BackupError as exc:
+        raise SystemExit(f"backup restore failed: {exc.code}") from exc
+    print(json.dumps({"valid": True, **report}, sort_keys=True))
+
+
+def _cmd_verify_integrity(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        report = verify_live_database(engine)
+    except IntegrityVerificationError as exc:
+        raise SystemExit(f"integrity verification failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_check_decisions(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        policy = load_decision_policy(args.policy)
+    except DecisionPolicyError as exc:
+        _decision_check_failed(exc.code)
+    try:
+        with SessionLocal() as session:
+            findings = check_decision_health(session)
+    except DecisionHealthError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    blocking = [finding for finding in findings if finding.reason in policy.fail_on]
+    if args.format == "sarif":
+        document = build_decision_health_sarif(findings, policy)
+    elif args.format == "json":
+        document = {
+            "valid": not blocking,
+            "finding_count": len(findings),
+            "blocking_count": len(blocking),
+            "policy_sha256": policy_sha256(policy),
+            "findings": [finding.content_free_model_dump() for finding in findings],
+        }
+    else:
+        document = None
+    if args.output is not None:
+        if document is None:
+            _decision_check_failed("output_format_invalid")
+        try:
+            atomic_write_export(args.output, document)
+        except PortabilityError as exc:
+            _decision_check_failed(exc.code)
+    elif document is not None:
+        print(json.dumps(document, sort_keys=True))
+    elif findings:
+        for finding in findings:
+            print("Decision requires review")
+            print(f"{finding.locator} changed after this decision was approved.")
+    else:
+        print("All approved decision citations resolve in current sources.")
+    if blocking:
+        raise SystemExit(1)
+
+
+def _cmd_check_impacts(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    evaluated_at = _parse_impact_as_of(args.as_of)
+    try:
+        with SessionLocal() as session:
+            verify_live_database(cast(Engine, session.get_bind()))
+            workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
+            findings = [
+                finding
+                for workspace_id in workspace_ids
+                for finding in compute_decision_impacts(
+                    session,
+                    workspace_id=workspace_id,
+                    as_of=evaluated_at,
+                )
+            ]
+    except IntegrityVerificationError as exc:
+        _impact_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _impact_check_failed("database_unavailable")
+    if args.format == "sarif":
+        document = build_decision_impact_sarif(findings, evaluated_at=evaluated_at)
+    elif args.format == "json":
+        document = {
+            "valid": not findings,
+            "finding_count": len(findings),
+            "root_review_count": len({item.root_review_id for item in findings}),
+            "impacted_decision_count": len({item.impacted_decision_id for item in findings}),
+            "evaluated_at": evaluated_at.isoformat(),
+            "findings": [item.model_dump() for item in findings],
+        }
+    else:
+        document = None
+    if args.output is not None:
+        if document is None:
+            _impact_check_failed("output_format_invalid")
+        try:
+            atomic_write_export(args.output, document)
+        except PortabilityError as exc:
+            _impact_check_failed(exc.code)
+    elif document is not None:
+        print(json.dumps(document, sort_keys=True))
+    else:
+        print(f"Evaluated at {evaluated_at.isoformat()}")
+        if findings:
+            for finding in findings:
+                print("Decision transitively impacted")
+                print(f"Depth: {finding.depth}")
+                print(f"Decision path: {' -> '.join(finding.decision_path)}")
+                print(
+                    "Relation path: "
+                    + " -> ".join(
+                        f"{kind}:{relation_id}"
+                        for kind, relation_id in zip(
+                            finding.relation_kinds,
+                            finding.relation_path,
+                            strict=True,
+                        )
+                    )
+                )
+        else:
+            print("No decisions are transitively impacted.")
+    if findings:
+        raise SystemExit(1)
+
+
+def _cmd_refresh_reviews(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        policy = load_decision_policy(args.policy)
+    except DecisionPolicyError as exc:
+        _decision_check_failed(exc.code)
+    try:
+        initialize_database(engine)
+        totals = {key: 0 for key in ("opened", "superseded", "resolved", "updated", "unchanged")}
+        with SessionLocal() as session:
+            workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
+            for workspace_id in workspace_ids:
+                summary = refresh_decision_reviews(
+                    session,
+                    workspace_id=workspace_id,
+                    policy=policy,
+                )
+                for key, value in summary.model_dump().items():
+                    totals[key] += value
+            session.commit()
+    except DecisionReviewError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(
+        json.dumps(
+            {"valid": True, "policy_sha256": policy_sha256(policy), **totals},
+            sort_keys=True,
+        )
+    )
+
+
+def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        result = run_stale_decision_demo(args.output_dir, force=args.force)
+    except EvidencePackageError as exc:
+        raise SystemExit(f"demo failed: {exc.code}") from exc
+    finding = cast(Any, result["finding"])
+    verification = cast(dict[str, Any], result["verification"])
+    print("1. ADR-007 approved with exact requirement evidence.")
+    print("2. requirement.md updated to a new immutable version.")
+    print("3. Proofline compared the approved citation with the current source.")
+    print()
+    print("Decision requires review")
+    print(f"{finding.locator} changed after this decision was approved.")
+    print("Accepted · review required")
+    print()
+    print(f"Offline package: {result['package']}")
+    print(f"Readable report: {result['report']}")
+    print(f"Review receipt: {result['review_receipt']}")
+    print(f"Verification: valid · root {verification['root_hash']}")
+
+
 def main(argv: list[str] | None = None) -> None:
-    # Subcommand branches reuse these names for unrelated report types.
-    report: Any
-    findings: Any
-    summary: Any
-    finding: Any
-    result: Any
     parser = argparse.ArgumentParser(prog="proofline")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -410,512 +977,44 @@ def main(argv: list[str] | None = None) -> None:
     stale_demo.add_argument("--output-dir", type=Path, default=Path(DEMO_DIRECTORY))
     stale_demo.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
-    if args.command == "serve":
-        if args.no_web:
-            os.environ["PROOFLINE_DISABLE_WEB"] = "true"
-        if args.web_dir is not None:
-            web_dir = args.web_dir.expanduser().resolve()
-            if not (web_dir / "index.html").is_file():
-                parser.error("--web-dir must contain index.html")
-            os.environ["PROOFLINE_WEB_DIR"] = str(web_dir)
-        try:
-            run_server(
-                args.host,
-                args.port,
-                ready_file=args.ready_file,
-                shutdown_file=args.shutdown_file,
-                log_level=args.log_level,
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            raise SystemExit(f"serve failed: {type(exc).__name__}") from exc
-    elif args.command == "launch":
-        data_dir = Path(os.environ.get("PROOFLINE_HOME", Path.cwd() / ".proofline"))
-        try:
-            run_server(
-                "127.0.0.1",
-                args.port,
-                ready_file=data_dir / "proofline-ready.json",
-                log_level=args.log_level,
-                open_browser=not args.no_browser,
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            raise SystemExit(f"launch failed: {type(exc).__name__}") from exc
-    elif args.command == "seed":
-        seed_demo()
-    elif args.command == "mcp":
-        initialize_database()
-        serve_stdio(sys.stdin, sys.stdout, include_titles=args.include_titles)
-    elif args.command == "sync":
-        try:
-            initialize_database()
-            with SessionLocal() as session:
-                summary = sync_folder(session, args.path, uri_root=args.uri_root)
-        except WorkspaceSyncError as exc:
-            raise SystemExit(f"sync failed: {exc.code}") from exc
-        except (OSError, SQLAlchemyError) as exc:
-            raise SystemExit("sync failed: database_unavailable") from exc
-        if args.format == "json":
-            print(json.dumps(summary.model_dump(), sort_keys=True))
-        else:
-            print(
-                f"Synced: {summary.created} created, {summary.updated} updated, "
-                f"{summary.unchanged} unchanged, {len(summary.failed)} failed"
-            )
-        if summary.failed:
-            raise SystemExit(1)
-    elif args.command == "eval":
-        report = evaluate_dataset(args.dataset, args.k)
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-        if (
-            report.recall_at_k < args.min_recall
-            or report.ndcg_at_k < args.min_ndcg
-            or report.expected_empty_accuracy < args.min_expected_empty_accuracy
-        ):
-            raise SystemExit(1)
-    elif args.command == "eval-grounded":
-        report = evaluate_grounded_dataset(args.dataset, args.limit)
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-        if not grounded_report_meets_thresholds(
-            report,
-            min_citation_resolution=args.min_citation_resolution,
-            min_citation_precision=args.min_citation_precision,
-            min_grounded_success=args.min_grounded_success,
-            min_status_accuracy=args.min_status_accuracy,
-        ):
-            raise SystemExit(1)
-    elif args.command == "eval-extraction":
-        report = evaluate_extraction_dataset(args.dataset)
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-        if not extraction_report_meets_thresholds(
-            report,
-            min_precision=args.min_precision,
-            min_recall=args.min_recall,
-            min_f1=args.min_f1,
-            min_evidence_resolution=args.min_evidence_resolution,
-            min_expected_evidence_accuracy=args.min_expected_evidence_accuracy,
-            min_negative_source_accuracy=args.min_negative_source_accuracy,
-        ):
-            raise SystemExit(1)
-    elif args.command == "eval-real-model-preflight":
-        try:
-            receipt = preflight_real_model_plan(args.plan, allow_mock=args.allow_mock)
-            write_preflight_receipt(args.output, receipt, force=args.force)
-        except (FileExistsError, OSError, ValueError) as exc:
-            raise SystemExit(f"real-model preflight failed: {type(exc).__name__}") from exc
-        print(receipt.model_dump_json(indent=2))
-        if receipt.status != "ready":
-            raise SystemExit(1)
-    elif args.command == "eval-real-model":
-        try:
-            comparison = run_real_model_comparison(args.plan, allow_mock=args.allow_mock)
-            write_comparison_receipt(args.output, comparison, force=args.force)
-        except (FileExistsError, OSError, ValueError) as exc:
-            raise SystemExit(f"real-model comparison failed: {type(exc).__name__}") from exc
-        print(comparison.model_dump_json(indent=2))
-        if comparison.status != "completed":
-            raise SystemExit(1)
-    elif args.command == "benchmark":
-        try:
-            report = benchmark_lexical_search(args.sources, args.queries, args.limit)
-        except ValueError as exc:
-            parser.error(str(exc))
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
-    elif args.command == "embed":
-        initialize_database()
-        try:
-            provider = build_embedding_provider(get_settings())
-        except ProviderConfigurationError as exc:
-            raise SystemExit(str(exc)) from exc
-        if provider is None:
-            raise SystemExit("embedding provider is disabled")
-        with SessionLocal() as session:
-            report = index_current_embeddings(session, provider)
-        print(
-            json.dumps(
-                {
-                    "indexed": report.indexed,
-                    "skipped": report.skipped,
-                    "model_run_ids": report.model_run_ids,
-                },
-                indent=2,
-            )
-        )
-    elif args.command == "export":
-        initialize_database()
-        try:
-            with SessionLocal() as session, session.begin():
-                document = build_portable_export(session)
-            atomic_write_export(args.output, document, force=args.force)
-        except PortabilityError as exc:
-            raise SystemExit(f"export failed: {exc.code}") from exc
-        print(
-            json.dumps(
-                {
-                    "schema": document["manifest"]["schema"],
-                    "payload_sha256": document["manifest"]["payload_sha256"],
-                    "counts": document["manifest"]["counts"],
-                },
-                sort_keys=True,
-            )
-        )
-    elif args.command == "verify-export":
-        try:
-            counts = load_and_verify_export(args.path)
-        except PortabilityError as exc:
-            raise SystemExit(f"export verification failed: {exc.code}") from exc
-        print(json.dumps({"valid": True, "counts": counts}, sort_keys=True))
-    elif args.command == "export-package":
-        initialize_database()
-        try:
-            if (
-                args.html_report is not None
-                and args.output.expanduser().resolve() == args.html_report.expanduser().resolve()
-            ):
-                raise EvidencePackageError("report_output_conflicts_with_package")
-            with SessionLocal() as session:
-                document = build_decision_package(session, args.artifact_id)
-            atomic_write_package(args.output, document, force=args.force)
-            if args.html_report is not None:
-                atomic_write_html_report(args.html_report, document, force=args.force)
-        except EvidencePackageError as exc:
-            raise SystemExit(f"package export failed: {exc.code}") from exc
-        print(
-            json.dumps(
-                {
-                    "schema": document["manifest"]["schema"],
-                    "root_hash": document["manifest"]["root_hash"],
-                    "artifact_id": document["payload"]["artifact"]["id"],
-                },
-                sort_keys=True,
-            )
-        )
-    elif args.command == "verify-package":
-        try:
-            _document, report = load_and_verify_package(args.path)
-        except EvidencePackageError as exc:
-            raise SystemExit(f"package verification failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "export-review-receipt":
-        initialize_database()
-        try:
-            _package, package_report = load_and_verify_package(args.package)
-            with SessionLocal() as session:
-                review = session.get(DecisionReview, args.review_id)
-                if review is None:
-                    raise ReviewReceiptError("review_not_found")
-                if package_report["artifact_id"] != review.decision_id:
-                    raise ReviewReceiptError("package_artifact_mismatch")
-                cited = session.get(SourceVersion, review.cited_source_version_id)
-                current = session.get(SourceVersion, review.current_source_version_id)
-                if cited is None or current is None:
-                    raise ReviewReceiptError("source_version_not_found")
-                document = build_review_receipt(
-                    review,
-                    package_report["root_hash"],
-                    cited_content_sha256=cited.content_hash,
-                    current_content_sha256=current.content_hash,
-                )
-            atomic_write_export(args.output, document)
-        except (EvidencePackageError, PortabilityError, ReviewReceiptError) as exc:
-            raise SystemExit(f"review receipt export failed: {exc.code}") from exc
-        print(
-            json.dumps(
-                {
-                    "schema": document["schema"],
-                    "review_id": document["review_id"],
-                    "receipt_hash": document["receipt_hash"],
-                    "dep_root_hash": document["dep_root_hash"],
-                },
-                sort_keys=True,
-            )
-        )
-    elif args.command == "verify-review-receipt":
-        try:
-            _document, report = load_and_verify_review_receipt(args.path)
-        except ReviewReceiptError as exc:
-            raise SystemExit(f"review receipt verification failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "generate-attestation-key":
-        try:
-            report = generate_attestation_keypair(
-                args.private_key,
-                args.public_key,
-                force=args.force,
-            )
-        except AttestationError as exc:
-            raise SystemExit(f"attestation key generation failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "attest":
-        try:
-            _reject_attestation_output_conflict(
-                args.output,
-                package=args.package,
-                private_key=args.private_key,
-                review_receipt=args.review_receipt,
-            )
-            _package, package_report = load_and_verify_package(args.package)
-            review_report = None
-            if args.review_receipt is not None:
-                _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
-            private_key = load_attestation_private_key(args.private_key)
-            document = build_signed_attestation(
-                package_report=package_report,
-                review_report=review_report,
-                private_key=private_key,
-                issued_at=_parse_attestation_time(args.issued_at),
-            )
-            atomic_write_attestation(args.output, document, force=args.force)
-            report = verify_signed_attestation(document, private_key.public_key())
-        except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
-            raise SystemExit(f"attestation failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "verify-attestation":
-        try:
-            _package, package_report = load_and_verify_package(args.package)
-            review_report = None
-            if args.review_receipt is not None:
-                _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
-            public_key = load_attestation_public_key(args.public_key)
-            document, report = load_and_verify_attestation(
-                args.path,
-                public_key,
-                package_report=package_report,
-                review_report=review_report,
-            )
-            if document["statement"]["review_receipt"] is not None and review_report is None:
-                raise AttestationError("review_subject_required")
-        except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
-            raise SystemExit(f"attestation verification failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "explain":
-        initialize_database()
-        try:
-            with SessionLocal() as session:
-                document = build_decision_package(session, args.artifact_id)
-            report = explain_decision_package(document)
-        except EvidencePackageError as exc:
-            raise SystemExit(f"artifact explanation failed: {exc.code}") from exc
-        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
-    elif args.command == "diff":
-        try:
-            before, _before_report = load_and_verify_package(args.before)
-            after, _after_report = load_and_verify_package(args.after)
-            report = diff_decision_packages(before, after)
-        except EvidencePackageError as exc:
-            raise SystemExit(f"package diff failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "import":
-        initialize_database()
-        try:
-            document = load_verified_import(args.path)
-            with SessionLocal() as session:
-                if args.preview_merge:
-                    report = preview_portable_merge(session, document)
-                elif args.merge:
-                    if not args.preview_sha256:
-                        raise PortabilityError("merge_preview_required")
-                    with session.begin():
-                        report = merge_portable_export(
-                            session,
-                            document,
-                            expected_preview_sha256=args.preview_sha256,
-                        )
-                else:
-                    with session.begin():
-                        report = import_portable_export(session, document)
-        except PortabilityError as exc:
-            raise SystemExit(f"import failed: {exc.code}") from exc
-        print(json.dumps({"valid": True, **report}, sort_keys=True))
-    elif args.command == "backup":
-        if engine.dialect.name != "sqlite":
-            raise SystemExit("backup failed: sqlite_required")
-        initialize_database()
-        try:
-            report = create_sqlite_backup(engine, args.output, force=args.force)
-        except BackupError as exc:
-            raise SystemExit(f"backup failed: {exc.code}") from exc
-        print(json.dumps({"valid": True, **report}, sort_keys=True))
-    elif args.command == "verify-backup":
-        try:
-            report = verify_sqlite_backup(args.path)
-        except BackupError as exc:
-            raise SystemExit(f"backup verification failed: {exc.code}") from exc
-        print(json.dumps({"valid": True, **report}, sort_keys=True))
-    elif args.command == "restore-backup":
-        if engine.dialect.name != "sqlite" or not engine.url.database:
-            raise SystemExit("backup restore failed: sqlite_file_required")
-        if engine.url.database == ":memory:":
-            raise SystemExit("backup restore failed: sqlite_file_required")
-        engine.dispose()
-        try:
-            report = restore_sqlite_backup(
-                args.path,
-                Path(engine.url.database),
-                rollback_output=args.rollback_output,
-            )
-        except BackupError as exc:
-            raise SystemExit(f"backup restore failed: {exc.code}") from exc
-        print(json.dumps({"valid": True, **report}, sort_keys=True))
-    elif args.command == "verify-integrity":
-        try:
-            report = verify_live_database(engine)
-        except IntegrityVerificationError as exc:
-            raise SystemExit(f"integrity verification failed: {exc.code}") from exc
-        print(json.dumps(report, sort_keys=True))
-    elif args.command == "check-decisions":
-        try:
-            policy = load_decision_policy(args.policy)
-        except DecisionPolicyError as exc:
-            _decision_check_failed(exc.code)
-        try:
-            with SessionLocal() as session:
-                findings = check_decision_health(session)
-        except DecisionHealthError as exc:
-            _decision_check_failed(exc.code)
-        except (OSError, SQLAlchemyError):
-            _decision_check_failed("database_unavailable")
-        blocking = [finding for finding in findings if finding.reason in policy.fail_on]
-        if args.format == "sarif":
-            document = build_decision_health_sarif(findings, policy)
-        elif args.format == "json":
-            document = {
-                "valid": not blocking,
-                "finding_count": len(findings),
-                "blocking_count": len(blocking),
-                "policy_sha256": policy_sha256(policy),
-                "findings": [finding.content_free_model_dump() for finding in findings],
-            }
-        else:
-            document = None
-        if args.output is not None:
-            if document is None:
-                _decision_check_failed("output_format_invalid")
-            try:
-                atomic_write_export(args.output, document)
-            except PortabilityError as exc:
-                _decision_check_failed(exc.code)
-        elif document is not None:
-            print(json.dumps(document, sort_keys=True))
-        elif findings:
-            for finding in findings:
-                print("Decision requires review")
-                print(f"{finding.locator} changed after this decision was approved.")
-        else:
-            print("All approved decision citations resolve in current sources.")
-        if blocking:
-            raise SystemExit(1)
-    elif args.command == "check-impacts":
-        evaluated_at = _parse_impact_as_of(args.as_of)
-        try:
-            with SessionLocal() as session:
-                verify_live_database(cast(Engine, session.get_bind()))
-                workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
-                findings = [
-                    finding
-                    for workspace_id in workspace_ids
-                    for finding in compute_decision_impacts(
-                        session,
-                        workspace_id=workspace_id,
-                        as_of=evaluated_at,
-                    )
-                ]
-        except IntegrityVerificationError as exc:
-            _impact_check_failed(exc.code)
-        except (OSError, SQLAlchemyError):
-            _impact_check_failed("database_unavailable")
-        if args.format == "sarif":
-            document = build_decision_impact_sarif(findings, evaluated_at=evaluated_at)
-        elif args.format == "json":
-            document = {
-                "valid": not findings,
-                "finding_count": len(findings),
-                "root_review_count": len({item.root_review_id for item in findings}),
-                "impacted_decision_count": len({item.impacted_decision_id for item in findings}),
-                "evaluated_at": evaluated_at.isoformat(),
-                "findings": [item.model_dump() for item in findings],
-            }
-        else:
-            document = None
-        if args.output is not None:
-            if document is None:
-                _impact_check_failed("output_format_invalid")
-            try:
-                atomic_write_export(args.output, document)
-            except PortabilityError as exc:
-                _impact_check_failed(exc.code)
-        elif document is not None:
-            print(json.dumps(document, sort_keys=True))
-        else:
-            print(f"Evaluated at {evaluated_at.isoformat()}")
-            if findings:
-                for finding in findings:
-                    print("Decision transitively impacted")
-                    print(f"Depth: {finding.depth}")
-                    print(f"Decision path: {' -> '.join(finding.decision_path)}")
-                    print(
-                        "Relation path: "
-                        + " -> ".join(
-                            f"{kind}:{relation_id}"
-                            for kind, relation_id in zip(
-                                finding.relation_kinds,
-                                finding.relation_path,
-                                strict=True,
-                            )
-                        )
-                    )
-            else:
-                print("No decisions are transitively impacted.")
-        if findings:
-            raise SystemExit(1)
-    elif args.command == "refresh-reviews":
-        try:
-            policy = load_decision_policy(args.policy)
-        except DecisionPolicyError as exc:
-            _decision_check_failed(exc.code)
-        try:
-            initialize_database(engine)
-            totals = {
-                key: 0 for key in ("opened", "superseded", "resolved", "updated", "unchanged")
-            }
-            with SessionLocal() as session:
-                workspace_ids = session.scalars(select(Workspace.id).order_by(Workspace.id)).all()
-                for workspace_id in workspace_ids:
-                    summary = refresh_decision_reviews(
-                        session,
-                        workspace_id=workspace_id,
-                        policy=policy,
-                    )
-                    for key, value in summary.model_dump().items():
-                        totals[key] += value
-                session.commit()
-        except DecisionReviewError as exc:
-            _decision_check_failed(exc.code)
-        except (OSError, SQLAlchemyError):
-            _decision_check_failed("database_unavailable")
-        print(
-            json.dumps(
-                {"valid": True, "policy_sha256": policy_sha256(policy), **totals},
-                sort_keys=True,
-            )
-        )
+    handlers = {
+        "serve": _cmd_serve,
+        "launch": _cmd_launch,
+        "seed": _cmd_seed,
+        "mcp": _cmd_mcp,
+        "sync": _cmd_sync,
+        "eval": _cmd_eval,
+        "eval-grounded": _cmd_eval_grounded,
+        "eval-extraction": _cmd_eval_extraction,
+        "eval-real-model-preflight": _cmd_eval_real_model_preflight,
+        "eval-real-model": _cmd_eval_real_model,
+        "benchmark": _cmd_benchmark,
+        "embed": _cmd_embed,
+        "export": _cmd_export,
+        "verify-export": _cmd_verify_export,
+        "export-package": _cmd_export_package,
+        "verify-package": _cmd_verify_package,
+        "export-review-receipt": _cmd_export_review_receipt,
+        "verify-review-receipt": _cmd_verify_review_receipt,
+        "generate-attestation-key": _cmd_generate_attestation_key,
+        "attest": _cmd_attest,
+        "verify-attestation": _cmd_verify_attestation,
+        "explain": _cmd_explain,
+        "diff": _cmd_diff,
+        "import": _cmd_import,
+        "backup": _cmd_backup,
+        "verify-backup": _cmd_verify_backup,
+        "restore-backup": _cmd_restore_backup,
+        "verify-integrity": _cmd_verify_integrity,
+        "check-decisions": _cmd_check_decisions,
+        "check-impacts": _cmd_check_impacts,
+        "refresh-reviews": _cmd_refresh_reviews,
+    }
+    handler = handlers.get(args.command)
+    if handler is not None:
+        handler(args, parser)
     elif args.command == "demo" and args.demo_name == "stale-decision":
-        try:
-            result = run_stale_decision_demo(args.output_dir, force=args.force)
-        except EvidencePackageError as exc:
-            raise SystemExit(f"demo failed: {exc.code}") from exc
-        finding = result["finding"]
-        print("1. ADR-007 approved with exact requirement evidence.")
-        print("2. requirement.md updated to a new immutable version.")
-        print("3. Proofline compared the approved citation with the current source.")
-        print()
-        print("Decision requires review")
-        print(f"{finding.locator} changed after this decision was approved.")
-        print("Accepted · review required")
-        print()
-        print(f"Offline package: {result['package']}")
-        print(f"Readable report: {result['report']}")
-        print(f"Review receipt: {result['review_receipt']}")
-        print(f"Verification: valid · root {result['verification']['root_hash']}")
+        _cmd_demo(args, parser)
 
 
 if __name__ == "__main__":
