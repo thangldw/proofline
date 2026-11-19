@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.7.0] - 2026-11-19
+
+- Added `proofline snapshot-health` and `proofline health-trend` (counts-only history of how many approved decisions are stale). Migration 24 adds the `decision_health_snapshots` table; existing tables and export formats are unchanged. Measured WAL mode for faster first sync and recorded the trade-off in the roadmap instead of applying it.
+
 ## [2.6.0] - 2026-11-19
 
 - Added `check-decisions --explain`, per-directory `overrides` in the decision policy, `export-adr`, `check-code-refs` (`proofline-decision: <id>` markers in code), `find-conflicts`, and property tests for anchor resolution. No schema migration.

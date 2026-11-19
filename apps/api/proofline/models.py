@@ -251,6 +251,21 @@ class DecisionReview(Base):
     closed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
+class DecisionHealthSnapshot(Base):
+    __tablename__ = "decision_health_snapshots"
+    __table_args__ = (Index("ix_health_snapshots_workspace_taken", "workspace_id", "taken_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    taken_at: Mapped[datetime] = mapped_column(default=utc_now)
+    approved_count: Mapped[int] = mapped_column(Integer)
+    finding_count: Mapped[int] = mapped_column(Integer)
+    moved_count: Mapped[int] = mapped_column(Integer, default=0)
+    changed_count: Mapped[int] = mapped_column(Integer, default=0)
+    ambiguous_count: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class IngestionJob(Base):
     __tablename__ = "ingestion_jobs"
 

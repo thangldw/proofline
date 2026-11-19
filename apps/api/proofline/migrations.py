@@ -834,6 +834,26 @@ def _add_decision_review_ledger(connection: Connection) -> None:
     )
 
 
+def _add_health_snapshots(connection: Connection) -> None:
+    connection.exec_driver_sql(
+        """CREATE TABLE IF NOT EXISTS decision_health_snapshots (
+            id VARCHAR(36) PRIMARY KEY,
+            workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+            taken_at DATETIME NOT NULL,
+            approved_count INTEGER NOT NULL,
+            finding_count INTEGER NOT NULL,
+            moved_count INTEGER NOT NULL,
+            changed_count INTEGER NOT NULL,
+            ambiguous_count INTEGER NOT NULL,
+            deleted_count INTEGER NOT NULL
+        )"""
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_health_snapshots_workspace_taken "
+        "ON decision_health_snapshots (workspace_id, taken_at)"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     (1, "initial foundation schema", _initial_schema),
     (2, "immutable source versions", _add_source_versions),
@@ -858,6 +878,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     (21, "evidence-first deterministic studio", _add_evidence_first_studio),
     (22, "decision evidence review ledger", _add_decision_review_ledger),
     (23, "source uri lookup index", _index_source_uri_lookup),
+    (24, "decision health snapshots", _add_health_snapshots),
 )
 
 

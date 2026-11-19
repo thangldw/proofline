@@ -47,6 +47,7 @@ from .decision_policy import (
 )
 from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
+from .decision_trend import record_all_snapshots, render_markdown, trend
 from .decision_why import DecisionWhyError, why
 from .embeddings import index_current_embeddings
 from .evaluation import (
@@ -964,6 +965,45 @@ def _cmd_find_conflicts(args: argparse.Namespace, parser: argparse.ArgumentParse
         print("Candidates only: a person decides whether they truly conflict.")
 
 
+def _cmd_snapshot_health(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        initialize_database(engine)
+        with SessionLocal() as session:
+            snapshots = record_all_snapshots(session)
+            session.commit()
+            summary = [
+                {"workspace_id": item.workspace_id, "approved": item.approved_count}
+                | {"findings": item.finding_count}
+                for item in snapshots
+            ]
+    except DecisionHealthError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(json.dumps({"snapshots": summary}, sort_keys=True))
+
+
+def _cmd_health_trend(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            points = trend(session, limit=args.limit)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(json.dumps({"points": [p.model_dump() for p in points]}, sort_keys=True))
+    elif args.format == "markdown":
+        print(render_markdown(points), end="")
+    elif not points:
+        print("No snapshots yet. Run `proofline snapshot-health` on a schedule.")
+    else:
+        for point in points:
+            bar = "#" * min(40, round(point.stale_percent / 2.5))
+            ratio = f"{point.findings:>4}/{point.approved:<4}"
+            print(f"{point.taken_at[:10]}  {ratio} {point.stale_percent:>5}%  {bar}")
+
+
 def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         result = run_stale_decision_demo(args.output_dir, force=args.force)
@@ -1246,6 +1286,14 @@ def main(argv: list[str] | None = None) -> None:
     )
     conflicts.add_argument("--min-similarity", type=float, default=0.5)
     conflicts.add_argument("--format", choices=("text", "json"), default="text")
+    subcommands.add_parser(
+        "snapshot-health", help="Record counts of stale decisions now (run on a schedule)"
+    )
+    health_trend = subcommands.add_parser(
+        "health-trend", help="Show how the share of stale decisions changed over time"
+    )
+    health_trend.add_argument("--limit", type=int, default=30)
+    health_trend.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
@@ -1306,6 +1354,8 @@ def main(argv: list[str] | None = None) -> None:
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
         "blame": _cmd_blame,
+        "snapshot-health": _cmd_snapshot_health,
+        "health-trend": _cmd_health_trend,
         "export-adr": _cmd_export_adr,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
