@@ -7,6 +7,7 @@
 - Added `proofline report`, a shareable HTML or Markdown health report (trend, stale citations, reviews due, possible conflicts) with an optional `--no-titles` mode.
 - Added `proofline completion bash|zsh|fish`, generated from the command tree.
 - Added `proofline graph`, the decision relation graph as Mermaid or Graphviz DOT with stale and possible-conflict markers.
+- Added `proofline policy-schema` and `spec/decision-policy/v1/schema.json`, a JSON Schema for `proofline.toml` that a test keeps in agreement with the loader.
 
 ## [2.9.0] - 2026-11-19
 
