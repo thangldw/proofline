@@ -1,12 +1,12 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import proofline.cli as cli_module
 import pytest
 from proofline.cli import main
 from proofline.decision_expiry import check_expiry, review_by_date
 from proofline.ingestion import extract_memories, ingest_source
-from proofline.models import Decision
+from proofline.models import Decision, SourceVersion
 from proofline.schemas import SourceCreate
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
@@ -73,3 +73,30 @@ def test_cli_check_expiry_exits_non_zero_when_overdue(session, monkeypatch, caps
     assert "overdue" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         main(["check-expiry", "--as-of", "nope"])
+
+
+def test_review_every_counts_from_the_cited_version_and_resets_on_a_new_one(session):
+    from proofline.decision_expiry import add_months
+
+    assert add_months(date(2027, 1, 31), 1) == date(2027, 2, 28)
+    assert add_months(date(2028, 1, 31), 1) == date(2028, 2, 29)
+    assert add_months(date(2027, 11, 15), 3) == date(2028, 2, 15)
+    assert review_by_date("Review every: 6 months") is None
+    assert review_by_date("Review every: 2 weeks", approved_on=date(2027, 1, 1)) == date(
+        2027, 1, 15
+    )
+    assert review_by_date("Review every: 1 year", approved_on=date(2027, 1, 1)) == date(2028, 1, 1)
+    assert review_by_date("Review every: 11 years", approved_on=date(2027, 1, 1)) is None
+    assert review_by_date("Review every: 0 days", approved_on=date(2027, 1, 1)) is None
+    decision = _approved(session, "Decision: Use SQLite.\nReason: local.\nReview every: 30 days")
+    recorded = session.get(SourceVersion, decision.source_version_id).created_at.date()
+    assert check_expiry(session, as_of=recorded) == []
+    late = check_expiry(session, as_of=recorded + timedelta(days=40))
+    assert late and late[0].state == "overdue" and late[0].days_overdue == 10
+    soon = check_expiry(session, as_of=recorded + timedelta(days=25), warn_within_days=10)
+    assert soon and soon[0].state == "due_soon"
+
+
+def test_review_every_line_is_part_of_the_extracted_quote():
+    (item,) = extract_memories("Decision: Use SQLite.\nReason: local.\nReview every: 6 months")
+    assert item["quote"].endswith("Review every: 6 months")

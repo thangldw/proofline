@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.9.0] - 2026-11-19
+
+- Added `Review every: N days|weeks|months|years` (repeats from the date the cited version was recorded; `rebind` restarts the cycle), `proofline suggest-links`, and a weekly operating routine in `docs/operations.md`. No schema migration.
+
 ## [2.8.0] - 2026-11-19
 
 - Added `proofline doctor`, the read-only `check_expiry` and `find_conflicts` MCP tools, and the action inputs `check-expiry` and `code-refs`. No schema migration.

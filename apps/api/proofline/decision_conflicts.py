@@ -82,3 +82,81 @@ def find_conflict_candidates(
                 )
             )
     return sorted(found, key=lambda item: (-item.similarity, item.first_id, item.second_id))
+
+
+RELATION_KINDS = ("based_on", "supersedes", "contradicts", "implements", "considered")
+
+
+@dataclass(frozen=True)
+class LinkSuggestion:
+    other_id: str
+    similarity: float
+    shared_terms: list[str]
+    other_is_older: bool
+    kinds_to_consider: tuple[str, ...] = RELATION_KINDS
+
+    def model_dump(self) -> dict[str, object]:
+        return {**asdict(self), "kinds_to_consider": list(self.kinds_to_consider)}
+
+
+def _text_terms(decision: Decision) -> frozenset[str]:
+    words = re.findall(
+        r"[\w\-]+", f"{decision.title} {decision.statement}".casefold(), flags=re.UNICODE
+    )
+    return frozenset(w for w in words if len(w) > 2 and w not in ENGLISH_QUERY_STOPWORDS)
+
+
+def suggest_links(
+    session: Session,
+    decision_ref: str,
+    *,
+    limit: int = 5,
+    min_similarity: float = 0.2,
+) -> list[LinkSuggestion]:
+    """Approved decisions a new decision probably relates to, for a person to link or ignore.
+
+    Compares title and statement words only; it never creates a relation.
+    """
+
+    if not 1 <= limit <= 20 or not 0 < min_similarity <= 1:
+        raise ValueError("suggest_arguments_invalid")
+    decisions = list(session.scalars(select(Decision).order_by(Decision.id)).all())
+    matches = [item for item in decisions if item.id.startswith(decision_ref)]
+    if len(matches) != 1 or len(decision_ref) < 8:
+        raise ValueError("decision_reference_invalid")
+    subject = matches[0]
+    related = {
+        frozenset((row.source_decision_id, row.target_decision_id))
+        for row in session.scalars(
+            select(DecisionRelation).where(
+                or_(
+                    DecisionRelation.source_decision_id == subject.id,
+                    DecisionRelation.target_decision_id == subject.id,
+                )
+            )
+        ).all()
+    }
+    mine = _text_terms(subject)
+    found: list[LinkSuggestion] = []
+    for other in decisions:
+        if other.id == subject.id or other.status not in {"active", "accepted"}:
+            continue
+        if other.source_version_id == subject.source_version_id:
+            continue
+        if frozenset((subject.id, other.id)) in related:
+            continue
+        theirs = _text_terms(other)
+        if not mine or not theirs:
+            continue
+        similarity = len(mine & theirs) / len(mine | theirs)
+        if similarity >= min_similarity:
+            found.append(
+                LinkSuggestion(
+                    other_id=other.id,
+                    similarity=round(similarity, 3),
+                    shared_terms=sorted(mine & theirs),
+                    other_is_older=(other.created_at, other.id) < (subject.created_at, subject.id),
+                )
+            )
+    found.sort(key=lambda item: (-item.similarity, item.other_id))
+    return found[:limit]

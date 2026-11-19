@@ -19,6 +19,19 @@ Restore verifies the candidate before atomic replacement. When a database exists
 
 After bulk ingest, run `proofline refresh-reviews --policy proofline.toml`, then `proofline check-decisions --policy proofline.toml --format sarif` and `proofline check-impacts --format sarif`. Export the historical DEP before its review receipt and retain both. `verify-integrity` checks active/superseded binding chains, review fingerprints, and audit references.
 
+### Weekly routine
+
+A team that keeps its database on one machine can run this loop on a schedule:
+
+1. `proofline sync <folder>` to ingest current documents, then `proofline snapshot-health` to record how many approved decisions are stale (counts only).
+2. `proofline doctor` for migrations, integrity, old open reviews and snapshot age; warnings do not fail it.
+3. `proofline check-decisions --explain` for what is stale and the command that fixes it; `proofline rebind` previews and applies the fix with an audited reason.
+4. `proofline check-expiry --warn-within 30` for decisions with a `Review by:` or `Review every:` line that are due; `proofline check-code-refs src/` for code that cites a stale decision.
+5. `proofline find-conflicts` and `proofline suggest-links <id>` as prompts for a person to link or reject; neither changes data.
+6. `proofline health-trend --format markdown` for the weekly report, and `proofline export-adr --output-dir adr/ --force` to refresh readable ADRs.
+
+In CI, the action covers steps 3 and 4 (`check-expiry`, `code-refs`) but not the history in step 1, because its workspace is discarded.
+
 ### Attestation keys
 
 Generate a key once in a restricted local directory. Distribute only the public key through an independent trusted channel. Sign only verified package/receipt subjects. Keep private keys outside repositories and synced folders; backup and rotation are external processes because Proofline has no revocation service.
@@ -69,6 +82,19 @@ Restore verify candidate trước atomic replacement. Khi database đã tồn t�
 
 Sau bulk ingest, chạy `proofline refresh-reviews --policy proofline.toml`, rồi `proofline check-decisions --policy proofline.toml --format sarif` và `proofline check-impacts --format sarif`. Export DEP lịch sử trước review receipt của nó và giữ cả hai. `verify-integrity` check active/superseded binding chain, review fingerprint và audit reference.
 
+### Quy trình hằng tuần
+
+Team giữ database trên một máy có thể chạy vòng lặp này theo lịch:
+
+1. `proofline sync <folder>` để ingest tài liệu hiện tại, rồi `proofline snapshot-health` để ghi số decision đã duyệt đang stale (chỉ số đếm).
+2. `proofline doctor` cho migration, integrity, review mở lâu và tuổi snapshot; cảnh báo không làm fail.
+3. `proofline check-decisions --explain` để biết cái gì stale và lệnh sửa; `proofline rebind` xem trước và áp dụng bản sửa kèm lý do được audit.
+4. `proofline check-expiry --warn-within 30` cho decision có dòng `Review by:` hoặc `Review every:` sắp đến hạn; `proofline check-code-refs src/` cho code trích dẫn decision đã stale.
+5. `proofline find-conflicts` và `proofline suggest-links <id>` làm gợi ý để người liên kết hoặc bỏ qua; cả hai không thay đổi dữ liệu.
+6. `proofline health-trend --format markdown` cho báo cáo tuần, và `proofline export-adr --output-dir adr/ --force` để làm mới ADR dễ đọc.
+
+Trong CI, action bao phủ bước 3 và 4 (`check-expiry`, `code-refs`) nhưng không có lịch sử của bước 1 vì workspace bị bỏ đi.
+
 ### Attestation key
 
 Generate key một lần trong restricted local directory. Chỉ phân phối public key qua trusted channel độc lập. Chỉ sign package/receipt subject đã verify. Giữ private key ngoài repository và synced folder; backup và rotation là quy trình bên ngoài vì Proofline không có revocation service.
@@ -118,6 +144,19 @@ Restore は atomic replacement 前に candidate を検証します。既存 data
 ### Bulk ingest と decision health
 
 Bulk ingest 後に `proofline refresh-reviews --policy proofline.toml`、続いて `proofline check-decisions --policy proofline.toml --format sarif` と `proofline check-impacts --format sarif` を実行します。Historical DEP を review receipt より先に export し、両方を保持します。`verify-integrity` は active/superseded binding chain、review fingerprint、audit reference を検査します。
+
+### 週次の運用
+
+データベースを 1 台に置く team は、次のループを定期実行できます:
+
+1. `proofline sync <folder>` で現在の文書を取り込み、`proofline snapshot-health` で stale な承認済み decision の数を記録します (件数のみ)。
+2. `proofline doctor` で migration、integrity、長く開いた review、snapshot の古さを確認します。警告では失敗しません。
+3. `proofline check-decisions --explain` で何が stale かと修正コマンドを確認し、`proofline rebind` で監査付きの理由とともに修正をプレビュー・適用します。
+4. `proofline check-expiry --warn-within 30` で `Review by:` または `Review every:` 行を持つ期限間近の decision を、`proofline check-code-refs src/` で stale な decision を引用する code を確認します。
+5. `proofline find-conflicts` と `proofline suggest-links <id>` は、人が関連付けるか却下するかを判断するための提示で、どちらもデータを変更しません。
+6. `proofline health-trend --format markdown` で週次レポートを、`proofline export-adr --output-dir adr/ --force` で読みやすい ADR を更新します。
+
+CI では action が手順 3 と 4 (`check-expiry`、`code-refs`) を担いますが、workspace が破棄されるため手順 1 の履歴は残りません。
 
 ### Attestation key
 

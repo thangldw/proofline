@@ -111,3 +111,31 @@ def test_cli_exports_checks_refs_and_finds_conflicts(session, monkeypatch, tmp_p
     assert len(json.loads(capsys.readouterr().out)["candidates"]) == 1
     main(["find-conflicts", "--min-similarity", "0.99"])
     assert "No conflict candidates." in capsys.readouterr().out
+
+
+def test_suggest_links_ranks_related_decisions_and_skips_linked_ones(session, monkeypatch, capsys):
+    from proofline.decision_conflicts import suggest_links
+
+    _, new = _approve(
+        session, "n", "Decision: Use Redis for the session cache layer.", "file:///n.md"
+    )
+    _, related = _approve(
+        session, "r", "Decision: Cache sessions in memory for the session layer.", "file:///r.md"
+    )
+    _approve(session, "x", "Decision: Adopt quarterly planning.", "file:///x.md")
+    found = suggest_links(session, new.id[:8], min_similarity=0.1)
+    assert [item.other_id for item in found] == [related.id]
+    assert "session" in found[0].shared_terms and "based_on" in found[0].kinds_to_consider
+    session.add(
+        DecisionRelation(source_decision_id=new.id, target_decision_id=related.id, kind="based_on")
+    )
+    session.commit()
+    assert suggest_links(session, new.id, min_similarity=0.1) == []
+    for ref, kwargs in (("short", {}), (new.id, {"limit": 0}), (new.id, {"min_similarity": 0})):
+        with pytest.raises(ValueError):
+            suggest_links(session, ref, **kwargs)
+    _patch(session, monkeypatch)
+    main(["suggest-links", new.id, "--format", "json"])
+    assert json.loads(capsys.readouterr().out)["suggestions"] == []
+    main(["suggest-links", new.id])
+    assert "No related decisions found." in capsys.readouterr().out

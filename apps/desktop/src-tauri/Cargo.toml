@@ -1,6 +1,6 @@
 [package]
 name = "proofline-desktop"
-version = "2.8.0"
+version = "2.9.0"
 description = "Experimental native shell for Proofline"
 authors = ["Thang Luu"]
 edition = "2021"
