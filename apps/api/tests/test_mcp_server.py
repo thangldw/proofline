@@ -60,6 +60,7 @@ def test_tool_list_is_read_only_and_closed():
         "list_decisions",
         "search_evidence",
         "blame_location",
+        "why_decision",
     }
     assert all(tool["inputSchema"]["additionalProperties"] is False for tool in tools)
 
@@ -157,7 +158,7 @@ def test_cli_mcp_speaks_json_rpc_over_a_real_subprocess(tmp_path):
     assert completed.returncode == 0
     replies = [json.loads(line) for line in completed.stdout.splitlines()]
     assert [reply["id"] for reply in replies] == [1, 2]
-    assert len(replies[1]["result"]["tools"]) == 5
+    assert len(replies[1]["result"]["tools"]) == 6
 
 
 JSON_VALUES = st.recursive(
@@ -238,3 +239,35 @@ def test_blame_location_is_content_free_unless_titles_are_enabled(seeded):
 )
 def test_blame_location_rejects_bad_arguments(arguments):
     assert call("blame_location", arguments)["isError"] is True
+
+
+def test_why_decision_withholds_text_unless_enabled(seeded):
+    decision_id, title = seeded
+    plain = call("why_decision", {"question": "NATS network"})["content"][0]["text"]
+    body = json.loads(plain)
+    assert "NATS" not in plain and "quote" not in plain
+    assert body["answer_count"] >= 0
+    full = json.loads(
+        call(
+            "why_decision",
+            {"question": "NATS network"},
+            include_titles=True,
+            include_excerpts=True,
+        )["content"][0]["text"]
+    )
+    for item in full["answers"]:
+        assert "quote" in item and "decision_title" in item
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {},
+        {"question": ""},
+        {"question": 3},
+        {"question": "a", "limit": 0},
+        {"question": "a", "x": 1},
+    ],
+)
+def test_why_decision_rejects_bad_arguments(arguments):
+    assert call("why_decision", arguments)["isError"] is True

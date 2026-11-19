@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, NoReturn, cast
@@ -34,6 +34,7 @@ from .backup import (
 from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .decision_blame import DecisionBlameError, blame
+from .decision_expiry import check_expiry
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_policy import (
@@ -41,7 +42,9 @@ from .decision_policy import (
     load_decision_policy,
     policy_sha256,
 )
+from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
+from .decision_why import DecisionWhyError, why
 from .embeddings import index_current_embeddings
 from .evaluation import (
     benchmark_lexical_search,
@@ -765,6 +768,114 @@ def _cmd_refresh_reviews(args: argparse.Namespace, parser: argparse.ArgumentPars
     )
 
 
+def _cmd_rebind(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            if args.review_id is None:
+                pending = list_pending_reviews(session)
+                if args.format == "json":
+                    print(json.dumps({"pending": [_review_row(item) for item in pending]}))
+                    return
+                if not pending:
+                    print("No pending reviews. Run `proofline refresh-reviews` to scan.")
+                for item in pending:
+                    row = _review_row(item)
+                    print(f"{row['id']}  {row['anchor_state']}  decision {row['decision_id']}")
+                return
+            preview = preview_rebind(session, args.review_id)
+            if not args.apply:
+                if args.format == "json":
+                    print(json.dumps(preview.model_dump(), sort_keys=True))
+                else:
+                    print(f"[{preview.anchor_state}] {preview.decision_title}")
+                    print("\n".join(preview.diff) or "(no textual difference to show)")
+                    print(
+                        'Re-run with --apply --reason "..." to accept the current text.'
+                        if preview.can_apply
+                        else f"Cannot re-anchor automatically: {preview.blocker}"
+                    )
+                return
+            if not args.reason:
+                _decision_check_failed("reason_required")
+            review = apply_rebind(session, args.review_id, actor="local_cli", reason=args.reason)
+            session.commit()
+            print(json.dumps({"review_id": review.id, "state": review.state}, sort_keys=True))
+    except DecisionReviewError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+
+
+def _review_row(review: Any) -> dict[str, Any]:
+    return {
+        "id": review.id,
+        "decision_id": review.decision_id,
+        "anchor_state": review.anchor_state,
+        "state": review.state,
+    }
+
+
+def _cmd_check_expiry(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    except ValueError:
+        _decision_check_failed("as_of_invalid")
+    try:
+        with SessionLocal() as session:
+            findings = check_expiry(session, as_of=as_of, warn_within_days=args.warn_within)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    overdue = [item for item in findings if item.state == "overdue"]
+    if args.format == "json":
+        print(
+            json.dumps(
+                {
+                    "valid": not overdue,
+                    "as_of": as_of.isoformat(),
+                    "findings": [item.content_free_model_dump() for item in findings],
+                },
+                sort_keys=True,
+            )
+        )
+    elif not findings:
+        print("No approved decision is past its review date.")
+    for item in findings if args.format == "text" else []:
+        suffix = (
+            f"{item.days_overdue} days overdue"
+            if item.state == "overdue"
+            else f"due in {-item.days_overdue} days"
+        )
+        print(
+            f"[{item.state}] {item.decision_title} ({item.decision_id}): "
+            f"review by {item.review_by}, {suffix}"
+        )
+    if overdue:
+        raise SystemExit(1)
+
+
+def _cmd_why(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            answers = why(session, args.question, limit=args.limit)
+    except DecisionWhyError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(json.dumps({"answers": [item.model_dump() for item in answers]}, sort_keys=True))
+        return
+    if not answers:
+        print("No approved decision matches that question.")
+    for item in answers:
+        warning = "" if item.health == "current" else f"  WARNING: citation {item.health}"
+        print(f"{item.decision_title} ({item.decision_id}) [{item.status}]{warning}")
+        print(f"  cited at {item.source_title}:{item.start_line}-{item.end_line}")
+        if item.rationale:
+            print(f"  because: {item.rationale}")
+
+
 def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         result = run_stale_decision_demo(args.output_dir, force=args.force)
@@ -1012,6 +1123,25 @@ def main(argv: list[str] | None = None) -> None:
     blame_parser.add_argument("target", help="Source path, URI or title, optionally with :LINE")
     blame_parser.add_argument("--line", type=int)
     blame_parser.add_argument("--format", choices=("text", "json"), default="text")
+    rebind = subcommands.add_parser(
+        "rebind", help="Preview or apply re-anchoring of a stale decision to its candidate text"
+    )
+    rebind.add_argument("review_id", nargs="?", help="Omit to list pending reviews")
+    rebind.add_argument("--apply", action="store_true")
+    rebind.add_argument("--reason")
+    rebind.add_argument("--format", choices=("text", "json"), default="text")
+    expiry = subcommands.add_parser(
+        "check-expiry", help="Fail when an approved decision is past its Review by date"
+    )
+    expiry.add_argument("--as-of", help="YYYY-MM-DD, default today (UTC)")
+    expiry.add_argument("--warn-within", type=int, default=0, help="Also list decisions due soon")
+    expiry.add_argument("--format", choices=("text", "json"), default="text")
+    why_parser = subcommands.add_parser(
+        "why", help="Find the approved decisions that answer a question, with citations"
+    )
+    why_parser.add_argument("question")
+    why_parser.add_argument("--limit", type=int, default=5)
+    why_parser.add_argument("--format", choices=("text", "json"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
@@ -1069,6 +1199,9 @@ def main(argv: list[str] | None = None) -> None:
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
         "blame": _cmd_blame,
+        "why": _cmd_why,
+        "check-expiry": _cmd_check_expiry,
+        "rebind": _cmd_rebind,
         "check-decisions": _cmd_check_decisions,
         "check-impacts": _cmd_check_impacts,
         "refresh-reviews": _cmd_refresh_reviews,
