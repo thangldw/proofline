@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.6.0] - 2026-11-19
+
+- Added `check-decisions --explain`, per-directory `overrides` in the decision policy, `export-adr`, `check-code-refs` (`proofline-decision: <id>` markers in code), `find-conflicts`, and property tests for anchor resolution. No schema migration.
+
 ## [2.5.0] - 2026-11-19
 
 - Added `proofline rebind` (preview a cited-vs-current diff, then re-anchor with an audited reason), `proofline why` and a read-only `why_decision` MCP tool (deterministic question-to-decision lookup with citation health), and `proofline check-expiry` for `Review by: YYYY-MM-DD` lines. No schema migration.

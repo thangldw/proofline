@@ -240,3 +240,27 @@ def test_stale_decision_demo_cli_reports_accepted_review_state(tmp_path, capsys)
     output = capsys.readouterr().out
     assert "Accepted · review required" in output
     assert "decision-review.json" in output
+
+
+def test_explain_prints_a_fix_for_each_finding(session, monkeypatch, capsys):
+    source, _decision = _approved_decision(session)
+    ingest_source(
+        session,
+        SourceCreate(
+            title="requirement.md",
+            uri=source.uri,
+            content="Decision: Use NATS for the local queue.\nReason: now permitted.",
+        ),
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "SessionLocal",
+        sessionmaker(bind=session.get_bind(), expire_on_commit=False),
+    )
+    with pytest.raises(SystemExit):
+        main(["check-decisions", "--explain"])
+    out = capsys.readouterr().out
+    assert "This blocks the gate." in out and "Fix:" in out and "proofline blame" in out
+    with pytest.raises(SystemExit):
+        main(["check-decisions"])
+    assert "Fix:" not in capsys.readouterr().out

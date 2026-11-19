@@ -74,3 +74,33 @@ def test_malformed_and_missing_policy_have_distinct_codes(tmp_path):
         load_decision_policy(malformed)
     with pytest.raises(DecisionPolicyError, match="^policy_file_unavailable$"):
         load_decision_policy(tmp_path / "missing.toml")
+
+
+def test_directory_overrides_choose_the_longest_matching_path(tmp_path):
+    from proofline.decision_policy import DecisionPolicyError, load_decision_policy, policy_sha256
+
+    path = tmp_path / "p.toml"
+    path.write_text(
+        "version = 1\n[decision_health]\n"
+        'fail_on = ["changed", "deleted"]\n'
+        'overrides = [{path = "notes", fail_on = []}, {path = "docs/adr", fail_on = ["moved"]}]\n'
+    )
+    policy = load_decision_policy(path)
+    assert policy.fail_on_for("file:///repo/docs/adr/001.md") == {"moved"}
+    assert policy.fail_on_for("file:///repo/notes/a.md") == frozenset()
+    assert policy.fail_on_for("file:///repo/src/a.md") == {"changed", "deleted"}
+    assert policy.fail_on_for("file:///repo/mynotes/a.md") == {"changed", "deleted"}
+    assert policy.fail_on_for(None) == {"changed", "deleted"}
+    base = tmp_path / "b.toml"
+    base.write_text('version = 1\n[decision_health]\nfail_on = ["changed", "deleted"]\n')
+    assert policy_sha256(policy) != policy_sha256(load_decision_policy(base))
+    for bad in (
+        'overrides = [{path = "a"}]',
+        'overrides = [{path = "../x", fail_on = []}]',
+        'overrides = [{path = "a", fail_on = ["nope"]}]',
+        'overrides = [{path = "a", fail_on = []}, {path = "a/", fail_on = []}]',
+        'overrides = "x"',
+    ):
+        path.write_text(f"version = 1\n[decision_health]\n{bad}\n")
+        with pytest.raises(DecisionPolicyError):
+            load_decision_policy(path)
