@@ -52,6 +52,7 @@ from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
+from .decision_watch import watch_folder
 from .decision_why import DecisionWhyError, why
 from .doctor import run_doctor
 from .embeddings import index_current_embeddings
@@ -1122,6 +1123,28 @@ def _cmd_notify(args: argparse.Namespace, parser: argparse.ArgumentParser) -> No
     )
 
 
+def _cmd_watch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.interval <= 0:
+        _decision_check_failed("interval_invalid")
+    try:
+        initialize_database()
+        print(f"watching {args.path} every {args.interval:g}s; Ctrl-C to stop", flush=True)
+        watch_folder(
+            SessionLocal,
+            args.path,
+            uri_root=args.uri_root,
+            interval=args.interval,
+            max_cycles=args.max_cycles,
+            emit=lambda line: print(line, flush=True),
+        )
+    except KeyboardInterrupt:
+        print("stopped")
+    except WorkspaceSyncError as exc:
+        raise SystemExit(f"watch failed: {exc.code}") from exc
+    except (OSError, SQLAlchemyError) as exc:
+        raise SystemExit("watch failed: database_unavailable") from exc
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1262,6 +1285,13 @@ def main(argv: list[str] | None = None) -> None:
         help="file:// URI the folder had when decisions were approved; defaults to its real path",
     )
     sync.add_argument("--format", choices=("text", "json"), default="text")
+    watch = subcommands.add_parser(
+        "watch", help="Re-sync a folder when documents change and report newly stale decisions"
+    )
+    watch.add_argument("path", type=Path)
+    watch.add_argument("--uri-root")
+    watch.add_argument("--interval", type=float, default=2.0, metavar="SECONDS")
+    watch.add_argument("--max-cycles", type=int, help=argparse.SUPPRESS)
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
     evaluate.add_argument("--k", type=int, default=10)
@@ -1557,6 +1587,7 @@ def main(argv: list[str] | None = None) -> None:
         "seed": _cmd_seed,
         "mcp": _cmd_mcp,
         "sync": _cmd_sync,
+        "watch": _cmd_watch,
         "eval": _cmd_eval,
         "eval-grounded": _cmd_eval_grounded,
         "eval-extraction": _cmd_eval_extraction,

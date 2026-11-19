@@ -11,6 +11,7 @@
 - Added `proofline graph`, the decision relation graph as Mermaid or Graphviz DOT with stale and possible-conflict markers.
 - Added `proofline policy-schema` and `spec/decision-policy/v1/schema.json`, a JSON Schema for `proofline.toml` that a test keeps in agreement with the loader.
 - Added `proofline notify --webhook URL`, a content-free review-expiry alert (generic JSON or Slack text) with https-only delivery, no redirects and a timeout.
+- Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
 
 ## [2.9.0] - 2026-11-19
 
