@@ -77,7 +77,7 @@ def _model_lineage(
         return []
     lineage: list[ModelRun] = []
     visited: set[str] = set()
-    cursor = run_id
+    cursor: str | None = run_id
     while cursor is not None:
         if cursor in visited:
             raise EvidencePackageError("model_run_lineage_invalid")

@@ -305,11 +305,18 @@ def _index_version(session: Session, source: Source, version: SourceVersion, con
         )
 
 
+def _require_job(session: Session, job_id: str) -> IngestionJob:
+    job = session.get(IngestionJob, job_id)
+    if job is None:
+        raise IngestionExecutionError(job_id)
+    return job
+
+
 def ingest_source(
     session: Session, payload: SourceCreate, *, commit: bool = True
 ) -> tuple[Source, bool]:
     digest = hashlib.sha256(payload.content.encode("utf-8")).hexdigest()
-    source = None
+    source: Source | None = None
     if payload.uri:
         matches = (
             session.query(Source)
@@ -340,7 +347,7 @@ def ingest_source(
             return duplicate, False
 
     created = source is None
-    if created:
+    if source is None:
         source_id = new_id()
         source = Source(
             id=source_id,
@@ -480,6 +487,8 @@ def _stage_ingestion_job(
             existing = session.scalar(
                 select(IngestionJob).where(IngestionJob.idempotency_key == normalized_key)
             )
+            if existing is None:
+                raise
             return existing, True
         raise
     return job, False
@@ -543,7 +552,7 @@ def _execute_staged_ingestion(session: Session, job_id: str) -> tuple[Source, bo
             workspace_id=staged_input.workspace_id,
         )
         source, created = ingest_source(session, payload, commit=False)
-        job = session.get(IngestionJob, job_id)
+        job = _require_job(session, job_id)
         staged_input = session.get(IngestionJobInput, job_id)
         job.source_id = source.id
         job.source_version_id = source.current_version_id
@@ -622,7 +631,7 @@ def run_ingestion_job(
         idempotency_key=normalized_key,
         max_attempts=max_attempts,
     )
-    if reused:
+    if reused and normalized_key is not None:
         return _existing_idempotent_result(session, normalized_key, request_hash)
     return _execute_staged_ingestion(session, job.id)
 
@@ -655,7 +664,7 @@ def retry_ingestion_job(session: Session, job_id: str) -> IngestionJob:
             updated_at=now,
         )
     )
-    if claimed.rowcount != 1:
+    if getattr(claimed, "rowcount", None) != 1:
         session.rollback()
         raise IngestionRetryConflict(job_id, "ingestion job is not claimable for retry")
     session.commit()

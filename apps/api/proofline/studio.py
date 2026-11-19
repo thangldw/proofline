@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 StudioKind = Literal[
     "audio_overview",
@@ -110,7 +110,7 @@ def build_studio_draft(kind: StudioKind, source_title: str, content: str) -> Stu
     summary = " ".join(item["body"] for item in items[:4])
 
     if kind == "audio_overview":
-        artifact = {
+        artifact: dict[str, Any] = {
             "format": "narration",
             "summary": summary,
             "items": [

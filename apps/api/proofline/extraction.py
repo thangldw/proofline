@@ -69,6 +69,8 @@ def extract_memory_candidates(
     if not source.current_version_id:
         raise ValueError("source has no current version")
     version = session.get(SourceVersion, source.current_version_id)
+    if version is None:
+        raise ValueError("source current version is missing")
     chunks = list(
         session.scalars(
             select(Chunk)

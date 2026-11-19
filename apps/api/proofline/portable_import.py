@@ -329,7 +329,7 @@ def _import_verified(
             elif existing.slug != item["slug"] or existing.title != item["title"]:
                 raise PortabilityError("workspace_conflict")
             else:
-                existing.created_at = _datetime(item["created_at"])
+                existing.created_at = _datetime(item["created_at"]) or existing.created_at
         session.flush()
 
         _insert_model_runs(session, payload["model_runs"])

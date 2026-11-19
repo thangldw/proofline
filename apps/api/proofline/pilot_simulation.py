@@ -9,6 +9,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import median
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
@@ -34,7 +35,7 @@ class SyntheticPilotTask(BaseModel):
     intent: str = Field(min_length=1)
     temporal: bool = False
     question: str = Field(min_length=2)
-    expected_status: str
+    expected_status: Literal["grounded", "insufficient_evidence"]
     expected_statements: list[GroundedExpectedStatement] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -90,7 +91,7 @@ class SyntheticTaskResult(BaseModel):
     persona: str
     intent: str
     temporal: bool
-    expected_status: str
+    expected_status: Literal["grounded", "insufficient_evidence"]
     actual_status: str
     completed: bool
     expected_source_uris: list[str]
@@ -262,7 +263,7 @@ def run_synthetic_pilot_simulation(
     proofline_inspections = sum(result.proofline_sources_inspected for result in results)
     naive_inspections = sum(result.naive_sources_inspected for result in results)
     latencies = [result.local_latency_ms for result in results]
-    completed = sum(result.completed for result in results)
+    completed_count = sum(result.completed for result in results)
     return SyntheticPilotReport(
         qualification=(
             "Credential-free deterministic simulation only. This is not external pilot, "
@@ -280,8 +281,8 @@ def run_synthetic_pilot_simulation(
         task_count=len(results),
         persona_count=len({result.persona for result in results}),
         temporal_task_count=sum(result.temporal for result in results),
-        completed_tasks=completed,
-        task_completion_rate=completed / len(results),
+        completed_tasks=completed_count,
+        task_completion_rate=completed_count / len(results),
         emitted_citations=emitted,
         resolved_citations=resolved,
         relevant_citations=relevant,

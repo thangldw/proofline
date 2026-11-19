@@ -119,6 +119,8 @@ def create_sqlite_backup(engine: Engine, output: Path, *, force: bool = False) -
         try:
             with engine.connect() as sqlalchemy_connection:
                 source = sqlalchemy_connection.connection.driver_connection
+                if source is None:
+                    raise sqlite3.OperationalError("driver_connection_unavailable")
                 destination = sqlite3.connect(temporary)
                 try:
                     source.backup(destination)

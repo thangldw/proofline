@@ -168,7 +168,7 @@ def _claim_transition(
         )
         .execution_options(synchronize_session=False)
     )
-    if result.rowcount != 1:
+    if getattr(result, "rowcount", None) != 1:
         raise DecisionReviewError("review_state_conflict")
     session.refresh(review)
     return before

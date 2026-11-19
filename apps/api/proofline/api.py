@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timedelta
+from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
@@ -115,7 +116,7 @@ from .schemas import (
     WorkspaceRead,
     normalize_retrieval_filters,
 )
-from .studio import build_studio_draft
+from .studio import StudioKind, build_studio_draft
 from .studio_exports import StudioExportError, build_studio_export
 
 router = APIRouter(prefix="/api/v1")
@@ -347,7 +348,7 @@ def create_source(
         raise HTTPException(
             status_code=409,
             detail=str(exc),
-            headers={"X-Proofline-Job-ID": exc.job_id},
+            headers={"X-Proofline-Job-ID": exc.job_id or ""},
         ) from exc
     except IngestionConflict as exc:
         headers = {"X-Proofline-Job-ID": exc.job_id} if exc.job_id else None
@@ -370,6 +371,8 @@ def create_source(
             selectinload(Source.decisions),
         )
     )
+    if hydrated is None:
+        raise HTTPException(status_code=404, detail="source_not_found")
     return source_to_read(hydrated)
 
 
@@ -601,10 +604,10 @@ def studio_artifact_to_read(artifact: StudioArtifact, source_title: str) -> Stud
         source_id=artifact.source_id,
         source_version_id=artifact.source_version_id,
         source_title=source_title,
-        kind=artifact.kind,
+        kind=cast(StudioKind, artifact.kind),
         title=artifact.title,
         content=artifact.content_json,
-        status=artifact.status,
+        status=cast(Literal["ready"], artifact.status),
         generation_method=artifact.generation_method,
         created_at=artifact.created_at,
         updated_at=artifact.updated_at,
@@ -1661,7 +1664,9 @@ def get_decision_timeline(
     )
     title = session.scalar(select(Source.title).where(Source.id == decision.source_id))
     return DecisionTimelineRead(
-        decision=decision_to_read(decision, title), incoming=incoming, outgoing=outgoing
+        decision=decision_to_read(decision, title),
+        incoming=[DecisionRelationRead.model_validate(item) for item in incoming],
+        outgoing=[DecisionRelationRead.model_validate(item) for item in outgoing],
     )
 
 

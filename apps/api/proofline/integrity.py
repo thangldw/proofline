@@ -4,7 +4,9 @@ import hashlib
 import json
 import math
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Any, NoReturn
 
 from sqlalchemy import Connection, Engine, text
 
@@ -22,7 +24,7 @@ class IntegrityVerificationError(RuntimeError):
         super().__init__(code)
 
 
-def _fail(code: str) -> None:
+def _fail(code: str) -> NoReturn:
     raise IntegrityVerificationError(code)
 
 
@@ -110,7 +112,7 @@ def _verify_sources_and_versions(connection: Connection) -> tuple[dict, dict]:
     return sources, versions
 
 
-def _valid_span(content: str, row: dict) -> bool:
+def _valid_span(content: str, row: Mapping[Any, Any]) -> bool:
     start = row["start_offset"]
     end = row["end_offset"]
     return (
@@ -266,13 +268,13 @@ def _verify_memories_and_evidence(
     if any(active_bindings[key] != 1 for key in roots):
         _fail("evidence_binding_invalid")
     for evidence_id in evidence_rows:
-        visited: set[str] = set()
-        cursor: str | None = evidence_id
-        while cursor is not None:
-            if cursor in visited:
+        evidence_visited: set[str] = set()
+        evidence_cursor: str | None = evidence_id
+        while evidence_cursor is not None:
+            if evidence_cursor in evidence_visited:
                 _fail("evidence_binding_cycle")
-            visited.add(cursor)
-            cursor = evidence_rows[cursor]["superseded_by_id"]
+            evidence_visited.add(evidence_cursor)
+            evidence_cursor = evidence_rows[evidence_cursor]["superseded_by_id"]
     if any(evidence_counts[memory_id] == 0 for memory_id in memories):
         _fail("memory_evidence_missing")
     return memories, evidence_rows
@@ -332,15 +334,19 @@ def _verify_decision_relations(connection: Connection, sources: dict, memories: 
     return len(relations)
 
 
-def _parse_database_datetime(value: str | None, *, nullable: bool = False) -> datetime | None:
-    if value is None and nullable:
-        return None
+def _parse_database_datetime(value: str | None) -> datetime:
     if not isinstance(value, str):
         _fail("decision_review_datetime_invalid")
     try:
         return datetime.fromisoformat(value)
     except ValueError:
         _fail("decision_review_datetime_invalid")
+
+
+def _parse_optional_database_datetime(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    return _parse_database_datetime(value)
 
 
 def _verify_decision_reviews(
@@ -407,7 +413,7 @@ def _verify_decision_reviews(
             _fail("decision_review_policy_invalid")
         opened = _parse_database_datetime(review["opened_at"])
         updated = _parse_database_datetime(review["updated_at"])
-        closed = _parse_database_datetime(review["closed_at"], nullable=True)
+        closed = _parse_optional_database_datetime(review["closed_at"])
         terminal = review["state"] in terminal_states
         if (
             opened > updated

@@ -824,6 +824,10 @@ def _require_array(value: Any, code: str) -> list[dict[str, Any]]:
     return value
 
 
+def _lookup(items: dict[str, dict[str, Any]], key: Any) -> Any:
+    return items.get(key) if isinstance(key, str) else None
+
+
 def _by_id(items: list[dict[str, Any]], code: str) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for item in items:
@@ -1314,7 +1318,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         workspace_slugs.add(workspace["slug"])
 
     version_numbers: dict[str, set[int]] = {source_id: set() for source_id in sources}
-    version_hashes: dict[str, set[str]] = {source_id: set() for source_id in sources}
+    version_hashes: dict[str, set[Any]] = {source_id: set() for source_id in sources}
     for version in versions.values():
         source_id = version.get("source_id")
         content = version.get("content")
@@ -1351,7 +1355,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         expected_identity = hashlib.sha256(f"source:{source['id']}".encode()).hexdigest()
         if identity_hash != expected_identity:
             raise PortabilityError("invalid_source_identity")
-        current = versions.get(source.get("current_version_id"))
+        current = _lookup(versions, source.get("current_version_id"))
         if not current or current.get("source_id") != source["id"]:
             raise PortabilityError("invalid_current_version")
         if current.get("version_number") != max(version_numbers[source["id"]], default=0):
@@ -1359,7 +1363,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
 
     chunk_ordinals: set[tuple[str, int]] = set()
     for chunk in chunks.values():
-        version = versions.get(chunk.get("source_version_id"))
+        version = _lookup(versions, chunk.get("source_version_id"))
         source_id = chunk.get("source_id")
         if source_id not in sources or not version or version.get("source_id") != source_id:
             raise PortabilityError("invalid_chunk_reference")
@@ -1400,7 +1404,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             cursor = model_runs[cursor].get("parent_run_id")
 
     for memory in memories.values():
-        version = versions.get(memory.get("source_version_id"))
+        version = _lookup(versions, memory.get("source_version_id"))
         if memory.get("source_id") not in sources or not version:
             raise PortabilityError("invalid_memory_reference")
         if version.get("source_id") != memory.get("source_id"):
@@ -1410,8 +1414,8 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             raise PortabilityError("invalid_memory_model_reference")
 
     for item in evidence.values():
-        memory = memories.get(item.get("memory_id"))
-        version = versions.get(item.get("source_version_id"))
+        memory = _lookup(memories, item.get("memory_id"))
+        version = _lookup(versions, item.get("source_version_id"))
         if not memory or not version or item.get("source_id") not in sources:
             raise PortabilityError("invalid_evidence_reference")
         if memory.get("source_id") != item.get("source_id") or version.get("source_id") != item.get(
@@ -1460,7 +1464,7 @@ def verify_portable_export(document: Any) -> dict[str, int]:
 
     active_bindings: dict[tuple[str, str], int] = {}
     for item in evidence.values():
-        root = evidence.get(item["binding_root_id"])
+        root = _lookup(evidence, item["binding_root_id"])
         if root is None or root["memory_id"] != item["memory_id"]:
             raise PortabilityError("invalid_evidence_binding")
         key = (item["memory_id"], item["binding_root_id"])
@@ -1482,13 +1486,13 @@ def verify_portable_export(document: Any) -> dict[str, int]:
     if any(active_bindings.get(key) != 1 for key in roots):
         raise PortabilityError("invalid_evidence_binding")
     for evidence_id in evidence:
-        visited: set[str] = set()
-        cursor: str | None = evidence_id
-        while cursor is not None:
-            if cursor in visited:
+        evidence_visited: set[str] = set()
+        evidence_cursor: str | None = evidence_id
+        while evidence_cursor is not None:
+            if evidence_cursor in evidence_visited:
                 raise PortabilityError("invalid_evidence_binding")
-            visited.add(cursor)
-            cursor = evidence[cursor]["superseded_by_id"]
+            evidence_visited.add(evidence_cursor)
+            evidence_cursor = evidence[evidence_cursor]["superseded_by_id"]
 
     evidence_counts = {memory_id: 0 for memory_id in memories}
     for item in evidence.values():
@@ -1601,13 +1605,13 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         if source_id is not None and source_id not in sources:
             raise PortabilityError("invalid_job_reference")
         if version_id is not None:
-            version = versions.get(version_id)
+            version = _lookup(versions, version_id)
             if not version or (source_id is not None and version.get("source_id") != source_id):
                 raise PortabilityError("invalid_job_reference")
 
     for card in study_cards.values():
-        version = versions.get(card.get("source_version_id"))
-        source = sources.get(card.get("source_id"))
+        version = _lookup(versions, card.get("source_version_id"))
+        source = _lookup(sources, card.get("source_id"))
         if (
             card.get("workspace_id") not in workspaces
             or source is None
@@ -1649,10 +1653,10 @@ def verify_portable_export(document: Any) -> dict[str, int]:
             raise PortabilityError("invalid_proposal_model_reference")
     proposal_citation_counts = {proposal_id: 0 for proposal_id in proposals}
     for citation in proposal_citations.values():
-        proposal = proposals.get(citation["proposal_id"])
-        source = sources.get(citation["source_id"])
-        version = versions.get(citation["source_version_id"])
-        chunk = chunks.get(citation["chunk_id"])
+        proposal = _lookup(proposals, citation["proposal_id"])
+        source = _lookup(sources, citation["source_id"])
+        version = _lookup(versions, citation["source_version_id"])
+        chunk = _lookup(chunks, citation["chunk_id"])
         if (
             proposal is None
             or source is None
@@ -1676,8 +1680,8 @@ def verify_portable_export(document: Any) -> dict[str, int]:
     artifact_citation_counts = {artifact_id: 0 for artifact_id in artifacts}
     artifact_ordinals: set[tuple[str, int]] = set()
     for artifact in artifacts.values():
-        source = sources.get(artifact["source_id"])
-        version = versions.get(artifact["source_version_id"])
+        source = _lookup(sources, artifact["source_id"])
+        version = _lookup(versions, artifact["source_version_id"])
         if (
             artifact["workspace_id"] not in workspaces
             or source is None
@@ -1687,8 +1691,8 @@ def verify_portable_export(document: Any) -> dict[str, int]:
         ):
             raise PortabilityError("invalid_studio_reference")
     for citation in studio_citations.values():
-        artifact = artifacts.get(citation["artifact_id"])
-        version = versions.get(citation["source_version_id"])
+        artifact = _lookup(artifacts, citation["artifact_id"])
+        version = _lookup(versions, citation["source_version_id"])
         if (
             artifact is None
             or version is None
