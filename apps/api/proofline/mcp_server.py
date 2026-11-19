@@ -21,6 +21,7 @@ from .database import SessionLocal, engine
 from .decision_blame import DecisionBlameError, blame
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
+from .decision_why import DecisionWhyError, why
 from .integrity import IntegrityVerificationError, verify_live_database
 from .models import Decision, Workspace, utc_now
 from .retrieval import lexical_search
@@ -35,6 +36,22 @@ MAX_TARGET_CHARS = 300
 TITLE_KEYS = ("root_decision_title", "impacted_decision_title")
 
 TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "why_decision",
+        "description": (
+            "Find approved decisions relevant to a question by deterministic term matching, with "
+            "citation location and health. Titles and cited text only if the operator enabled them."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "minLength": 1, "maxLength": MAX_QUERY_CHARS},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": ["question"],
+            "additionalProperties": False,
+        },
+    },
     {
         "name": "blame_location",
         "description": (
@@ -219,7 +236,35 @@ def _tool_blame_location(arguments: dict[str, Any], disclosure: Disclosure) -> A
     return {"entry_count": len(entries), "entries": [dump(item) for item in entries]}
 
 
+def _tool_why_decision(arguments: dict[str, Any], disclosure: Disclosure) -> Any:
+    question = arguments.get("question")
+    limit = arguments.get("limit", 5)
+    if set(arguments) - {"question", "limit"} or not isinstance(question, str):
+        raise ToolError("arguments_invalid")
+    if not question.strip() or len(question) > MAX_QUERY_CHARS:
+        raise ToolError("arguments_invalid")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+        raise ToolError("arguments_invalid")
+    try:
+        with SessionLocal() as session:
+            answers = why(session, question, limit=limit)
+    except DecisionWhyError as exc:
+        raise ToolError(exc.code) from exc
+    documents = []
+    for answer in answers:
+        item = answer.content_free_model_dump()
+        if disclosure.titles:
+            item["decision_title"] = answer.decision_title
+            item["source_title"] = answer.source_title
+        if disclosure.excerpts:
+            item["quote"] = answer.quote[:MAX_EXCERPT_CHARS]
+            item["rationale"] = (answer.rationale or "")[:MAX_EXCERPT_CHARS] or None
+        documents.append(item)
+    return {"answer_count": len(documents), "answers": documents}
+
+
 HANDLERS: dict[str, Callable[[dict[str, Any], Disclosure], Any]] = {
+    "why_decision": _tool_why_decision,
     "blame_location": _tool_blame_location,
     "check_decisions": _tool_check_decisions,
     "check_impacts": _tool_check_impacts,

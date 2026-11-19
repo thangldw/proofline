@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [2.5.0] - 2026-11-19
+
+- Added `proofline rebind` (preview a cited-vs-current diff, then re-anchor with an audited reason), `proofline why` and a read-only `why_decision` MCP tool (deterministic question-to-decision lookup with citation health), and `proofline check-expiry` for `Review by: YYYY-MM-DD` lines. No schema migration.
+
 ## [2.4.0] - 2026-11-19
 
 - Added `proofline blame <path>[:line]` and the read-only `blame_location` MCP tool: which approved decisions are anchored at a file or line, with anchor state and current span.

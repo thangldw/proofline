@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: thangldw/proofline@v2.4.0
+      - uses: thangldw/proofline@v2.5.0
         with:
           path: docs
           snapshot: .proofline/decisions.json
@@ -36,7 +36,7 @@ permissions:
   contents: read
   pull-requests: write
 ...
-      - uses: thangldw/proofline@v2.4.0
+      - uses: thangldw/proofline@v2.5.0
         with:
           comment: "true"
           # path, snapshot, uri-root as above
