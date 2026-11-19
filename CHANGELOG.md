@@ -13,6 +13,7 @@
 - Added `proofline notify --webhook URL`, a content-free review-expiry alert (generic JSON or Slack text) with https-only delivery, no redirects and a timeout.
 - Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
 - Added the read-only `decision_graph` MCP tool (ids, stale flags and edge kinds; titles only with `--include-titles`).
+- Added executable decisions: `Enforce: forbid|require "text" in <glob>` and `Enforce: require file <glob>` lines, checked by `proofline check-enforcement`. Literal patterns only; rule lines are part of the cited text. No schema migration.
 
 ## [2.9.0] - 2026-11-19
 

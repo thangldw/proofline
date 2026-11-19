@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .decision_enforce import ENFORCE_LINE
 from .decision_expiry import REVIEW_LINE
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .models import (
@@ -213,7 +214,7 @@ def extract_memories(content: str) -> list[dict]:
                 break
             rationale_match = RATIONALE_PREFIX.match(candidate)
             status_match = STATUS_PREFIX.match(candidate)
-            review_by_match = REVIEW_LINE.match(candidate)
+            review_by_match = REVIEW_LINE.match(candidate) or ENFORCE_LINE.match(candidate)
             if rationale_match:
                 found_metadata = True
                 rationale = rationale_match.group(1).strip()
