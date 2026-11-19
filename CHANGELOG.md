@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.
+
+- Added `proofline import-adr`, which converts existing Markdown ADRs into files the indexer extracts decisions from. No schema migration.
+- Added `proofline hook install|uninstall`, a git pre-commit hook that runs `check-code-refs` on staged files (and optionally `sync` plus `check-decisions`).
+- Added `proofline report`, a shareable HTML or Markdown health report (trend, stale citations, reviews due, possible conflicts) with an optional `--no-titles` mode.
+- Added `proofline completion bash|zsh|fish`, generated from the command tree.
+- Added `proofline graph`, the decision relation graph as Mermaid or Graphviz DOT with stale and possible-conflict markers.
+- Added `proofline policy-schema` and `spec/decision-policy/v1/schema.json`, a JSON Schema for `proofline.toml` that a test keeps in agreement with the loader.
+- Added `proofline notify --webhook URL`, a content-free review-expiry alert (generic JSON or Slack text) with https-only delivery, no redirects and a timeout.
+- Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
+
 ## [2.9.0] - 2026-11-19
 
 - Added `Review every: N days|weeks|months|years` (repeats from the date the cited version was recorded; `rebind` restarts the cycle), `proofline suggest-links`, and a weekly operating routine in `docs/operations.md`. No schema migration.

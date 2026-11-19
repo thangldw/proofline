@@ -246,3 +246,32 @@ def test_ingestion_failure_is_persisted_without_source_content(session, monkeypa
     assert "private source text" not in job.error_detail
     assert session.get(IngestionJobInput, job.id).content == "private source text"
     assert session.scalar(select(func.count()).select_from(Source)) == 0
+
+
+def test_reverting_a_source_to_earlier_content_reuses_that_version(session):
+    from proofline.decision_health import check_decision_health
+
+    def put(content):
+        return ingest_source(session, SourceCreate(title="a", uri="file:///a.md", content=content))[
+            0
+        ]
+
+    original = "Decision: Use SQLite.\nReason: local.\n"
+    source = put(original)
+    first_version = source.current_version_id
+    decision = session.scalar(select(Decision).where(Decision.source_id == source.id))
+    decision.status = "accepted"
+    session.commit()
+
+    put("Decision: Use NATS.\nReason: scale.\n")
+    assert [item.decision_id for item in check_decision_health(session)] == [decision.id]
+
+    reverted = put(original)
+    assert reverted.current_version_id == first_version
+    assert reverted.content == original
+    assert decision.id not in {item.decision_id for item in check_decision_health(session)}
+    versions = session.scalar(
+        select(func.count()).select_from(SourceVersion).where(SourceVersion.source_id == source.id)
+    )
+    assert versions == 2
+    assert put(original).current_version_id == first_version

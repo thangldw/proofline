@@ -38,16 +38,21 @@ from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
 from .decision_conflicts import find_conflict_candidates, suggest_links
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
+from .decision_graph import build_graph, render_dot, render_mermaid
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
+from .decision_import import AdrImportError, import_adrs
+from .decision_notify import NotifyError, send_expiry_notification
 from .decision_policy import (
     DecisionPolicyError,
     load_decision_policy,
     policy_sha256,
 )
 from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
+from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
+from .decision_watch import watch_folder
 from .decision_why import DecisionWhyError, why
 from .doctor import run_doctor
 from .embeddings import index_current_embeddings
@@ -68,11 +73,13 @@ from .evidence_packages import (
     explain_decision_package,
     load_and_verify_package,
 )
+from .git_hook import HookError, install_hook, uninstall_hook
 from .ingestion import ingest_source
 from .integrity import IntegrityVerificationError, verify_live_database
 from .mcp_server import serve_stdio
 from .model_gateway import ProviderConfigurationError, build_embedding_provider
 from .models import DecisionReview, SourceVersion, Workspace
+from .policy_schema import render_policy_schema
 from .portability import (
     PortabilityError,
     atomic_write_export,
@@ -99,6 +106,7 @@ from .review_receipts import (
 from .sarif import build_decision_health_sarif, build_decision_impact_sarif
 from .schemas import SourceCreate
 from .server import run_server
+from .shell_completion import render_completion
 from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
 from .workspace_sync import WorkspaceSyncError, sync_folder
 
@@ -922,6 +930,37 @@ def _cmd_export_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     print(json.dumps({"exported": len(exported), "output_dir": str(args.output_dir)}))
 
 
+def _cmd_import_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        result = import_adrs(args.adr_dir, args.output_dir, force=args.force)
+    except AdrImportError as exc:
+        _decision_check_failed(exc.code)
+    except OSError:
+        _decision_check_failed("output_unavailable")
+    document = {
+        "imported": [
+            {"source": item.source.name, "output": str(item.output), "status": item.status}
+            for item in result.imported
+        ],
+        "skipped": [{"source": item.source.name, "reason": item.reason} for item in result.skipped],
+        "next_step": f"proofline sync {args.output_dir}",
+    }
+    print(json.dumps(document, sort_keys=True))
+
+
+def _cmd_hook(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.hook_action == "install":
+            result = install_hook(args.repo, with_decisions=args.with_decisions, force=args.force)
+        else:
+            result = uninstall_hook(args.repo)
+    except HookError as exc:
+        _decision_check_failed(exc.code)
+    except OSError:
+        _decision_check_failed("hook_unwritable")
+    print(json.dumps({"action": result.action, "path": str(result.path)}))
+
+
 def _cmd_check_code_refs(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         refs = scan_code_refs(args.paths)
@@ -1003,6 +1042,107 @@ def _cmd_health_trend(args: argparse.Namespace, parser: argparse.ArgumentParser)
             bar = "#" * min(40, round(point.stale_percent / 2.5))
             ratio = f"{point.findings:>4}/{point.approved:<4}"
             print(f"{point.taken_at[:10]}  {ratio} {point.stale_percent:>5}%  {bar}")
+
+
+def _cmd_report(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    except ValueError:
+        _decision_check_failed("as_of_invalid")
+    try:
+        with SessionLocal() as session:
+            report = build_report(session, as_of=as_of, include_titles=not args.no_titles)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (DecisionHealthError, OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    text = render_report_html(report) if args.format == "html" else render_report_markdown(report)
+    if args.output is None:
+        print(text, end="")
+        return
+    try:
+        args.output.write_text(text, encoding="utf-8")
+    except OSError:
+        _decision_check_failed("output_unavailable")
+    print(json.dumps({"output": str(args.output), "format": args.format}))
+
+
+def _cmd_completion(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    print(render_completion(parser, args.shell), end="")
+
+
+def _cmd_graph(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            graph = build_graph(
+                session,
+                include_titles=not args.no_titles,
+                include_conflicts=not args.no_conflicts,
+                include_isolated=args.include_isolated,
+            )
+    except (DecisionHealthError, OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(render_dot(graph) if args.format == "dot" else render_mermaid(graph), end="")
+
+
+def _cmd_policy_schema(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    print(render_policy_schema(), end="")
+
+
+def _cmd_notify(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    except ValueError:
+        _decision_check_failed("as_of_invalid")
+    try:
+        with SessionLocal() as session:
+            findings = check_expiry(session, as_of=as_of, warn_within_days=args.warn_within)
+        result = send_expiry_notification(
+            args.webhook,
+            findings,
+            as_of=as_of.isoformat(),
+            style=args.style,
+            always=args.always,
+        )
+    except NotifyError as exc:
+        _decision_check_failed(exc.code)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    print(
+        json.dumps(
+            {
+                "sent": result.sent,
+                "overdue": result.overdue,
+                "due_soon": result.due_soon,
+                "status": result.status,
+            },
+            sort_keys=True,
+        )
+    )
+
+
+def _cmd_watch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.interval <= 0:
+        _decision_check_failed("interval_invalid")
+    try:
+        initialize_database()
+        print(f"watching {args.path} every {args.interval:g}s; Ctrl-C to stop", flush=True)
+        watch_folder(
+            SessionLocal,
+            args.path,
+            uri_root=args.uri_root,
+            interval=args.interval,
+            max_cycles=args.max_cycles,
+            emit=lambda line: print(line, flush=True),
+        )
+    except KeyboardInterrupt:
+        print("stopped")
+    except WorkspaceSyncError as exc:
+        raise SystemExit(f"watch failed: {exc.code}") from exc
+    except (OSError, SQLAlchemyError) as exc:
+        raise SystemExit("watch failed: database_unavailable") from exc
 
 
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -1145,6 +1285,13 @@ def main(argv: list[str] | None = None) -> None:
         help="file:// URI the folder had when decisions were approved; defaults to its real path",
     )
     sync.add_argument("--format", choices=("text", "json"), default="text")
+    watch = subcommands.add_parser(
+        "watch", help="Re-sync a folder when documents change and report newly stale decisions"
+    )
+    watch.add_argument("path", type=Path)
+    watch.add_argument("--uri-root")
+    watch.add_argument("--interval", type=float, default=2.0, metavar="SECONDS")
+    watch.add_argument("--max-cycles", type=int, help=argparse.SUPPRESS)
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
     evaluate.add_argument("--k", type=int, default=10)
@@ -1321,6 +1468,58 @@ def main(argv: list[str] | None = None) -> None:
     )
     export_adr.add_argument("--output-dir", type=Path, required=True)
     export_adr.add_argument("--force", action="store_true")
+    import_adr = subcommands.add_parser(
+        "import-adr",
+        help="Convert existing Markdown ADRs into files Proofline can index (then run sync)",
+    )
+    import_adr.add_argument("adr_dir", type=Path)
+    import_adr.add_argument("--output-dir", type=Path, required=True)
+    import_adr.add_argument("--force", action="store_true")
+    hook = subcommands.add_parser(
+        "hook", help="Install or remove a git pre-commit hook that runs the decision checks"
+    )
+    hook_actions = hook.add_subparsers(dest="hook_action", required=True)
+    hook_install = hook_actions.add_parser("install", help="Write .git/hooks/pre-commit")
+    hook_install.add_argument("--repo", type=Path, default=Path("."))
+    hook_install.add_argument(
+        "--with-decisions",
+        action="store_true",
+        help="Also run `sync` and `check-decisions` (slower; indexes the working tree)",
+    )
+    hook_install.add_argument("--force", action="store_true")
+    hook_uninstall = hook_actions.add_parser("uninstall", help="Remove a hook Proofline wrote")
+    hook_uninstall.add_argument("--repo", type=Path, default=Path("."))
+    report = subcommands.add_parser(
+        "report", help="Write a shareable health report (trend, stale, reviews due, conflicts)"
+    )
+    report.add_argument("--format", choices=("html", "markdown"), default="html")
+    report.add_argument("--output", type=Path)
+    report.add_argument("--as-of")
+    report.add_argument(
+        "--no-titles", action="store_true", help="Withhold decision titles and source names"
+    )
+    completion = subcommands.add_parser(
+        "completion", help="Print a shell completion script (eval it or save it)"
+    )
+    completion.add_argument("shell", choices=("bash", "zsh", "fish"))
+    graph = subcommands.add_parser(
+        "graph", help="Print the decision relation graph as Mermaid or Graphviz DOT"
+    )
+    graph.add_argument("--format", choices=("mermaid", "dot"), default="mermaid")
+    graph.add_argument("--no-titles", action="store_true", help="Label nodes with short ids")
+    graph.add_argument("--no-conflicts", action="store_true", help="Omit possible-conflict edges")
+    graph.add_argument("--include-isolated", action="store_true", help="Also draw unlinked nodes")
+    subcommands.add_parser(
+        "policy-schema", help="Print the JSON Schema for proofline.toml (editor validation)"
+    )
+    notify = subcommands.add_parser(
+        "notify", help="POST a content-free review-expiry alert to a webhook (id and counts only)"
+    )
+    notify.add_argument("--webhook", required=True, help="https URL (http only for loopback)")
+    notify.add_argument("--style", choices=("generic", "slack"), default="generic")
+    notify.add_argument("--as-of")
+    notify.add_argument("--warn-within", type=int, default=7, metavar="DAYS")
+    notify.add_argument("--always", action="store_true", help="Send even when nothing is due")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1388,6 +1587,7 @@ def main(argv: list[str] | None = None) -> None:
         "seed": _cmd_seed,
         "mcp": _cmd_mcp,
         "sync": _cmd_sync,
+        "watch": _cmd_watch,
         "eval": _cmd_eval,
         "eval-grounded": _cmd_eval_grounded,
         "eval-extraction": _cmd_eval_extraction,
@@ -1417,6 +1617,13 @@ def main(argv: list[str] | None = None) -> None:
         "snapshot-health": _cmd_snapshot_health,
         "health-trend": _cmd_health_trend,
         "export-adr": _cmd_export_adr,
+        "import-adr": _cmd_import_adr,
+        "hook": _cmd_hook,
+        "report": _cmd_report,
+        "completion": _cmd_completion,
+        "graph": _cmd_graph,
+        "policy-schema": _cmd_policy_schema,
+        "notify": _cmd_notify,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
