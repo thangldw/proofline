@@ -53,6 +53,15 @@ from .decision_graph import build_graph, render_dot, render_mermaid
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
 from .decision_import import AdrImportError, import_adrs
+from .decision_ledger import (
+    DEFAULT_LEDGER,
+    LedgerError,
+    append_entry,
+    compare_with_base,
+    ledger_at_ref,
+    read_ledger,
+    render_comparison,
+)
 from .decision_notify import NotifyError, send_expiry_notification
 from .decision_policy import (
     DecisionPolicyError,
@@ -1244,6 +1253,29 @@ def _cmd_code_context(args: argparse.Namespace, parser: argparse.ArgumentParser)
         raise SystemExit(1)
 
 
+def _cmd_ledger(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.ledger_action == "verify":
+            entries = read_ledger(args.file)
+            print(json.dumps({"valid": True, "entries": len(entries)}))
+            return
+        with SessionLocal() as session:
+            if args.ledger_action == "append":
+                entry = append_entry(session, args.file)
+                print(json.dumps(entry.model_dump(), sort_keys=True))
+                return
+            base = ledger_at_ref(args.root, args.base, args.file)
+            result = compare_with_base(session, base)
+    except LedgerError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(json.dumps(result.model_dump(), sort_keys=True))
+    else:
+        print(render_comparison(result), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1647,6 +1679,21 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Exit 1 when a touched decision is stale or a rule is violated",
     )
+    ledger = subcommands.add_parser(
+        "ledger", help="Keep a hash-chained, content-free health history in the repository"
+    )
+    ledger_actions = ledger.add_subparsers(dest="ledger_action", required=True)
+    for name, text in (
+        ("append", "Append the current health to the ledger file"),
+        ("verify", "Verify the ledger's hash chain"),
+        ("compare", "Compare current health with the ledger committed at a git ref"),
+    ):
+        action = ledger_actions.add_parser(name, help=text)
+        action.add_argument("--file", type=Path, default=DEFAULT_LEDGER)
+        if name == "compare":
+            action.add_argument("--base", required=True, help="Git ref, e.g. origin/main")
+            action.add_argument("--root", type=Path, default=Path("."))
+            action.add_argument("--format", choices=("markdown", "json"), default="markdown")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1754,6 +1801,7 @@ def main(argv: list[str] | None = None) -> None:
         "check-enforcement": _cmd_check_enforcement,
         "asof": _cmd_asof,
         "code-context": _cmd_code_context,
+        "ledger": _cmd_ledger,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,

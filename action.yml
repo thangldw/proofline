@@ -33,6 +33,9 @@ inputs:
   code-context:
     description: On pull requests, append the approved decisions touched by the change (code references, edited documents, applicable rules) to the job summary. Informational; needs fetch-depth 0 and proofline-version 2.10.0 or newer.
     default: "false"
+  ledger:
+    description: Path of a committed `proofline ledger` file. On pull requests, compare the current decision health with the ledger at the base ref and add it to the job summary. Informational; needs fetch-depth 0 and proofline-version 2.10.0 or newer. Empty skips it.
+    default: ""
   comment:
     description: Post or update one content-free summary comment on the pull request. Needs the pull-requests write permission.
     default: "false"
@@ -68,6 +71,7 @@ runs:
         PL_CODE_REFS: ${{ inputs.code-refs }}
         PL_ENFORCE: ${{ inputs.enforce }}
         PL_CONTEXT: ${{ inputs.code-context }}
+        PL_LEDGER: ${{ inputs.ledger }}
         PL_BASE_REF: ${{ github.base_ref }}
       run: |
         set -uo pipefail
@@ -97,6 +101,9 @@ runs:
         fi
         if [ "$PL_CONTEXT" = "true" ] && [ -n "$PL_BASE_REF" ]; then
           proofline code-context --base "origin/$PL_BASE_REF" | tee -a "$GITHUB_STEP_SUMMARY" || true
+        fi
+        if [ -n "$PL_LEDGER" ] && [ -n "$PL_BASE_REF" ]; then
+          proofline ledger compare --file "$PL_LEDGER" --base "origin/$PL_BASE_REF" | tee -a "$GITHUB_STEP_SUMMARY" || true
         fi
         exit "$status"
     - name: Comment on the pull request
