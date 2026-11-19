@@ -47,6 +47,7 @@ from .decision_policy import (
     policy_sha256,
 )
 from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
+from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
 from .decision_why import DecisionWhyError, why
@@ -1038,6 +1039,29 @@ def _cmd_health_trend(args: argparse.Namespace, parser: argparse.ArgumentParser)
             print(f"{point.taken_at[:10]}  {ratio} {point.stale_percent:>5}%  {bar}")
 
 
+def _cmd_report(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    except ValueError:
+        _decision_check_failed("as_of_invalid")
+    try:
+        with SessionLocal() as session:
+            report = build_report(session, as_of=as_of, include_titles=not args.no_titles)
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (DecisionHealthError, OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    text = render_report_html(report) if args.format == "html" else render_report_markdown(report)
+    if args.output is None:
+        print(text, end="")
+        return
+    try:
+        args.output.write_text(text, encoding="utf-8")
+    except OSError:
+        _decision_check_failed("output_unavailable")
+    print(json.dumps({"output": str(args.output), "format": args.format}))
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1375,6 +1399,15 @@ def main(argv: list[str] | None = None) -> None:
     hook_install.add_argument("--force", action="store_true")
     hook_uninstall = hook_actions.add_parser("uninstall", help="Remove a hook Proofline wrote")
     hook_uninstall.add_argument("--repo", type=Path, default=Path("."))
+    report = subcommands.add_parser(
+        "report", help="Write a shareable health report (trend, stale, reviews due, conflicts)"
+    )
+    report.add_argument("--format", choices=("html", "markdown"), default="html")
+    report.add_argument("--output", type=Path)
+    report.add_argument("--as-of")
+    report.add_argument(
+        "--no-titles", action="store_true", help="Withhold decision titles and source names"
+    )
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1473,6 +1506,7 @@ def main(argv: list[str] | None = None) -> None:
         "export-adr": _cmd_export_adr,
         "import-adr": _cmd_import_adr,
         "hook": _cmd_hook,
+        "report": _cmd_report,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
