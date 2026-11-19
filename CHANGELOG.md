@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added `proofline import-adr`, which converts existing Markdown ADRs into files the indexer extracts decisions from. No schema migration.
+- Added `proofline hook install|uninstall`, a git pre-commit hook that runs `check-code-refs` on staged files (and optionally `sync` plus `check-decisions`).
 
 ## [2.9.0] - 2026-11-19
 
