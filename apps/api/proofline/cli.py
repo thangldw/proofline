@@ -22,6 +22,7 @@ from .attestations import (
     load_and_verify_attestation,
     load_attestation_private_key,
     load_attestation_public_key,
+    load_revoked_key_ids,
     verify_signed_attestation,
 )
 from .backup import (
@@ -207,7 +208,12 @@ def _cmd_seed(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None
 
 def _cmd_mcp(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     initialize_database()
-    serve_stdio(sys.stdin, sys.stdout, include_titles=args.include_titles)
+    serve_stdio(
+        sys.stdin,
+        sys.stdout,
+        include_titles=args.include_titles,
+        include_excerpts=args.include_excerpts,
+    )
 
 
 def _cmd_sync(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -477,9 +483,13 @@ def _cmd_verify_attestation(args: argparse.Namespace, parser: argparse.ArgumentP
         if args.review_receipt is not None:
             _receipt, review_report = load_and_verify_review_receipt(args.review_receipt)
         public_key = load_attestation_public_key(args.public_key)
+        revoked = (
+            load_revoked_key_ids(args.revocations) if args.revocations is not None else frozenset()
+        )
         document, report = load_and_verify_attestation(
             args.path,
             public_key,
+            revoked_key_ids=revoked,
             package_report=package_report,
             review_report=review_report,
         )
@@ -799,6 +809,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Include decision titles in tool results (they reach the client's model)",
     )
+    mcp.add_argument(
+        "--include-excerpts",
+        action="store_true",
+        help="Include short evidence excerpts in search results (they reach the client's model)",
+    )
     sync = subcommands.add_parser(
         "sync",
         help="Index a document folder headlessly (for CI) under a stable file URI root",
@@ -922,6 +937,11 @@ def main(argv: list[str] | None = None) -> None:
     verify_attestation.add_argument("--public-key", type=Path, required=True)
     verify_attestation.add_argument("--package", type=Path, required=True)
     verify_attestation.add_argument("--review-receipt", type=Path)
+    verify_attestation.add_argument(
+        "--revocations",
+        type=Path,
+        help="JSON list of revoked key ids (proofline-key-revocations-v1) you trust",
+    )
     explain = subcommands.add_parser(
         "explain", help="Explain one memory artifact and its exact provenance"
     )

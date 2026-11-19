@@ -12,11 +12,11 @@ Run `proofline COMMAND --help` for the exact option schema. Commands return zero
 | Portable snapshot | `export`, `verify-export`, `import` | Export, verify, restore, or explicitly merge portable JSON state. |
 | Evidence package | `export-package`, `verify-package`, `explain`, `diff` | Export or independently verify a DEP; explain content-free provenance; verify both packages before diffing. |
 | Review receipt | `export-review-receipt`, `verify-review-receipt` | Bind a persisted review to a verified DEP and verify the receipt offline. |
-| Attestation | `generate-attestation-key`, `attest`, `verify-attestation` | Generate a local Ed25519 keypair, sign exact verified subjects, or verify against a trusted public key. |
+| Attestation | `generate-attestation-key`, `attest`, `verify-attestation` | Generate a local Ed25519 keypair, sign exact verified subjects, or verify against a trusted public key and an optional `--revocations` list. |
 | Recovery | `backup`, `verify-backup`, `restore-backup`, `verify-integrity` | Create/verify SQLite backup, atomically restore with rollback output, or check live provenance. |
 | Decision health | `check-decisions`, `refresh-reviews`, `check-impacts` | Run read-only stale/impact CI checks or persist the current review ledger. |
 | Headless sync | `sync` | Index a document folder without a server, under a stable `--uri-root`, so CI can reuse a committed snapshot. See [PR gate](pr-gate.md). |
-| Local MCP | `mcp` | Serve read-only decision checks to a local MCP client over stdio; titles are withheld unless `--include-titles`. See [MCP](mcp.md). |
+| Local MCP | `mcp` | Serve read-only decision checks to a local MCP client over stdio; titles and evidence excerpts are withheld unless `--include-titles` / `--include-excerpts`. See [MCP](mcp.md). |
 | Demo | `demo stale-decision` | Run the self-contained stale-citation story; output directory reuse requires `--force`. |
 
 Common verification examples:

@@ -26,6 +26,9 @@ SIGNATURE_ALGORITHM = "ed25519"
 SIGNATURE_DOMAIN = b"proofline/signed-attestation/v1\0"
 MAX_ATTESTATION_BYTES = 1024 * 1024
 MAX_KEY_BYTES = 64 * 1024
+REVOCATION_SCHEMA = "proofline-key-revocations-v1"
+MAX_REVOCATION_BYTES = 256 * 1024
+MAX_REVOCATIONS = 1000
 ENVELOPE_KEYS = {"schema", "algorithm", "key_id", "statement", "signature"}
 STATEMENT_KEYS = {
     "schema",
@@ -223,6 +226,7 @@ def verify_signed_attestation(
     document: Any,
     public_key: Ed25519PublicKey,
     *,
+    revoked_key_ids: frozenset[str] = frozenset(),
     package_report: dict[str, Any] | None = None,
     review_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -233,6 +237,9 @@ def verify_signed_attestation(
         raise AttestationError("public_key_type_invalid")
     if document["key_id"] != _key_id(public_key):
         raise AttestationError("key_id_mismatch")
+    if document["key_id"] in revoked_key_ids:
+        # issued_at is signer-controlled, so a revoked key is rejected whatever it claims.
+        raise AttestationError("key_revoked")
     signature_value = document["signature"]
     if not isinstance(signature_value, str):
         raise AttestationError("signature_encoding_invalid")
@@ -282,10 +289,36 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def load_revoked_key_ids(path: Path) -> frozenset[str]:
+    """Load a verifier-supplied revocation list: ``{"schema", "revoked": [{"key_id", ...}]}``."""
+
+    try:
+        data = path.read_bytes()
+        if len(data) > MAX_REVOCATION_BYTES:
+            raise AttestationError("revocations_too_large")
+        document = json.loads(data, object_pairs_hook=_unique_object)
+    except AttestationError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AttestationError("revocations_unreadable") from exc
+    if not isinstance(document, dict) or document.get("schema") != REVOCATION_SCHEMA:
+        raise AttestationError("revocations_schema_unsupported")
+    entries = document.get("revoked")
+    if not isinstance(entries, list) or len(entries) > MAX_REVOCATIONS:
+        raise AttestationError("revocations_shape_invalid")
+    key_ids: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or not _is_hash(entry.get("key_id")):
+            raise AttestationError("revocations_shape_invalid")
+        key_ids.add(entry["key_id"])
+    return frozenset(key_ids)
+
+
 def load_and_verify_attestation(
     path: Path,
     public_key: Ed25519PublicKey,
     *,
+    revoked_key_ids: frozenset[str] = frozenset(),
     package_report: dict[str, Any] | None = None,
     review_report: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -301,6 +334,7 @@ def load_and_verify_attestation(
     return document, verify_signed_attestation(
         document,
         public_key,
+        revoked_key_ids=revoked_key_ids,
         package_report=package_report,
         review_report=review_report,
     )

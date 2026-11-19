@@ -29,7 +29,7 @@ def test_migrations_are_idempotent_and_recorded(tmp_path):
             .all()
         )
         tables = set(inspect(connection).get_table_names())
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     assert {
         "sources",
         "source_versions",
@@ -154,7 +154,7 @@ def test_v22_backfills_evidence_anchors_and_binding_identity(tmp_path):
         }
 
     empty_hash = hashlib.sha256(b"").hexdigest()
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     assert evidence["anchor_version"] == "markdown-context-v1"
     assert json.loads(evidence["section_path"]) == []
     assert evidence["prefix_sha256"] == empty_hash
@@ -254,7 +254,7 @@ def test_v7_ingestion_jobs_migrate_without_becoming_retryable(tmp_path):
         staged_count = connection.execute(
             text("SELECT count(*) FROM ingestion_job_inputs")
         ).scalar_one()
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     assert job["request_hash"] is None
     assert job["idempotency_key"] is None
     assert job["max_attempts"] == 1
@@ -388,7 +388,7 @@ def test_v9_model_runs_gain_repair_lineage_without_losing_metadata(tmp_path):
         "repair_reason": None,
     }
     assert "ix_model_runs_parent_run_id" in indexes
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     engine.dispose()
 
 
@@ -469,7 +469,7 @@ def test_v10_superseded_memories_normalize_to_obsolete(tmp_path):
             .all()
         )
     assert statuses == {"memory-v10": "obsolete", "memory-v10-custom": "candidate"}
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     engine.dispose()
 
 
@@ -558,7 +558,7 @@ def test_v11_database_gains_persistent_unique_import_receipts(tmp_path):
     }
     assert columns["imported_at"]["default"] == "CURRENT_TIMESTAMP"
     assert indexes["ix_import_receipts_payload_sha256"] == 1
-    assert versions == list(range(1, 23))
+    assert versions == list(range(1, 24))
     reopened.dispose()
 
 
@@ -888,3 +888,13 @@ def test_large_foundation_fixture_migrates_with_exact_provenance_and_recovery(tm
             == 0
         )
     engine.dispose()
+
+
+def test_migration_23_indexes_source_uri_lookups(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'v23-source-uri-index.db'}")
+    initialize_database(engine)
+    with engine.connect() as connection:
+        plan = connection.exec_driver_sql(
+            "EXPLAIN QUERY PLAN SELECT id FROM sources WHERE workspace_id = 'w' AND uri = 'u'"
+        ).fetchall()
+    assert any("ix_sources_workspace_uri" in row[-1] for row in plan)

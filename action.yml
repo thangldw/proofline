@@ -17,10 +17,16 @@ inputs:
     default: ""
   proofline-version:
     description: Exact proofline-evidence version to install from PyPI.
-    default: "2.2.0"
+    default: "2.3.0"
   sarif-output:
     description: Where to write the SARIF report.
     default: proofline-decision-health.sarif
+  comment:
+    description: Post or update one content-free summary comment on the pull request. Needs the pull-requests write permission.
+    default: "false"
+  github-token:
+    description: Token used only when `comment` is true.
+    default: ${{ github.token }}
 
 outputs:
   sarif-file:
@@ -54,4 +60,14 @@ runs:
         if [ -n "$PL_POLICY" ]; then policy_args=(--policy "$PL_POLICY"); fi
         proofline check-decisions --format sarif --output "$PL_SARIF" "${policy_args[@]}"
         echo "sarif-file=$PL_SARIF" >> "$GITHUB_OUTPUT"
+        proofline check-decisions --format json --output "$RUNNER_TEMP/pl-decisions.json" "${policy_args[@]}"
+        proofline check-impacts --format json --output "$RUNNER_TEMP/pl-impacts.json"
         proofline check-decisions "${policy_args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: Comment on the pull request
+      if: always() && inputs.comment == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        python "${{ github.action_path }}/scripts/pr_gate_comment.py" \
+          --decisions "$RUNNER_TEMP/pl-decisions.json" --impacts "$RUNNER_TEMP/pl-impacts.json"

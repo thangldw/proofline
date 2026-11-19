@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: thangldw/proofline@v2.2.0
+      - uses: thangldw/proofline@v2.3.0
         with:
           path: docs
           snapshot: .proofline/decisions.json
@@ -28,6 +28,21 @@ jobs:
 ```
 
 The action runs `proofline import`, `proofline sync`, and `proofline check-decisions`, writes a SARIF file, and exits non-zero when findings match the `fail_on` list in `proofline.toml`. Pin the action to a full commit SHA in production.
+
+Optional pull-request comment: set `comment: "true"` and grant `pull-requests: write` to have the action create or update one content-free comment (decision ids, line ranges, reasons, downstream impact counts; no titles or quotes). It only runs on `pull_request` events and is skipped otherwise.
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+...
+      - uses: thangldw/proofline@v2.3.0
+        with:
+          comment: "true"
+          # path, snapshot, uri-root as above
+```
+
+Scale: on a synthetic workspace of 10,000 Markdown files (Apple M-series, Python 3.15), the first `proofline sync` took about 51 s (roughly 195 files/s, one durable ingestion job per file), a re-sync with nothing changed about 2.2 s, a re-sync with 1% changed about 2.8 s, and `check-decisions` about 0.4 s. Reproduce with `python scripts/benchmark_workspace.py --documents 10000`.
 
 Trust boundary: the snapshot is an ordinary repository file. Anyone who can change it can change which decisions exist, so protect the branch and review snapshot diffs. The check proves a cited quote is absent from the current document; it does not judge whether the change is acceptable.
 
@@ -41,6 +56,10 @@ Làm fail pull request khi tài liệu mà decision đã duyệt trích dẫn b�
 
 Action chạy `proofline import`, `proofline sync` và `proofline check-decisions`, ghi file SARIF và thoát khác 0 khi finding khớp danh sách `fail_on` trong `proofline.toml`. Ở production hãy pin action theo full commit SHA.
 
+Comment tùy chọn: đặt `comment: "true"` và cấp `pull-requests: write` để action tạo hoặc cập nhật một comment không chứa nội dung (id decision, dải dòng, lý do, số decision bị ảnh hưởng; không có title hay quote). Chỉ chạy với sự kiện `pull_request`.
+
+Quy mô: với 10.000 file Markdown tổng hợp, `proofline sync` lần đầu mất khoảng 51 s, re-sync không đổi khoảng 2,2 s, re-sync đổi 1% khoảng 2,8 s, `check-decisions` khoảng 0,4 s. Tái hiện bằng `python scripts/benchmark_workspace.py --documents 10000`.
+
 Trust boundary: snapshot chỉ là file thường trong repository. Ai sửa được nó thì đổi được tập decision, nên cần bảo vệ branch và review diff của snapshot. Check chỉ chứng minh quote được trích không còn trong tài liệu hiện tại; nó không đánh giá thay đổi đó có chấp nhận được không.
 
 ## 日本語
@@ -52,5 +71,9 @@ Trust boundary: snapshot chỉ là file thường trong repository. Ai sửa đ�
 3. English 節の workflow を追加します。
 
 Action は `proofline import`、`proofline sync`、`proofline check-decisions` を実行し、SARIF file を出力し、`proofline.toml` の `fail_on` に該当する finding があれば non-zero で終了します。Production では action を full commit SHA に pin してください。
+
+Comment (任意): `comment: "true"` を設定し `pull-requests: write` を付与すると、内容を含まない comment (decision id、行範囲、理由、影響件数。title や quote なし) を 1 件作成または更新します。`pull_request` event でのみ動作します。
+
+規模: 合成 Markdown 10,000 file で、初回 `proofline sync` は約 51 秒、変更なしの再 sync は約 2.2 秒、1% 変更の再 sync は約 2.8 秒、`check-decisions` は約 0.4 秒でした。`python scripts/benchmark_workspace.py --documents 10000` で再現できます。
 
 Trust boundary: snapshot は通常の repository file です。変更できる人は decision の集合を変えられるため、branch を保護し snapshot の diff を review してください。この check は引用 quote が現在の document に存在しないことを示すだけで、変更が許容できるかは判断しません。

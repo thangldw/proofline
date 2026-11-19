@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .anchors import build_evidence_anchor
@@ -44,6 +44,7 @@ class WorkspaceLease(Base):
 
 class Source(Base):
     __tablename__ = "sources"
+    __table_args__ = (Index("ix_sources_workspace_uri", "workspace_id", "uri"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     workspace_id: Mapped[str] = mapped_column(

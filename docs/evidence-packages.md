@@ -21,7 +21,9 @@ proofline verify-attestation envelope.json \
   --review-receipt decision-review.json
 ```
 
-The verifier must obtain the trusted public key through an independent channel. Signature validity proves matching private-key control for the exact subjects; it does not prove legal identity, authorization, trusted time, revocation, transparency-log inclusion, or artifact safety.
+The verifier must obtain the trusted public key through an independent channel. Signature validity proves matching private-key control for the exact subjects; it does not prove legal identity, authorization, trusted time, transparency-log inclusion, or artifact safety.
+
+Key revocation is verifier-side and opt-in: `proofline verify-attestation ... --revocations revoked.json` rejects any attestation signed by a listed key with `key_revoked`. The file is `{"schema": "proofline-key-revocations-v1", "revoked": [{"key_id": "<64 hex>", "reason": "optional"}]}`, at most 256 KiB and 1000 entries. Because `issued_at` is chosen by the signer and there is no trusted timestamp, a revoked key is rejected regardless of the time it claims. You must obtain the revocation file through the same independent channel as the trusted public key; Proofline does not distribute or refresh revocation lists.
 
 ### Specifications
 
@@ -53,7 +55,9 @@ proofline verify-attestation envelope.json \
   --review-receipt decision-review.json
 ```
 
-Verifier phải nhận trusted public key qua kênh độc lập. Signature hợp lệ chứng minh quyền kiểm soát private key tương ứng cho đúng subject; không chứng minh legal identity, authorization, trusted time, revocation, transparency-log inclusion hoặc artifact safety.
+Verifier phải nhận trusted public key qua kênh độc lập. Signature hợp lệ chứng minh quyền kiểm soát private key tương ứng cho đúng subject; không chứng minh legal identity, authorization, trusted time, transparency-log inclusion hoặc artifact safety.
+
+Thu hồi khoá do verifier tự quyết và là tùy chọn: `proofline verify-attestation ... --revocations revoked.json` từ chối mọi attestation ký bởi khoá có trong danh sách với mã `key_revoked`. File có dạng `{"schema": "proofline-key-revocations-v1", "revoked": [{"key_id": "<64 hex>", "reason": "tùy chọn"}]}`, tối đa 256 KiB và 1000 mục. Vì `issued_at` do bên ký chọn và chưa có trusted timestamp nên khoá bị thu hồi bị từ chối bất kể thời điểm nó khai báo. Bạn phải lấy file thu hồi qua cùng kênh độc lập với trusted public key; Proofline không phân phối hay làm mới danh sách.
 
 ### Specification
 
@@ -85,7 +89,9 @@ proofline verify-attestation envelope.json \
   --review-receipt decision-review.json
 ```
 
-Verifier は trusted public key を独立 channel から取得する必要があります。Signature validity は正確な subject に対する matching private-key control を証明しますが、legal identity、authorization、trusted time、revocation、transparency-log inclusion、artifact safety は証明しません。
+Verifier は trusted public key を独立 channel から取得する必要があります。Signature validity は正確な subject に対する matching private-key control を証明しますが、legal identity、authorization、trusted time、transparency-log inclusion、artifact safety は証明しません。
+
+Key revocation は verifier 側の opt-in です: `proofline verify-attestation ... --revocations revoked.json` は、一覧に載る key で署名された attestation を `key_revoked` で拒否します。File は `{"schema": "proofline-key-revocations-v1", "revoked": [{"key_id": "<64 hex>", "reason": "任意"}]}` 形式で、最大 256 KiB・1000 件です。`issued_at` は署名者が選ぶ値で trusted timestamp がないため、失効 key は主張する時刻に関係なく拒否されます。Revocation file は trusted public key と同じ独立 channel で入手してください。Proofline は失効 list を配布・更新しません。
 
 ### Specification
 
@@ -95,3 +101,4 @@ Verifier は trusted public key を独立 channel から取得する必要があ
 - [三言語 verification diagram](diagrams/evidence-verification.html)
 
 全 format は provider-independent であり、schema、canonicalization、hash、binding、signature error に対して fail closed します。出荷済み workflow は single-user/local で、これら artifact は hosted coordination を追加しません。
+
