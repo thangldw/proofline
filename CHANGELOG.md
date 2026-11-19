@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `proofline import-adr`, which converts existing Markdown ADRs into files the indexer extracts decisions from. No schema migration.
+
 ## [2.9.0] - 2026-11-19
 
 - Added `Review every: N days|weeks|months|years` (repeats from the date the cited version was recorded; `rebind` restarts the cycle), `proofline suggest-links`, and a weekly operating routine in `docs/operations.md`. No schema migration.

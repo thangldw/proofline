@@ -40,6 +40,7 @@ from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
 from .decision_health import DecisionHealthError, check_decision_health
 from .decision_impacts import compute_decision_impacts
+from .decision_import import AdrImportError, import_adrs
 from .decision_policy import (
     DecisionPolicyError,
     load_decision_policy,
@@ -922,6 +923,24 @@ def _cmd_export_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     print(json.dumps({"exported": len(exported), "output_dir": str(args.output_dir)}))
 
 
+def _cmd_import_adr(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        result = import_adrs(args.adr_dir, args.output_dir, force=args.force)
+    except AdrImportError as exc:
+        _decision_check_failed(exc.code)
+    except OSError:
+        _decision_check_failed("output_unavailable")
+    document = {
+        "imported": [
+            {"source": item.source.name, "output": str(item.output), "status": item.status}
+            for item in result.imported
+        ],
+        "skipped": [{"source": item.source.name, "reason": item.reason} for item in result.skipped],
+        "next_step": f"proofline sync {args.output_dir}",
+    }
+    print(json.dumps(document, sort_keys=True))
+
+
 def _cmd_check_code_refs(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         refs = scan_code_refs(args.paths)
@@ -1321,6 +1340,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     export_adr.add_argument("--output-dir", type=Path, required=True)
     export_adr.add_argument("--force", action="store_true")
+    import_adr = subcommands.add_parser(
+        "import-adr",
+        help="Convert existing Markdown ADRs into files Proofline can index (then run sync)",
+    )
+    import_adr.add_argument("adr_dir", type=Path)
+    import_adr.add_argument("--output-dir", type=Path, required=True)
+    import_adr.add_argument("--force", action="store_true")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1417,6 +1443,7 @@ def main(argv: list[str] | None = None) -> None:
         "snapshot-health": _cmd_snapshot_health,
         "health-trend": _cmd_health_trend,
         "export-adr": _cmd_export_adr,
+        "import-adr": _cmd_import_adr,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
