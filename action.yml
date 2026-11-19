@@ -1,0 +1,57 @@
+name: Proofline decision check
+description: Fail a pull request when an approved decision's cited evidence changed in the documents.
+author: Thang Luu
+
+inputs:
+  path:
+    description: Folder of Markdown/text documents to index, relative to the workspace.
+    default: "."
+  snapshot:
+    description: Portable JSON snapshot (proofline export) holding the approved decisions.
+    required: true
+  uri-root:
+    description: file:// URI the folder had when the snapshot was created; keeps source identity stable across machines.
+    required: true
+  policy:
+    description: Optional path to a proofline.toml decision policy.
+    default: ""
+  proofline-version:
+    description: Exact proofline-evidence version to install from PyPI.
+    default: "2.1.0"
+  sarif-output:
+    description: Where to write the SARIF report.
+    default: proofline-decision-health.sarif
+
+outputs:
+  sarif-file:
+    description: Path to the SARIF report.
+    value: ${{ steps.check.outputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.12"
+    - name: Install Proofline
+      shell: bash
+      run: python -m pip install --disable-pip-version-check "proofline-evidence==${{ inputs.proofline-version }}"
+    - name: Check approved decisions
+      id: check
+      shell: bash
+      env:
+        PROOFLINE_HOME: ${{ runner.temp }}/proofline-home
+        PL_PATH: ${{ inputs.path }}
+        PL_SNAPSHOT: ${{ inputs.snapshot }}
+        PL_URI_ROOT: ${{ inputs.uri-root }}
+        PL_POLICY: ${{ inputs.policy }}
+        PL_SARIF: ${{ inputs.sarif-output }}
+      run: |
+        set -uo pipefail
+        proofline import "$PL_SNAPSHOT"
+        proofline sync "$PL_PATH" --uri-root "$PL_URI_ROOT"
+        policy_args=()
+        if [ -n "$PL_POLICY" ]; then policy_args=(--policy "$PL_POLICY"); fi
+        proofline check-decisions --format sarif --output "$PL_SARIF" "${policy_args[@]}"
+        echo "sarif-file=$PL_SARIF" >> "$GITHUB_OUTPUT"
+        proofline check-decisions "${policy_args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"

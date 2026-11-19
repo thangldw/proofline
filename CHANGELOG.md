@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [2.1.0] - 2026-11-19
+
+- Added `proofline sync`, a headless deterministic folder indexer with a stable `--uri-root`.
+- Added a reusable composite GitHub Action that gates pull requests on changed decision evidence, with SARIF output.
+- Added the pull-request gate recipe (`docs/pr-gate.md`).
 - Align development and CI Node.js with jsdom 30 requirements.
 - Upgrade React/ReactDOM and their types together with the Vite/React-plugin/jsdom toolchain; deduplicate the workspace runtime.
 - Preserve spacing in navigation accessible names and recognize the narrow React 19 production diagnostic URL path in the static egress check.

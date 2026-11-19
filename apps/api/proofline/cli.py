@@ -88,6 +88,7 @@ from .sarif import build_decision_health_sarif, build_decision_impact_sarif
 from .schemas import SourceCreate
 from .server import run_server
 from .stale_decision_demo import DEMO_DIRECTORY, run_stale_decision_demo
+from .workspace_sync import WorkspaceSyncError, sync_folder
 
 
 def unit_interval(value: str) -> float:
@@ -214,6 +215,16 @@ def main(argv: list[str] | None = None) -> None:
         "--log-level", choices=("critical", "error", "warning", "info"), default="warning"
     )
     subcommands.add_parser("seed", help="Index the bundled example decision")
+    sync = subcommands.add_parser(
+        "sync",
+        help="Index a document folder headlessly (for CI) under a stable file URI root",
+    )
+    sync.add_argument("path", type=Path)
+    sync.add_argument(
+        "--uri-root",
+        help="file:// URI the folder had when decisions were approved; defaults to its real path",
+    )
+    sync.add_argument("--format", choices=("text", "json"), default="text")
     evaluate = subcommands.add_parser("eval", help="Run a versioned retrieval evaluation")
     evaluate.add_argument("--dataset", type=Path, required=True)
     evaluate.add_argument("--k", type=int, default=10)
@@ -414,6 +425,24 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(f"launch failed: {type(exc).__name__}") from exc
     elif args.command == "seed":
         seed_demo()
+    elif args.command == "sync":
+        try:
+            initialize_database()
+            with SessionLocal() as session:
+                summary = sync_folder(session, args.path, uri_root=args.uri_root)
+        except WorkspaceSyncError as exc:
+            raise SystemExit(f"sync failed: {exc.code}") from exc
+        except (OSError, SQLAlchemyError) as exc:
+            raise SystemExit("sync failed: database_unavailable") from exc
+        if args.format == "json":
+            print(json.dumps(summary.model_dump(), sort_keys=True))
+        else:
+            print(
+                f"Synced: {summary.created} created, {summary.updated} updated, "
+                f"{summary.unchanged} unchanged, {len(summary.failed)} failed"
+            )
+        if summary.failed:
+            raise SystemExit(1)
     elif args.command == "eval":
         report = evaluate_dataset(args.dataset, args.k)
         print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))

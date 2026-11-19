@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from threading import Lock
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 from sqlalchemy import delete, insert, select
 from sqlalchemy.exc import IntegrityError
@@ -186,7 +186,9 @@ def _failed_file(relative_path: str, code: str, *, uri: str | None = None) -> Fo
     )
 
 
-def _prepare_file(root: Path, candidate: Path) -> PreparedFile | FolderScanFileResult:
+def _prepare_file(
+    root: Path, candidate: Path, *, uri_root: str | None = None
+) -> PreparedFile | FolderScanFileResult:
     relative_path = candidate.relative_to(root).as_posix()
     try:
         resolved = candidate.resolve(strict=True)
@@ -195,6 +197,8 @@ def _prepare_file(root: Path, candidate: Path) -> PreparedFile | FolderScanFileR
     if not _is_within(resolved, root):
         return _failed_file(relative_path, "file_symlink_escape")
     uri = resolved.as_uri()
+    if uri_root is not None:
+        uri = f"{uri_root.rstrip('/')}/{quote(relative_path)}"
     try:
         before_read = resolved.stat()
         if not stat.S_ISREG(before_read.st_mode):
