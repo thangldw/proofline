@@ -35,7 +35,7 @@ from .config import get_settings
 from .database import SessionLocal, engine, initialize_database
 from .decision_blame import DecisionBlameError, blame
 from .decision_code_refs import CodeRefError, check_code_refs, scan_code_refs
-from .decision_conflicts import find_conflict_candidates
+from .decision_conflicts import find_conflict_candidates, suggest_links
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
 from .decision_health import DecisionHealthError, check_decision_health
@@ -1026,6 +1026,30 @@ def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> No
         raise SystemExit(1)
 
 
+def _cmd_suggest_links(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            suggestions = suggest_links(
+                session, args.decision_id, limit=args.limit, min_similarity=args.min_similarity
+            )
+    except ValueError as exc:
+        _decision_check_failed(str(exc))
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        print(json.dumps({"suggestions": [s.model_dump() for s in suggestions]}, sort_keys=True))
+        return
+    if not suggestions:
+        print("No related decisions found.")
+        return
+    for item in suggestions:
+        age = "older" if item.other_is_older else "newer"
+        print(
+            f"{item.other_id}  {item.similarity}  ({age}; shared: {', '.join(item.shared_terms)})"
+        )
+    print("Suggestions only. Create a relation in Studio or POST /decision-relations.")
+
+
 def _cmd_demo(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         result = run_stale_decision_demo(args.output_dir, force=args.force)
@@ -1321,6 +1345,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     doctor.add_argument("--policy", type=Path)
     doctor.add_argument("--format", choices=("text", "json"), default="text")
+    suggest = subcommands.add_parser(
+        "suggest-links", help="List approved decisions a decision probably relates to"
+    )
+    suggest.add_argument("decision_id", help="Decision id or an 8+ character prefix")
+    suggest.add_argument("--limit", type=int, default=5)
+    suggest.add_argument("--min-similarity", type=float, default=0.2)
+    suggest.add_argument("--format", choices=("text", "json"), default="text")
     check_decisions = subcommands.add_parser(
         "check-decisions",
         help="Read-only CI check that approved citations still resolve in current sources",
@@ -1381,6 +1412,7 @@ def main(argv: list[str] | None = None) -> None:
         "restore-backup": _cmd_restore_backup,
         "verify-integrity": _cmd_verify_integrity,
         "blame": _cmd_blame,
+        "suggest-links": _cmd_suggest_links,
         "doctor": _cmd_doctor,
         "snapshot-health": _cmd_snapshot_health,
         "health-trend": _cmd_health_trend,

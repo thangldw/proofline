@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .decision_expiry import REVIEW_LINE
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .models import (
     Chunk,
@@ -113,9 +114,6 @@ MEMORY_PATTERNS = {
 DECISION_PREFIX, DECISION_HEADING = MEMORY_PATTERNS["decision"]
 RATIONALE_PREFIX = re.compile(r"^(?:rationale|reason|because|lý do)\s*[:\-]\s*(.+)$", re.I)
 STATUS_PREFIX = re.compile(r"^(?:status|trạng thái)\s*[:\-]\s*(.+)$", re.I)
-REVIEW_BY_PREFIX = re.compile(
-    r"^(?:review[ _-]?by|xem xét lại trước)\s*[:\-]\s*(\d{4}-\d{2}-\d{2})\s*$", re.I
-)
 
 
 def line_number(content: str, offset: int) -> int:
@@ -215,7 +213,7 @@ def extract_memories(content: str) -> list[dict]:
                 break
             rationale_match = RATIONALE_PREFIX.match(candidate)
             status_match = STATUS_PREFIX.match(candidate)
-            review_by_match = REVIEW_BY_PREFIX.match(candidate)
+            review_by_match = REVIEW_LINE.match(candidate)
             if rationale_match:
                 found_metadata = True
                 rationale = rationale_match.group(1).strip()
