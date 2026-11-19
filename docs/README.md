@@ -5,7 +5,7 @@
 ### Choose a path
 
 - Evaluator: [Getting started](getting-started.md), [v2.2.0 release](releases/v2.2.0.md), [real pilot evidence](pilot.md), then [architecture](architecture.md).
-- CI: [Pull-request gate](pr-gate.md). Agents: [local MCP server](mcp.md).
+- CI: [Pull-request gate](pr-gate.md). Agents: [local MCP server](mcp.md). Planned: [roadmap](roadmap.md).
 - Integrator: [CLI reference](cli-reference.md), [API reference](api-reference.md), and [evidence packages](evidence-packages.md).
 - Operator: [Operations](operations.md), [security](../SECURITY.md), and [release process](release-process.md).
 - Independent verifier: [Evidence packages](evidence-packages.md) and the [Decision Evidence Package specification](../spec/decision-evidence-package/README.md).
