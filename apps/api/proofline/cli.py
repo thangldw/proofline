@@ -75,6 +75,8 @@ from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
 from .decision_undocumented import candidates_from_diff, find_undocumented
 from .decision_watch import watch_folder
+from .decision_whatif import WhatIfError, what_if_superseded
+from .decision_whatif import render_text as render_what_if
 from .decision_why import DecisionWhyError, why
 from .doctor import run_doctor
 from .embeddings import index_current_embeddings
@@ -1327,6 +1329,21 @@ def _cmd_find_undocumented(args: argparse.Namespace, parser: argparse.ArgumentPa
         raise SystemExit(1)
 
 
+def _cmd_what_if(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            result = what_if_superseded(session, args.decision, args.root)
+    except WhatIfError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.format == "json":
+        document = result.model_dump() if not args.no_titles else result.content_free_model_dump()
+        print(json.dumps(document, sort_keys=True))
+    else:
+        print(render_what_if(result, include_titles=not args.no_titles), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1760,6 +1777,14 @@ def main(argv: list[str] | None = None) -> None:
     undocumented.add_argument("--ignore", action="append", default=[], metavar="NAME")
     undocumented.add_argument("--format", choices=("markdown", "json"), default="markdown")
     undocumented.add_argument("--fail-on-undocumented", action="store_true")
+    what_if = subcommands.add_parser(
+        "what-if",
+        help="Preview the blast radius of superseding a decision (dependents, code refs, rules)",
+    )
+    what_if.add_argument("decision", help="Decision id or unique prefix (4+ characters)")
+    what_if.add_argument("--root", type=Path, default=Path("."))
+    what_if.add_argument("--format", choices=("text", "json"), default="text")
+    what_if.add_argument("--no-titles", action="store_true")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1870,6 +1895,7 @@ def main(argv: list[str] | None = None) -> None:
         "ledger": _cmd_ledger,
         "agent-hook": _cmd_agent_hook,
         "find-undocumented": _cmd_find_undocumented,
+        "what-if": _cmd_what_if,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
