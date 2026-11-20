@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `proofline propose`, which drafts candidate decisions (never accepted) for additions no approved decision mentions, and a `PostToolUse` nudge in `agent-hook post` that asks the agent to tell the user and offer a draft when it adds such a dependency or infrastructure file.
 ## [2.10.0] - 2026-11-20
 
 - Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.

@@ -167,3 +167,16 @@ def find_undocumented(
             continue
         missing.append(Undocumented(candidate.path, candidate.kind, candidate.name))
     return missing
+
+
+def candidates_from_lines(path: str, added: list[str], *, whole_file: bool) -> list[Candidate]:
+    """Candidates in text an agent just wrote (infrastructure only for whole-file writes)."""
+
+    found: list[Candidate] = []
+    if whole_file:
+        for pattern, label in _INFRA:
+            if pattern.search(path):
+                found.append(Candidate(path, "infrastructure", label))
+    else:
+        found.extend(Candidate(path, "dependency", name) for name in _manifest_names(path, added))
+    return sorted(set(found), key=lambda c: (c.path, c.kind, c.name))

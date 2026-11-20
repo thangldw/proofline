@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .decision_context import ContextItem, build_context
 from .decision_enforce import check_enforcement
+from .decision_undocumented import candidates_from_lines, find_undocumented
 from .models import Decision
 
 EDIT_TOOLS = {"Edit": "file_path", "Write": "file_path", "MultiEdit": "file_path"}
@@ -81,6 +82,46 @@ def pre_tool_use(session: Session, event: dict[str, Any], root: Path) -> dict[st
     }
 
 
+def _written_lines(event: dict[str, Any]) -> tuple[list[str], bool]:
+    tool_input = event.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return [], False
+    if event.get("tool_name") == "Write":
+        content = tool_input.get("content")
+        return (content.splitlines() if isinstance(content, str) else []), True
+    edits = tool_input.get("edits") if event.get("tool_name") == "MultiEdit" else [tool_input]
+    lines: list[str] = []
+    for edit in edits if isinstance(edits, list) else []:
+        if not isinstance(edit, dict):
+            continue
+        new, old = edit.get("new_string"), edit.get("old_string")
+        if isinstance(new, str):
+            before = set(old.splitlines()) if isinstance(old, str) else set()
+            lines.extend(line for line in new.splitlines() if line not in before)
+    return lines, False
+
+
+def _undocumented_nudge(
+    session: Session, event: dict[str, Any], path: str
+) -> dict[str, Any] | None:
+    lines, whole_file = _written_lines(event)
+    missing = find_undocumented(session, candidates_from_lines(path, lines, whole_file=whole_file))
+    if not missing:
+        return None
+    names = ", ".join(f"{item.kind} {_clean(item.name, 60)}" for item in missing[:MAX_ITEMS])
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": (
+                f"Proofline: no approved decision mentions {names} (added in {path}). Tell the "
+                "user, and with their agreement run `proofline propose --kind KIND --name NAME "
+                "--path PATH` to draft a candidate decision for them to review. Never mark a "
+                "proposal accepted yourself."
+            ),
+        }
+    }
+
+
 def post_tool_use(session: Session, event: dict[str, Any], root: Path) -> dict[str, Any] | None:
     path = target_path(event, root)
     if path is None:
@@ -91,7 +132,7 @@ def post_tool_use(session: Session, event: dict[str, Any], root: Path) -> dict[s
         if finding.path == path
     ]
     if not relevant:
-        return None
+        return _undocumented_nudge(session, event, path)
     lines = [
         f"Proofline: this edit to {path} violates an Enforce rule of an approved decision. "
         "Fix the code or tell the user the decision needs to change; do not edit the decision "
