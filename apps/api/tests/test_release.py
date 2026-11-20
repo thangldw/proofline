@@ -65,7 +65,7 @@ def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
         "apps/desktop/src-tauri/tauri.conf.json",
         "apps/desktop/src-tauri/Cargo.toml",
         "apps/desktop/src-tauri/Cargo.lock",
-        "docs/releases/v2.11.0.md",
+        "docs/releases/v2.11.1.md",
         "scripts/release_check.py",
     )
     for relative in required:
@@ -76,7 +76,7 @@ def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
     cargo_lock = candidate / "apps/desktop/src-tauri/Cargo.lock"
     cargo_lock.write_text(
         cargo_lock.read_text(encoding="utf-8").replace(
-            'name = "proofline-desktop"\nversion = "2.11.0"',
+            'name = "proofline-desktop"\nversion = "2.11.1"',
             'name = "proofline-desktop"\nversion = "2.0.1"',
             1,
         ),
@@ -84,7 +84,7 @@ def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
     )
 
     completed = subprocess.run(
-        [sys.executable, "scripts/release_check.py", "--tag", "v2.11.0"],
+        [sys.executable, "scripts/release_check.py", "--tag", "v2.11.1"],
         cwd=candidate,
         check=False,
         capture_output=True,
@@ -92,7 +92,7 @@ def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
     )
 
     assert completed.returncode == 1
-    assert "Cargo.lock proofline-desktop is '2.0.1'; expected '2.11.0'" in completed.stderr
+    assert "Cargo.lock proofline-desktop is '2.0.1'; expected '2.11.1'" in completed.stderr
 
 
 @pytest.mark.parametrize(
@@ -205,12 +205,12 @@ def test_release_entrypoints_require_full_gates_and_both_python_artifacts():
 
 def test_release_asset_selection_excludes_unsigned_desktop_packages(tmp_path):
     names = (
-        "proofline_evidence-2.11.0-py3-none-any.whl",
-        "proofline_evidence-2.11.0.tar.gz",
-        "proofline-web-v2.11.0.tar.gz",
-        "proofline-platform-v2.11.0-darwin-arm64.json",
-        "proofline-desktop-v2.11.0-macos-arm64.dmg",
-        "proofline-desktop-v2.11.0-macos-arm64.json",
+        "proofline_evidence-2.11.1-py3-none-any.whl",
+        "proofline_evidence-2.11.1.tar.gz",
+        "proofline-web-v2.11.1.tar.gz",
+        "proofline-platform-v2.11.1-darwin-arm64.json",
+        "proofline-desktop-v2.11.1-macos-arm64.dmg",
+        "proofline-desktop-v2.11.1-macos-arm64.json",
     )
     for name in names:
         (tmp_path / name).write_bytes(b"artifact")
@@ -222,7 +222,7 @@ def test_release_asset_selection_excludes_unsigned_desktop_packages(tmp_path):
             "--dist-dir",
             str(tmp_path),
             "--tag",
-            "v2.11.0",
+            "v2.11.1",
             "--web-format",
             "tar.gz",
             "--platform-slug",
@@ -236,10 +236,10 @@ def test_release_asset_selection_excludes_unsigned_desktop_packages(tmp_path):
 
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout.splitlines() == [
-        str(tmp_path / "proofline_evidence-2.11.0-py3-none-any.whl"),
-        str(tmp_path / "proofline_evidence-2.11.0.tar.gz"),
-        str(tmp_path / "proofline-web-v2.11.0.tar.gz"),
-        str(tmp_path / "proofline-platform-v2.11.0-darwin-arm64.json"),
+        str(tmp_path / "proofline_evidence-2.11.1-py3-none-any.whl"),
+        str(tmp_path / "proofline_evidence-2.11.1.tar.gz"),
+        str(tmp_path / "proofline-web-v2.11.1.tar.gz"),
+        str(tmp_path / "proofline-platform-v2.11.1-darwin-arm64.json"),
     ]
 
 
@@ -253,8 +253,8 @@ def test_trusted_publisher_workflow_separates_build_publish_and_public_verificat
     assert "name: pypi" in workflow
     assert "id-token: write" in workflow
     assert "pypa/gh-action-pypi-publish@" in workflow
-    assert "proofline_evidence-2.11.0-py3-none-any.whl" in workflow
-    assert "proofline_evidence-2.11.0.tar.gz" in workflow
+    assert "proofline_evidence-2.11.1-py3-none-any.whl" in workflow
+    assert "proofline_evidence-2.11.1.tar.gz" in workflow
     assert "--verify-only" in workflow
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in workflow
     assert "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" in workflow

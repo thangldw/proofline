@@ -12,7 +12,7 @@
       "name": "proofline",
       "source": "./plugins/proofline",
       "description": "Verify evidence-backed engineering decisions, and make approved decisions binding for coding agents: decision context before an edit, Enforce: rules after it.",
-      "version": "2.11.0",
+      "version": "2.11.1",
       "author": {
         "name": "Thang Luu",
         "url": "https://github.com/thangldw"
