@@ -7,8 +7,5 @@
     "test:e2e": "npm --workspace @proofline/web run test:e2e",
     "test:web": "npm --workspace @proofline/web run test"
   },
-  "workspaces": ["apps/web", "apps/desktop"],
-  "overrides": {
-    "nanoid": "3.3.18"
-  }
+  "workspaces": ["apps/web", "apps/desktop"]
 }
