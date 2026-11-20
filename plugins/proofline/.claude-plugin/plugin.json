@@ -1,6 +1,6 @@
 {
   "name": "proofline",
-  "version": "2.11.0",
+  "version": "2.11.1",
   "description": "Evidence-first decision memory: verify decisions with exact citations, and make approved decisions binding for coding agents through hooks.",
   "author": {
     "name": "Thang Luu",
