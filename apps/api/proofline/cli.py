@@ -47,6 +47,8 @@ from .decision_context import (
 from .decision_context import (
     render_markdown as render_context_markdown,
 )
+from .decision_debt import DebtError, build_debt_map
+from .decision_debt import render_markdown as render_debt
 from .decision_enforce import EnforceError, check_enforcement
 from .decision_expiry import check_expiry
 from .decision_export import DecisionExportError, export_adrs
@@ -1344,6 +1346,22 @@ def _cmd_what_if(args: argparse.Namespace, parser: argparse.ArgumentParser) -> N
         print(render_what_if(result, include_titles=not args.no_titles), end="")
 
 
+def _cmd_debt(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            rows = build_debt_map(session, args.root, since_days=args.since, depth=args.depth)
+    except DebtError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("database_unavailable")
+    if args.only_gaps:
+        rows = [row for row in rows if row.undecided]
+    if args.format == "json":
+        print(json.dumps({"directories": [row.model_dump() for row in rows]}, sort_keys=True))
+    else:
+        print(render_debt(rows, since_days=args.since), end="")
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1785,6 +1803,14 @@ def main(argv: list[str] | None = None) -> None:
     what_if.add_argument("--root", type=Path, default=Path("."))
     what_if.add_argument("--format", choices=("text", "json"), default="text")
     what_if.add_argument("--no-titles", action="store_true")
+    debt = subcommands.add_parser(
+        "debt", help="Rank recently changed directories by whether any decision covers them"
+    )
+    debt.add_argument("--root", type=Path, default=Path("."))
+    debt.add_argument("--since", type=int, default=90, metavar="DAYS")
+    debt.add_argument("--depth", type=int, default=2, help="Directory levels to group by")
+    debt.add_argument("--only-gaps", action="store_true", help="Show only undecided directories")
+    debt.add_argument("--format", choices=("markdown", "json"), default="markdown")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1896,6 +1922,7 @@ def main(argv: list[str] | None = None) -> None:
         "agent-hook": _cmd_agent_hook,
         "find-undocumented": _cmd_find_undocumented,
         "what-if": _cmd_what_if,
+        "debt": _cmd_debt,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,

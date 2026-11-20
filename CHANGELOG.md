@@ -14,6 +14,7 @@
 - Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
 - Added the read-only `decision_graph` MCP tool (ids, stale flags and edge kinds; titles only with `--include-titles`).
 - Added executable decisions: `Enforce: forbid|require "text" in <glob>` and `Enforce: require file <glob>` lines, checked by `proofline check-enforcement`. Literal patterns only; rule lines are part of the cited text. No schema migration.
+- Added `proofline debt`, a map of recently changed directories and whether any code marker or `Enforce:` rule covers them.
 - Added `proofline what-if <decision>`, a read-only preview of superseding a decision: transitive dependents, other relations, code markers and the `Enforce:` rules that would stop being checked.
 - Added `proofline find-undocumented`, which lists dependencies and infrastructure files a diff adds that no approved decision mentions, as prompts to write an ADR.
 - Added `proofline agent-hook pre|post`, Claude Code hook handlers that put the approved decisions attached to a file into the agent's context before an edit and block the edit's result when it violates an `Enforce:` rule.
