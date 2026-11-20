@@ -1,0 +1,29 @@
+{
+  "description": "Proofline: show approved decisions before an edit and enforce their Enforce: rules after it. Silent unless the project has a .proofline/proofline.db and the proofline CLI is installed.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v proofline >/dev/null 2>&1 && proofline agent-hook pre || true",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v proofline >/dev/null 2>&1 && proofline agent-hook post || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

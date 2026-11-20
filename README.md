@@ -4,9 +4,18 @@
 
 ## English
 
-Product introduction: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Latest published release: [v2.9.0](https://github.com/thangldw/proofline/releases/tag/v2.9.0). Main may contain later source or documentation changes; they do not replace the published artifact or its recorded verification.
+Product introduction: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Latest published release: [v2.10.0](https://github.com/thangldw/proofline/releases/tag/v2.10.0). Main may contain later source or documentation changes; they do not replace the published artifact or its recorded verification.
 
 Proofline is a local-first engineering decision memory that binds decisions to immutable source versions and exact citation spans. When a requirement changes, deterministic checks mark the affected evidence for review without rewriting the historical decision.
+
+### Use it in Claude Code
+
+```text
+/plugin marketplace add thangldw/proofline
+/plugin install proofline@proofline
+```
+
+The plugin carries the decision skill and two hooks that make approved decisions binding for the agent: before an edit it shows the decisions attached to that file, and after an edit it blocks results that violate an `Enforce:` rule. The hooks stay silent unless the `proofline` CLI is installed (`pip install proofline-evidence`) and the project has a `.proofline/proofline.db`. See [MCP and agents](docs/mcp.md).
 
 ### Five-minute path
 
@@ -35,7 +44,7 @@ Published scale figures are synthetic regression evidence, not team or hosted-pr
 
 ### Documentation and releases
 
-Start with the [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/operations.md), and [v2.9.0 release notes](docs/releases/v2.9.0.md).
+Start with the [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [evidence package formats](docs/evidence-packages.md), [operations](docs/operations.md), and [v2.10.0 release notes](docs/releases/v2.10.0.md).
 
 Proofline is also packaged as a local skills plugin. The [OpenAI plugin submission record](docs/submission/openai-plugin.md) separates repository facts from dated external publication observations. The recorded [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) does not imply that the repository can independently confirm the currently public version; this project does not claim a hosted connector.
 
@@ -43,9 +52,18 @@ See [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [term
 
 ## Tiếng Việt
 
-Trang giới thiệu: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Release đã phát hành mới nhất: [v2.9.0](https://github.com/thangldw/proofline/releases/tag/v2.9.0). Main có thể chứa source hoặc tài liệu mới hơn; chúng không thay thế artifact đã phát hành hay evidence kiểm chứng của artifact.
+Trang giới thiệu: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/). Release đã phát hành mới nhất: [v2.10.0](https://github.com/thangldw/proofline/releases/tag/v2.10.0). Main có thể chứa source hoặc tài liệu mới hơn; chúng không thay thế artifact đã phát hành hay evidence kiểm chứng của artifact.
 
 Proofline là bộ nhớ quyết định kỹ thuật local-first, liên kết decision với phiên bản nguồn bất biến và exact citation span. Khi requirement thay đổi, kiểm tra xác định đánh dấu evidence bị ảnh hưởng để review mà không viết lại decision lịch sử.
+
+### Dùng trong Claude Code
+
+```text
+/plugin marketplace add thangldw/proofline
+/plugin install proofline@proofline
+```
+
+Plugin mang theo skill về decision và hai hook biến decision đã duyệt thành ràng buộc với agent: trước khi sửa, hook hiện các decision gắn với file đó; sau khi sửa, hook chặn kết quả vi phạm luật `Enforce:`. Hook im lặng trừ khi đã cài CLI `proofline` (`pip install proofline-evidence`) và dự án có `.proofline/proofline.db`. Xem [MCP và agent](docs/mcp.md).
 
 ### Luồng dưới năm phút
 
@@ -74,7 +92,7 @@ Các số liệu scale đã công bố là bằng chứng hồi quy synthetic, k
 
 ### Tài liệu và release
 
-Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [định dạng evidence package](docs/evidence-packages.md), [operations](docs/operations.md) và [release note v2.9.0](docs/releases/v2.9.0.md).
+Bắt đầu từ [documentation hub](docs/README.md), [getting started](docs/getting-started.md), [architecture](docs/architecture.md), [decision lifecycle](docs/decision-lifecycle.md), [định dạng evidence package](docs/evidence-packages.md), [operations](docs/operations.md) và [release note v2.10.0](docs/releases/v2.10.0.md).
 
 Proofline cũng được đóng gói thành local skills plugin. [Hồ sơ submission OpenAI plugin](docs/submission/openai-plugin.md) tách repository fact khỏi quan sát external publication có ngày. [URL OpenAI Plugins Directory](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) đã ghi không có nghĩa repository có thể tự xác nhận version đang public; project này không claim hosted connector.
 
@@ -82,9 +100,18 @@ Xem [privacy](PRIVACY.md), [security](SECURITY.md), [support](SUPPORT.md), [term
 
 ## 日本語
 
-紹介ページ: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/)。最新の公開 release は [v2.9.0](https://github.com/thangldw/proofline/releases/tag/v2.9.0) です。Main の新しい source/documentation change は公開 artifact やその検証記録を置換しません。
+紹介ページ: [thangldw.github.io/proofline/](https://thangldw.github.io/proofline/)。最新の公開 release は [v2.10.0](https://github.com/thangldw/proofline/releases/tag/v2.10.0) です。Main の新しい source/documentation change は公開 artifact やその検証記録を置換しません。
 
 Proofline は、decision を不変の source version と正確な citation span に結び付ける local-first の engineering decision memory です。Requirement が変わると、決定的検査が影響を受けた evidence を review 対象にし、過去の decision 自体は書き換えません。
+
+### Claude Code で使う
+
+```text
+/plugin marketplace add thangldw/proofline
+/plugin install proofline@proofline
+```
+
+Plugin は decision の skill と、承認済み decision を agent への拘束力にする 2 つの hook を含みます。編集前にそのファイルに紐づく decision を示し、編集後に `Enforce:` ルールに違反する結果をブロックします。`proofline` CLI (`pip install proofline-evidence`) がインストールされ、プロジェクトに `.proofline/proofline.db` がある場合のみ動作し、それ以外は沈黙します。[MCP と agent](docs/mcp.md) を参照してください。
 
 ### 五分以内の操作
 
@@ -113,7 +140,7 @@ Demo は使い捨て workspace を作成し、引用済み requirement を変更
 
 ### 文書と release
 
-[Documentation hub](docs/README.md)、[getting started](docs/getting-started.md)、[architecture](docs/architecture.md)、[decision lifecycle](docs/decision-lifecycle.md)、[evidence package format](docs/evidence-packages.md)、[operations](docs/operations.md)、[v2.9.0 release note](docs/releases/v2.9.0.md) を参照してください。
+[Documentation hub](docs/README.md)、[getting started](docs/getting-started.md)、[architecture](docs/architecture.md)、[decision lifecycle](docs/decision-lifecycle.md)、[evidence package format](docs/evidence-packages.md)、[operations](docs/operations.md)、[v2.10.0 release note](docs/releases/v2.10.0.md) を参照してください。
 
 Proofline は local skills plugin としても packaging されています。[OpenAI plugin submission record](docs/submission/openai-plugin.md) は repository fact と日付付き external publication observation を分離します。記録済み [OpenAI Plugins Directory URL](https://chatgpt.com/plugins/plugins_6a6efdf2ccbc81919ebb4cb01805ebaa) は、repository が現在の public version を独立確認できることを意味しません。この project は hosted connector を提供すると主張しません。
 

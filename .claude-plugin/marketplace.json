@@ -1,0 +1,27 @@
+{
+  "name": "proofline",
+  "owner": {
+    "name": "Thang Luu",
+    "url": "https://github.com/thangldw"
+  },
+  "metadata": {
+    "description": "Evidence-first decision memory for engineering teams and coding agents."
+  },
+  "plugins": [
+    {
+      "name": "proofline",
+      "source": "./",
+      "description": "Verify evidence-backed engineering decisions, and make approved decisions binding for coding agents: decision context before an edit, Enforce: rules after it.",
+      "version": "2.10.0",
+      "author": {
+        "name": "Thang Luu",
+        "url": "https://github.com/thangldw"
+      },
+      "homepage": "https://github.com/thangldw/proofline",
+      "repository": "https://github.com/thangldw/proofline",
+      "license": "Apache-2.0",
+      "category": "development",
+      "keywords": ["engineering-decisions", "adr", "evidence", "provenance", "hooks"]
+    }
+  ]
+}

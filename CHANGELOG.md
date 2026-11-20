@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.
+## [2.10.0] - 2026-11-20
 
+- Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.
 - Added `proofline import-adr`, which converts existing Markdown ADRs into files the indexer extracts decisions from. No schema migration.
 - Added `proofline hook install|uninstall`, a git pre-commit hook that runs `check-code-refs` on staged files (and optionally `sync` plus `check-decisions`).
 - Added `proofline report`, a shareable HTML or Markdown health report (trend, stale citations, reviews due, possible conflicts) with an optional `--no-titles` mode.
@@ -14,6 +15,7 @@
 - Added `proofline watch <folder>`, which re-syncs when documents change and reports decisions that became stale or recovered.
 - Added the read-only `decision_graph` MCP tool (ids, stale flags and edge kinds; titles only with `--include-titles`).
 - Added executable decisions: `Enforce: forbid|require "text" in <glob>` and `Enforce: require file <glob>` lines, checked by `proofline check-enforcement`. Literal patterns only; rule lines are part of the cited text. No schema migration.
+- Added the Claude Code plugin surface: `.claude-plugin/marketplace.json` (install with `/plugin marketplace add thangldw/proofline`) and `hooks/hooks.json`, which registers `agent-hook` before and after edits.
 - Added `proofline debt`, a map of recently changed directories and whether any code marker or `Enforce:` rule covers them.
 - Added `proofline what-if <decision>`, a read-only preview of superseding a decision: transitive dependents, other relations, code markers and the `Enforce:` rules that would stop being checked.
 - Added `proofline find-undocumented`, which lists dependencies and infrastructure files a diff adds that no approved decision mentions, as prompts to write an ADR.
