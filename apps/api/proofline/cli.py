@@ -73,6 +73,12 @@ from .decision_policy import (
 )
 from .decision_propose import DEFAULT_DIR, KINDS, ProposeError, write_proposals
 from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
+from .decision_release import (
+    build_release_attestation,
+    collect_state,
+    load_and_verify_release,
+    verify_release_attestation,
+)
 from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
@@ -518,6 +524,45 @@ def _cmd_attest(args: argparse.Namespace, parser: argparse.ArgumentParser) -> No
     except (AttestationError, EvidencePackageError, ReviewReceiptError) as exc:
         raise SystemExit(f"attestation failed: {exc.code}") from exc
     print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_attest_release(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        private_key = load_attestation_private_key(args.private_key)
+        with SessionLocal() as session:
+            state = collect_state(session, args.root, args.ledger, tag=args.tag)
+        if args.require_compliant and not state["compliant"]:
+            raise AttestationError("not_compliant")
+        if state["dirty"] and not args.allow_dirty:
+            raise AttestationError("worktree_dirty")
+        document = build_release_attestation(
+            state, private_key, _parse_attestation_time(args.issued_at)
+        )
+        atomic_write_attestation(args.output, document, force=args.force)
+        report = verify_release_attestation(document, private_key.public_key())
+    except (AttestationError, LedgerError) as exc:
+        raise SystemExit(f"release attestation failed: {exc.code}") from exc
+    except (OSError, SQLAlchemyError) as exc:
+        raise SystemExit("release attestation failed: state_unavailable") from exc
+    print(json.dumps(report, sort_keys=True))
+
+
+def _cmd_verify_release_attestation(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
+    try:
+        public_key = load_attestation_public_key(args.public_key)
+        revoked = (
+            load_revoked_key_ids(args.revocations) if args.revocations is not None else frozenset()
+        )
+        report = load_and_verify_release(
+            args.path, public_key, revoked_key_ids=revoked, expected_commit=args.commit
+        )
+    except AttestationError as exc:
+        raise SystemExit(f"release attestation verification failed: {exc.code}") from exc
+    print(json.dumps(report, sort_keys=True))
+    if args.require_compliant and not report["compliant"]:
+        raise SystemExit(1)
 
 
 def _cmd_verify_attestation(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -1658,6 +1703,27 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         help="JSON list of revoked key ids (proofline-key-revocations-v1) you trust",
     )
+    attest_release = subcommands.add_parser(
+        "attest-release",
+        help="Sign a content-free statement of decision health at the checked-out commit",
+    )
+    attest_release.add_argument("--private-key", type=Path, required=True)
+    attest_release.add_argument("--output", type=Path, required=True)
+    attest_release.add_argument("--root", type=Path, default=Path("."))
+    attest_release.add_argument("--ledger", type=Path, help="Ledger whose head hash to include")
+    attest_release.add_argument("--tag", help="Release tag the statement is about")
+    attest_release.add_argument("--issued-at")
+    attest_release.add_argument("--require-compliant", action="store_true")
+    attest_release.add_argument("--allow-dirty", action="store_true")
+    attest_release.add_argument("--force", action="store_true")
+    verify_release = subcommands.add_parser(
+        "verify-release-attestation", help="Verify a release attestation against a trusted key"
+    )
+    verify_release.add_argument("path", type=Path)
+    verify_release.add_argument("--public-key", type=Path, required=True)
+    verify_release.add_argument("--commit", help="Full commit SHA the attestation must cover")
+    verify_release.add_argument("--revocations", type=Path)
+    verify_release.add_argument("--require-compliant", action="store_true")
     explain = subcommands.add_parser(
         "explain", help="Explain one memory artifact and its exact provenance"
     )
@@ -1937,6 +2003,8 @@ def main(argv: list[str] | None = None) -> None:
         "verify-review-receipt": _cmd_verify_review_receipt,
         "generate-attestation-key": _cmd_generate_attestation_key,
         "attest": _cmd_attest,
+        "attest-release": _cmd_attest_release,
+        "verify-release-attestation": _cmd_verify_release_attestation,
         "verify-attestation": _cmd_verify_attestation,
         "explain": _cmd_explain,
         "diff": _cmd_diff,
