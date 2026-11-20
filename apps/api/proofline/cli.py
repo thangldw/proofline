@@ -73,6 +73,7 @@ from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
+from .decision_undocumented import candidates_from_diff, find_undocumented
 from .decision_watch import watch_folder
 from .decision_why import DecisionWhyError, why
 from .doctor import run_doctor
@@ -1293,6 +1294,39 @@ def _cmd_agent_hook(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         print(output)
 
 
+def _cmd_find_undocumented(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.diff_file is not None:
+            diff = (
+                sys.stdin.read()
+                if str(args.diff_file) == "-"
+                else args.diff_file.read_text(encoding="utf-8")
+            )
+        elif args.base:
+            diff = git_diff(args.root, args.base)
+        else:
+            _decision_check_failed("diff_source_required")
+        with SessionLocal() as session:
+            missing = find_undocumented(
+                session, candidates_from_diff(diff), ignore=frozenset(args.ignore)
+            )
+    except ContextError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, UnicodeError, SQLAlchemyError):
+        _decision_check_failed("context_unavailable")
+    if args.format == "json":
+        print(json.dumps({"undocumented": [item.model_dump() for item in missing]}, sort_keys=True))
+    elif not missing:
+        print("Every added dependency and infrastructure file is covered by an approved decision.")
+    else:
+        print("### Possible undocumented decisions\n")
+        print("No approved decision mentions these additions. Consider writing an ADR.\n")
+        for item in missing:
+            print(f"- {item.kind} `{item.name}` in `{item.path}`")
+    if args.fail_on_undocumented and missing:
+        raise SystemExit(1)
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1716,6 +1750,16 @@ def main(argv: list[str] | None = None) -> None:
         help="Claude Code hook: show decisions before an edit, enforce rules after it",
     )
     agent_hook.add_argument("phase", choices=("pre", "post"))
+    undocumented = subcommands.add_parser(
+        "find-undocumented",
+        help="List added dependencies and infrastructure files that no approved decision mentions",
+    )
+    undocumented.add_argument("--base", help="Git ref to diff against (uses `<base>...HEAD`)")
+    undocumented.add_argument("--diff-file", type=Path, help="Unified diff file, or - for stdin")
+    undocumented.add_argument("--root", type=Path, default=Path("."))
+    undocumented.add_argument("--ignore", action="append", default=[], metavar="NAME")
+    undocumented.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    undocumented.add_argument("--fail-on-undocumented", action="store_true")
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1825,6 +1869,7 @@ def main(argv: list[str] | None = None) -> None:
         "code-context": _cmd_code_context,
         "ledger": _cmd_ledger,
         "agent-hook": _cmd_agent_hook,
+        "find-undocumented": _cmd_find_undocumented,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
