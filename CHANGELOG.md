@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Moved the Claude Code plugin into `plugins/proofline/` (manifest, hooks, a copy of the skill, icon, README, LICENSE) so the plugin directory can scan a small folder; the marketplace now points there and the manifest declares an icon and no network hosts. `/plugin marketplace add thangldw/proofline` is unchanged.
+- Moved the Claude Code plugin into `plugins/proofline/` (manifest, hooks, a copy of the skill, icon, README, LICENSE) so the plugin directory can scan a small folder; the marketplace now points there and the manifest declares an icon. `/plugin marketplace add thangldw/proofline` is unchanged.
+- Plugin hooks now call `hooks/pre.sh` and `hooks/post.sh` through `${CLAUDE_PLUGIN_ROOT}` (same silent, never-failing behaviour) and the manifest drops the unsupported `network` field, to satisfy the directory's validation rules.
 - Added `supportURL` to the OpenAI plugin manifest; the plugin portal now requires it for new versions.
 - Recorded the 2.11.0 OpenAI plugin submission (in review) in `docs/submission/openai-plugin.md`.
 
