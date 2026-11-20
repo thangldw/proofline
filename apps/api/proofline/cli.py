@@ -81,6 +81,7 @@ from .decision_release import (
 )
 from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
+from .decision_rules_export import RulesExportError, collect_rules, render_semgrep
 from .decision_trend import record_all_snapshots, render_markdown, trend
 from .decision_undocumented import Candidate, candidates_from_diff, find_undocumented
 from .decision_watch import watch_folder
@@ -1377,6 +1378,29 @@ def _cmd_find_undocumented(args: argparse.Namespace, parser: argparse.ArgumentPa
         raise SystemExit(1)
 
 
+def _cmd_export_rules(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        with SessionLocal() as session:
+            exported, skipped = collect_rules(session)
+        text = render_semgrep(exported)
+    except RulesExportError as exc:
+        _decision_check_failed(exc.code)
+    except SQLAlchemyError:
+        _decision_check_failed("database_unavailable")
+    if args.output is None:
+        print(text, end="")
+    else:
+        try:
+            args.output.write_text(text, encoding="utf-8")
+        except OSError:
+            _decision_check_failed("output_unwritable")
+    for item in skipped:
+        print(
+            f"skipped decision {item.decision_id[:8]} rule {item.rule_index}: {item.reason}",
+            file=sys.stderr,
+        )
+
+
 def _cmd_propose(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         if args.base:
@@ -1892,6 +1916,12 @@ def main(argv: list[str] | None = None) -> None:
     undocumented.add_argument("--ignore", action="append", default=[], metavar="NAME")
     undocumented.add_argument("--format", choices=("markdown", "json"), default="markdown")
     undocumented.add_argument("--fail-on-undocumented", action="store_true")
+    export_rules = subcommands.add_parser(
+        "export-rules",
+        help="Export Enforce: forbid rules as Semgrep rules so CI can enforce them at scale",
+    )
+    export_rules.add_argument("--format", choices=("semgrep",), default="semgrep")
+    export_rules.add_argument("--output", type=Path, help="Write here instead of stdout")
     propose = subcommands.add_parser(
         "propose",
         help="Draft candidate decisions (never accepted) for additions no decision covers",
@@ -2032,6 +2062,7 @@ def main(argv: list[str] | None = None) -> None:
         "ledger": _cmd_ledger,
         "agent-hook": _cmd_agent_hook,
         "find-undocumented": _cmd_find_undocumented,
+        "export-rules": _cmd_export_rules,
         "propose": _cmd_propose,
         "what-if": _cmd_what_if,
         "debt": _cmd_debt,
