@@ -85,7 +85,7 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         (repository / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
     )
     claude_plugin = json.loads(
-        (repository / ".claude-plugin/plugin.json").read_text(encoding="utf-8")
+        (repository / "plugins/proofline/.claude-plugin/plugin.json").read_text(encoding="utf-8")
     )
     marketplace = json.loads(
         (repository / ".claude-plugin/marketplace.json").read_text(encoding="utf-8")
@@ -112,7 +112,7 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         "package-lock.json workspace": lock["packages"]["apps/web"]["version"],
         "package-lock.json desktop workspace": lock["packages"]["apps/desktop"]["version"],
         ".codex-plugin/plugin.json": codex_plugin["version"],
-        ".claude-plugin/plugin.json": claude_plugin["version"],
+        "plugins/proofline/.claude-plugin/plugin.json": claude_plugin["version"],
         ".kimi-plugin/plugin.json": kimi_plugin["version"],
         ".claude-plugin/marketplace.json": (
             marketplace_versions[0] if len(marketplace_versions) == 1 else None

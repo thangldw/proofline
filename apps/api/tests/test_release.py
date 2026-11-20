@@ -56,7 +56,7 @@ def test_release_check_rejects_stale_desktop_cargo_lock(tmp_path):
         "package-lock.json",
         "CHANGELOG.md",
         ".codex-plugin/plugin.json",
-        ".claude-plugin/plugin.json",
+        "plugins/proofline/.claude-plugin/plugin.json",
         ".kimi-plugin/plugin.json",
         ".claude-plugin/marketplace.json",
         "apps/api/proofline/__init__.py",
@@ -305,7 +305,7 @@ def test_release_check_covers_public_plugin_version_surfaces():
 
     for manifest in (
         ".codex-plugin/plugin.json",
-        ".claude-plugin/plugin.json",
+        "plugins/proofline/.claude-plugin/plugin.json",
         ".kimi-plugin/plugin.json",
     ):
         assert manifest in release_check

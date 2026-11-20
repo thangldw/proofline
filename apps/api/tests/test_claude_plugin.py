@@ -16,17 +16,17 @@ def _json(relative):
 
 def test_plugin_and_marketplace_agree_with_the_package_version():
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-    plugin = _json(".claude-plugin/plugin.json")
+    plugin = _json("plugins/proofline/.claude-plugin/plugin.json")
     marketplace = _json(".claude-plugin/marketplace.json")
     assert plugin["name"] == "proofline" and plugin["version"] == version
     [entry] = marketplace["plugins"]
     assert entry["name"] == plugin["name"] and entry["version"] == version
-    assert entry["source"] == "./"
+    assert entry["source"] == "./plugins/proofline"
     assert "hooks" not in plugin, "hooks/hooks.json is loaded by convention; naming it duplicates"
 
 
 def test_hooks_only_call_the_agent_hook_and_never_fail_the_session():
-    hooks = _json("hooks/hooks.json")["hooks"]
+    hooks = _json("plugins/proofline/hooks/hooks.json")["hooks"]
     assert set(hooks) == {"PreToolUse", "PostToolUse"}
     phases = {"PreToolUse": "pre", "PostToolUse": "post"}
     for event, groups in hooks.items():
@@ -53,7 +53,7 @@ def test_registered_hook_commands_exist_in_the_cli(capsys):
 def test_hook_command_is_silent_without_the_cli_and_forwards_when_present(phase, tmp_path):
     command = next(
         hook["command"]
-        for groups in _json("hooks/hooks.json")["hooks"].values()
+        for groups in _json("plugins/proofline/hooks/hooks.json")["hooks"].values()
         for group in groups
         for hook in group["hooks"]
         if hook["command"].endswith(f"agent-hook {phase} || true")
@@ -76,3 +76,18 @@ def test_hook_command_is_silent_without_the_cli_and_forwards_when_present(phase,
         cwd=tmp_path,
     )
     assert present.returncode == 0 and present.stdout.strip() == f"called agent-hook {phase}"
+
+
+def test_plugin_skill_copy_matches_the_shared_skill():
+    shared = ROOT / "skills"
+    bundled = ROOT / "plugins/proofline/skills"
+
+    def files(base):
+        return sorted(
+            p.relative_to(base) for p in base.rglob("*") if p.is_file() and p.name != ".DS_Store"
+        )
+
+    names = files(shared)
+    assert names == files(bundled)
+    for name in names:
+        assert (shared / name).read_bytes() == (bundled / name).read_bytes(), name
