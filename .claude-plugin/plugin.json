@@ -1,7 +1,7 @@
 {
   "name": "proofline",
-  "version": "2.9.0",
-  "description": "Evidence-first decision memory with deterministic impact and signed attestations.",
+  "version": "2.10.0",
+  "description": "Evidence-first decision memory: verify decisions with exact citations, and make approved decisions binding for coding agents through hooks.",
   "author": {
     "name": "Thang Luu",
     "url": "https://github.com/thangldw"
@@ -9,5 +9,11 @@
   "homepage": "https://github.com/thangldw/proofline",
   "repository": "https://github.com/thangldw/proofline",
   "license": "Apache-2.0",
-  "keywords": ["engineering-decisions", "adr", "evidence", "provenance"]
+  "keywords": [
+    "engineering-decisions",
+    "adr",
+    "evidence",
+    "provenance",
+    "hooks"
+  ]
 }

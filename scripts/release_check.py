@@ -87,6 +87,14 @@ def validate_release(repository: Path, tag: str) -> list[str]:
     claude_plugin = json.loads(
         (repository / ".claude-plugin/plugin.json").read_text(encoding="utf-8")
     )
+    marketplace = json.loads(
+        (repository / ".claude-plugin/marketplace.json").read_text(encoding="utf-8")
+    )
+    marketplace_versions = [
+        entry.get("version")
+        for entry in marketplace.get("plugins", [])
+        if entry.get("name") == "proofline"
+    ]
     kimi_plugin = json.loads((repository / ".kimi-plugin/plugin.json").read_text(encoding="utf-8"))
     runtime_version = read_dunder_version(repository / "apps/api/proofline/__init__.py")
     cargo_lock_version = read_cargo_package_version(
@@ -106,6 +114,9 @@ def validate_release(repository: Path, tag: str) -> list[str]:
         ".codex-plugin/plugin.json": codex_plugin["version"],
         ".claude-plugin/plugin.json": claude_plugin["version"],
         ".kimi-plugin/plugin.json": kimi_plugin["version"],
+        ".claude-plugin/marketplace.json": (
+            marketplace_versions[0] if len(marketplace_versions) == 1 else None
+        ),
     }
     for surface, value in observed.items():
         expected = (
