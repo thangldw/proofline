@@ -15,5 +15,9 @@
     "evidence",
     "provenance",
     "hooks"
-  ]
+  ],
+  "icon": "./assets/plugin-icon.png",
+  "network": {
+    "hosts": []
+  }
 }

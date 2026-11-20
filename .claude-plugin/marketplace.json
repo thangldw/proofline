@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "proofline",
-      "source": "./",
+      "source": "./plugins/proofline",
       "description": "Verify evidence-backed engineering decisions, and make approved decisions binding for coding agents: decision context before an edit, Enforce: rules after it.",
       "version": "2.11.0",
       "author": {
@@ -21,7 +21,13 @@
       "repository": "https://github.com/thangldw/proofline",
       "license": "Apache-2.0",
       "category": "development",
-      "keywords": ["engineering-decisions", "adr", "evidence", "provenance", "hooks"]
+      "keywords": [
+        "engineering-decisions",
+        "adr",
+        "evidence",
+        "provenance",
+        "hooks"
+      ]
     }
   ]
 }
