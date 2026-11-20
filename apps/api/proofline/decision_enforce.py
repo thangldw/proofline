@@ -72,6 +72,28 @@ def parse_rule(text: str) -> Rule | None:
     return None
 
 
+def glob_regex(pattern: str) -> re.Pattern[str]:
+    out = []
+    index = 0
+    while index < len(pattern):
+        if pattern.startswith("**/", index):
+            out.append("(?:.*/)?")
+            index += 3
+        elif pattern.startswith("**", index):
+            out.append(".*")
+            index += 2
+        elif pattern[index] == "*":
+            out.append("[^/]*")
+            index += 1
+        elif pattern[index] == "?":
+            out.append("[^/]")
+            index += 1
+        else:
+            out.append(re.escape(pattern[index]))
+            index += 1
+    return re.compile("".join(out) + r"\Z")
+
+
 def rules_in_quote(quote: str) -> list[str]:
     return [m.group(1) for line in quote.splitlines() if (m := ENFORCE_LINE.match(line.strip()))]
 
@@ -120,7 +142,9 @@ def evaluate_rule(root: Path, rule: Rule) -> list[tuple[str, str, int | None]]:
     return outcomes
 
 
-def check_enforcement(session: Session, root: Path) -> list[EnforceFinding]:
+def check_enforcement(
+    session: Session, root: Path, *, only_path: str | None = None
+) -> list[EnforceFinding]:
     """Check declarative `Enforce:` rules of approved decisions against the files under root."""
 
     if not root.is_dir():
@@ -142,6 +166,12 @@ def check_enforcement(session: Session, root: Path) -> list[EnforceFinding]:
             rule = parse_rule(text)
             if rule is None:
                 findings.append(EnforceFinding(decision.id, index, text, "rule_invalid"))
+                continue
+            if (
+                only_path is not None
+                and rule.kind != "require_file"
+                and not glob_regex(rule.glob).match(only_path)
+            ):
                 continue
             findings.extend(
                 EnforceFinding(decision.id, index, text, problem, path, line)

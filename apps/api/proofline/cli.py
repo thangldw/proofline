@@ -13,6 +13,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import __version__
+from .agent_hook import run as run_agent_hook
 from .attestations import (
     AttestationError,
     atomic_write_attestation,
@@ -31,7 +32,7 @@ from .backup import (
     restore_sqlite_backup,
     verify_sqlite_backup,
 )
-from .config import get_settings
+from .config import get_settings, proofline_home
 from .database import SessionLocal, engine, initialize_database
 from .decision_asof import AsOfError, decisions_as_of, parse_as_of
 from .decision_blame import DecisionBlameError, blame
@@ -1276,6 +1277,22 @@ def _cmd_ledger(args: argparse.Namespace, parser: argparse.ArgumentParser) -> No
         print(render_comparison(result), end="")
 
 
+def _cmd_agent_hook(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Claude Code hook: must never break the agent, so every failure is silent."""
+
+    try:
+        root = Path.cwd()
+        if not (proofline_home() / "proofline.db").exists():
+            return
+        raw = sys.stdin.read(1_000_000)
+        with SessionLocal() as session:
+            output = run_agent_hook(session, raw, args.phase, root)
+    except Exception:  # noqa: BLE001 - a hook failure must not interrupt the user's session
+        return
+    if output:
+        print(output)
+
+
 def _cmd_doctor(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1694,6 +1711,11 @@ def main(argv: list[str] | None = None) -> None:
             action.add_argument("--base", required=True, help="Git ref, e.g. origin/main")
             action.add_argument("--root", type=Path, default=Path("."))
             action.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    agent_hook = subcommands.add_parser(
+        "agent-hook",
+        help="Claude Code hook: show decisions before an edit, enforce rules after it",
+    )
+    agent_hook.add_argument("phase", choices=("pre", "post"))
     code_refs = subcommands.add_parser(
         "check-code-refs",
         help="Fail when code marked `proofline-decision: <id>` points at a stale decision",
@@ -1802,6 +1824,7 @@ def main(argv: list[str] | None = None) -> None:
         "asof": _cmd_asof,
         "code-context": _cmd_code_context,
         "ledger": _cmd_ledger,
+        "agent-hook": _cmd_agent_hook,
         "check-code-refs": _cmd_check_code_refs,
         "find-conflicts": _cmd_find_conflicts,
         "why": _cmd_why,
