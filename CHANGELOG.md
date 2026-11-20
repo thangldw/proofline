@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+## [2.11.0] - 2026-11-20
+
 - Added `proofline export-rules`, which exports `Enforce: forbid` rules as Semgrep rules (literal patterns, every skipped rule reported on stderr).
 - Added `proofline attest-release` and `verify-release-attestation`: an Ed25519-signed, content-free statement of decision health (stale citations, `Enforce:` findings, decision digest, ledger head, clean tree) for one commit, for change-management evidence. A new `proofline-release-attestation-v1` schema; existing attestations are unchanged.
 - Added `proofline propose`, which drafts candidate decisions (never accepted) for additions no approved decision mentions, and a `PostToolUse` nudge in `agent-hook post` that asks the agent to tell the user and offer a draft when it adds such a dependency or infrastructure file.
+
 ## [2.10.0] - 2026-11-20
 
 - Fixed re-syncing a document that was reverted to content it had before: it failed with `ingestion_error` (a unique constraint on source version content). The source now points back at its existing version, so a citation that was stale recovers.
