@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `supportURL` to the OpenAI plugin manifest; the plugin portal now requires it for new versions.
 ## [2.11.0] - 2026-11-20
 
 - Added `proofline export-rules`, which exports `Enforce: forbid` rules as Semgrep rules (literal patterns, every skipped rule reported on stderr).

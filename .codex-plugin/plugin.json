@@ -19,6 +19,7 @@
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/thangldw/proofline",
+    "supportURL": "https://github.com/thangldw/proofline/issues",
     "privacyPolicyURL": "https://github.com/thangldw/proofline/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/thangldw/proofline/blob/main/TERMS.md",
     "defaultPrompt": [
