@@ -16,8 +16,5 @@
     "provenance",
     "hooks"
   ],
-  "icon": "./assets/plugin-icon.png",
-  "network": {
-    "hosts": []
-  }
+  "icon": "./assets/plugin-icon.png"
 }

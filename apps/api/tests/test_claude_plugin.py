@@ -34,8 +34,10 @@ def test_hooks_only_call_the_agent_hook_and_never_fail_the_session():
         assert group["matcher"] == "Edit|Write|MultiEdit"
         [hook] = group["hooks"]
         assert hook["type"] == "command" and hook["timeout"] <= 30
-        assert hook["command"].endswith(f"proofline agent-hook {phases[event]} || true")
-        assert "command -v proofline" in hook["command"]
+        assert hook["command"] == "${CLAUDE_PLUGIN_ROOT}/hooks/" + phases[event] + ".sh"
+        script = (ROOT / "plugins/proofline/hooks" / f"{phases[event]}.sh").read_text()
+        assert f"proofline agent-hook {phases[event]} || true" in script
+        assert "command -v proofline" in script
 
 
 def test_registered_hook_commands_exist_in_the_cli(capsys):
@@ -51,16 +53,12 @@ def test_registered_hook_commands_exist_in_the_cli(capsys):
 
 @pytest.mark.parametrize("phase", ["pre", "post"])
 def test_hook_command_is_silent_without_the_cli_and_forwards_when_present(phase, tmp_path):
-    command = next(
-        hook["command"]
-        for groups in _json("plugins/proofline/hooks/hooks.json")["hooks"].values()
-        for group in groups
-        for hook in group["hooks"]
-        if hook["command"].endswith(f"agent-hook {phase} || true")
-    )
+    script = ROOT / "plugins/proofline/hooks" / f"{phase}.sh"
+    assert os.access(script, os.X_OK)
+    command = str(script)
     bare = {**os.environ, "PATH": "/usr/bin:/bin"}
     absent = subprocess.run(
-        ["sh", "-c", command], capture_output=True, text=True, env=bare, input="{}", cwd=tmp_path
+        [command], capture_output=True, text=True, env=bare, input="{}", cwd=tmp_path
     )
     assert absent.returncode == 0 and absent.stdout == "" and absent.stderr == ""
     stub = tmp_path / "bin"
@@ -68,7 +66,7 @@ def test_hook_command_is_silent_without_the_cli_and_forwards_when_present(phase,
     (stub / "proofline").write_text('#!/bin/sh\necho "called $@"\nexit 7\n')
     (stub / "proofline").chmod(0o755)
     present = subprocess.run(
-        ["sh", "-c", command],
+        [command],
         capture_output=True,
         text=True,
         env={**bare, "PATH": f"{stub}:/usr/bin:/bin"},
