@@ -71,11 +71,12 @@ from .decision_policy import (
     load_decision_policy,
     policy_sha256,
 )
+from .decision_propose import DEFAULT_DIR, KINDS, ProposeError, write_proposals
 from .decision_rebind import apply_rebind, list_pending_reviews, preview_rebind
 from .decision_report import build_report, render_report_html, render_report_markdown
 from .decision_reviews import DecisionReviewError, refresh_decision_reviews
 from .decision_trend import record_all_snapshots, render_markdown, trend
-from .decision_undocumented import candidates_from_diff, find_undocumented
+from .decision_undocumented import Candidate, candidates_from_diff, find_undocumented
 from .decision_watch import watch_folder
 from .decision_whatif import WhatIfError, what_if_superseded
 from .decision_whatif import render_text as render_what_if
@@ -1331,6 +1332,36 @@ def _cmd_find_undocumented(args: argparse.Namespace, parser: argparse.ArgumentPa
         raise SystemExit(1)
 
 
+def _cmd_propose(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    try:
+        if args.base:
+            with SessionLocal() as session:
+                candidates: list[Candidate] = [
+                    Candidate(item.path, item.kind, item.name)
+                    for item in find_undocumented(
+                        session, candidates_from_diff(git_diff(args.root, args.base))
+                    )
+                ]
+        elif args.name and args.path:
+            candidates = [Candidate(args.path, args.kind, args.name)]
+        else:
+            _decision_check_failed("base_or_name_and_path_required")
+        written = write_proposals(candidates, args.output_dir, reason=args.reason)
+    except ContextError as exc:
+        _decision_check_failed(exc.code)
+    except ProposeError as exc:
+        _decision_check_failed(exc.code)
+    except (OSError, SQLAlchemyError):
+        _decision_check_failed("context_unavailable")
+    if args.format == "json":
+        print(json.dumps({"proposals": [str(item.output) for item in written]}, sort_keys=True))
+    elif not written:
+        print("Nothing to propose: every addition is already covered by an approved decision.")
+    else:
+        for item in written:
+            print(f"Drafted {item.output} (status: candidate; review it, then accept)")
+
+
 def _cmd_what_if(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     try:
         with SessionLocal() as session:
@@ -1795,6 +1826,18 @@ def main(argv: list[str] | None = None) -> None:
     undocumented.add_argument("--ignore", action="append", default=[], metavar="NAME")
     undocumented.add_argument("--format", choices=("markdown", "json"), default="markdown")
     undocumented.add_argument("--fail-on-undocumented", action="store_true")
+    propose = subcommands.add_parser(
+        "propose",
+        help="Draft candidate decisions (never accepted) for additions no decision covers",
+    )
+    propose.add_argument("--base", help="Git ref: draft one per undocumented addition in the diff")
+    propose.add_argument("--kind", choices=KINDS, default="dependency")
+    propose.add_argument("--name", help="Dependency or infrastructure name to draft a decision for")
+    propose.add_argument("--path", help="File that declares it, relative to the repository")
+    propose.add_argument("--reason", help="Rationale to put in the draft")
+    propose.add_argument("--root", type=Path, default=Path("."))
+    propose.add_argument("--output-dir", type=Path, default=Path(DEFAULT_DIR))
+    propose.add_argument("--format", choices=("text", "json"), default="text")
     what_if = subcommands.add_parser(
         "what-if",
         help="Preview the blast radius of superseding a decision (dependents, code refs, rules)",
@@ -1921,6 +1964,7 @@ def main(argv: list[str] | None = None) -> None:
         "ledger": _cmd_ledger,
         "agent-hook": _cmd_agent_hook,
         "find-undocumented": _cmd_find_undocumented,
+        "propose": _cmd_propose,
         "what-if": _cmd_what_if,
         "debt": _cmd_debt,
         "check-code-refs": _cmd_check_code_refs,
