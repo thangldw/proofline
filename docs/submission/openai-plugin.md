@@ -16,7 +16,7 @@ Observation date: 2026-08-24
 
 ### External state
 
-Authenticated portal and public Directory observation at 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` passed scanning and review, and version 2.0.2 was published at the stable plugin URL. The public page showed the expected three prompts, `Manage Evidence Decisions` skill, `Read, Write` capabilities, developer `DUC THANG LUU`, and version 2.0.2. The accidental duplicate draft plugin was deleted, and the portal then listed one Proofline plugin. Treat approval/publication as external state, not a repository guarantee.
+Authenticated portal and public Directory observation at 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` passed scanning and review, and version 2.0.2 was published at the stable plugin URL. The public page showed the expected three prompts, `Manage Evidence Decisions` skill, `Read, Write` capabilities, developer `DUC THANG LUU`, and version 2.0.2. The accidental duplicate draft plugin was deleted, and the portal then listed one Proofline plugin. Treat approval/publication as external state, not a repository guarantee. Update at 2026-11-20: version 2.11.0 (ZIP SHA-256 `6ca8441cce19a7682b6e70224c82dfe60559aa432d46988342f6060418109bb1`, which adds `supportURL`) passed the portal metadata and skill checks and was submitted for review; the portal then showed review status "In review" while the public page still showed 2.0.2. Publication of 2.11.0 has not been observed.
 
 ### Reviewer workflow
 
@@ -48,7 +48,7 @@ Proofline reviews evidence-backed engineering decisions, preserves exact cited s
 
 ### External state
 
-Quan sát authenticated portal và public Directory lúc 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` đã pass scanning và review; version 2.0.2 đã được publish tại stable plugin URL. Public page hiển thị đúng ba prompt, skill `Manage Evidence Decisions`, capabilities `Read, Write`, developer `DUC THANG LUU` và version 2.0.2. Duplicate draft plugin tạo nhầm đã được xoá; portal sau đó chỉ còn một plugin Proofline. Xem approval/publication là external state, không phải guarantee của repository.
+Quan sát authenticated portal và public Directory lúc 2026-08-24T11:25+09:00: submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` đã pass scanning và review; version 2.0.2 đã được publish tại stable plugin URL. Public page hiển thị đúng ba prompt, skill `Manage Evidence Decisions`, capabilities `Read, Write`, developer `DUC THANG LUU` và version 2.0.2. Duplicate draft plugin tạo nhầm đã được xoá; portal sau đó chỉ còn một plugin Proofline. Xem approval/publication là external state, không phải guarantee của repository. Cập nhật 2026-11-20: version 2.11.0 (ZIP SHA-256 `6ca8441cce19a7682b6e70224c82dfe60559aa432d46988342f6060418109bb1`, có thêm `supportURL`) đã pass kiểm tra metadata và skill của portal và được gửi duyệt; portal hiển thị trạng thái "In review" trong khi public page vẫn là 2.0.2. Chưa quan sát thấy 2.11.0 được publish.
 
 ### Reviewer workflow
 
@@ -80,7 +80,7 @@ Proofline review engineering decision có evidence, giữ exact cited span, veri
 
 ### External state
 
-2026-08-24T11:25+09:00 の authenticated portal と public Directory の observation では、submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` は scanning と review に合格し、version 2.0.2 が stable plugin URL に publish されました。Public page は想定された 3 つの prompt、`Manage Evidence Decisions` skill、`Read, Write` capabilities、developer `DUC THANG LUU`、version 2.0.2 を表示しました。誤って作成した duplicate draft plugin は削除され、その後 portal には Proofline plugin が 1 つだけ表示されました。Approval/publication は external state であり repository guarantee ではありません。
+2026-08-24T11:25+09:00 の authenticated portal と public Directory の observation では、submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` は scanning と review に合格し、version 2.0.2 が stable plugin URL に publish されました。Public page は想定された 3 つの prompt、`Manage Evidence Decisions` skill、`Read, Write` capabilities、developer `DUC THANG LUU`、version 2.0.2 を表示しました。誤って作成した duplicate draft plugin は削除され、その後 portal には Proofline plugin が 1 つだけ表示されました。Approval/publication は external state であり repository guarantee ではありません。2026-11-20 の更新：version 2.11.0（ZIP SHA-256 `6ca8441cce19a7682b6e70224c82dfe60559aa432d46988342f6060418109bb1`、`supportURL` を追加）は portal の metadata と skill のチェックに合格して審査に提出され、portal の review status は "In review" でしたが、public page は 2.0.2 のままでした。2.11.0 の publish はまだ確認されていません。
 
 ### Reviewer workflow
 
