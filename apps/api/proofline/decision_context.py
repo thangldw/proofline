@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .decision_blame import blame
 from .decision_code_refs import MAX_FILE_BYTES, REF_PATTERN
-from .decision_enforce import evaluate_rule, parse_rule, rules_in_quote
+from .decision_enforce import evaluate_rule, glob_regex, parse_rule, rules_in_quote
 from .decision_health import check_decision_health
 from .models import Decision
 
@@ -89,28 +89,6 @@ def git_diff(root: Path, base: str) -> str:
     return completed.stdout
 
 
-def _glob_regex(pattern: str) -> re.Pattern[str]:
-    out = []
-    index = 0
-    while index < len(pattern):
-        if pattern.startswith("**/", index):
-            out.append("(?:.*/)?")
-            index += 3
-        elif pattern.startswith("**", index):
-            out.append(".*")
-            index += 2
-        elif pattern[index] == "*":
-            out.append("[^/]*")
-            index += 1
-        elif pattern[index] == "?":
-            out.append("[^/]")
-            index += 1
-        else:
-            out.append(re.escape(pattern[index]))
-            index += 1
-    return re.compile("".join(out) + r"\Z")
-
-
 def _near(line: int, ranges: list[tuple[int, int]], radius: int) -> bool:
     return any(start - radius <= line <= end + radius for start, end in ranges)
 
@@ -153,7 +131,7 @@ def build_context(
         for index, text in enumerate(dict.fromkeys(texts), start=1):
             rule = parse_rule(text)
             if rule is not None:
-                rules.append((decision, index, rule, _glob_regex(rule.glob)))
+                rules.append((decision, index, rule, glob_regex(rule.glob)))
 
     items: list[ContextItem] = []
     for path, ranges in sorted(changes.items()):
