@@ -25,6 +25,8 @@ Plugin submission is a separate external workflow. Rebuild and inspect the skill
 
 ### Current release
 
+Update at 2026-11-22: PyPI and GitHub Releases report 2.11.1 (wheel SHA-256 `e5776d09d7b60269a4fa8824a1b8cc5f8d972209cfbdbc94fbc89c9ed49b99e4`, sdist `80c5cfaad387bca1eca57459ad42fc00784246317eb76faa14dc6d0dc66edf47`, tag `v2.11.1` at `4bf850a`). The OpenAI plugin portal reported 2.11.0 as published after review; the public ChatGPT page was not re-checked. The Claude plugin is distributed through the GitHub marketplace only. The 2.0.2 record below is the earlier observation.
+
 As verified on 2026-08-24, PyPI, GitHub Releases, and the OpenAI Plugins Directory reported Proofline 2.0.2 as published. The Git tag resolves to release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be`. Public PyPI SHA-256 digests are `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474` for the wheel and `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` for the sdist. The submitted plugin ZIP SHA-256 is `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`, and submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` was observed as published.
 
 ## Tiếng Việt
@@ -52,6 +54,8 @@ Plugin submission là external workflow riêng. Rebuild và inspect skills-only 
 
 ### Release hiện tại
 
+Cập nhật 2026-11-22: PyPI và GitHub Releases báo 2.11.1 (SHA-256 wheel `e5776d09d7b60269a4fa8824a1b8cc5f8d972209cfbdbc94fbc89c9ed49b99e4`, sdist `80c5cfaad387bca1eca57459ad42fc00784246317eb76faa14dc6d0dc66edf47`, tag `v2.11.1` tại `4bf850a`). Portal plugin OpenAI báo 2.11.0 đã publish sau review; chưa kiểm tra lại public ChatGPT page. Claude plugin chỉ phân phối qua GitHub marketplace. Bản ghi 2.0.2 bên dưới là observation trước đó.
+
 Theo verification ngày 2026-08-24, PyPI, GitHub Releases và OpenAI Plugins Directory đều báo Proofline 2.0.2 đã published. Git tag resolve tới release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be`. Public PyPI SHA-256 là `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474` cho wheel và `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` cho sdist. Submitted plugin ZIP SHA-256 là `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360`; submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` đã được quan sát ở trạng thái published.
 
 ## 日本語
@@ -78,5 +82,7 @@ PyPI は project-scoped Trusted Publisher を使い、long-lived token を repos
 Plugin submission は別の external workflow です。Skills-only bundle を再 build/inspect し、clean directory で bundle conformance を実行し、dated submission evidence を更新して新 immutable plugin version を submit します。外部観測前に approval/publication を claim しません。Remote MCP connector には別の hosted-security design が必要で、この release path には含みません。
 
 ### Current release
+
+2026-11-22 更新: PyPI と GitHub Releases は 2.11.1 を報告しています (wheel SHA-256 `e5776d09d7b60269a4fa8824a1b8cc5f8d972209cfbdbc94fbc89c9ed49b99e4`、sdist `80c5cfaad387bca1eca57459ad42fc00784246317eb76faa14dc6d0dc66edf47`、tag `v2.11.1` は `4bf850a`)。OpenAI plugin portal は review 後に 2.11.0 を published と報告しましたが、public ChatGPT page は再確認していません。Claude plugin は GitHub marketplace のみで配布します。以下の 2.0.2 の記録は以前の observation です。
 
 2026-08-24 の verification では、PyPI、GitHub Releases、OpenAI Plugins Directory のすべてで Proofline 2.0.2 の published status を確認しました。Git tag は release commit `5328eba3cd907db1190ce2a3be7a5f96ae5b67be` に resolve します。Public PyPI SHA-256 は wheel が `f5e256f8a91a8c61f80e6b588a5bfd102990972d01fe5db6628b378812f45474`、sdist が `59e6f155912a66cffb88493f5e114928c8aa71ef76fe4cab39891bc8feda28bd` です。Submitted plugin ZIP SHA-256 は `c6e8e83ba66e78811dcd6d99011d6454abb367969abf77ca7dbbd1803df8360` で、submission `appsub_6a8ba7cb85dc81919f961b5ca9a9f62d` の published status を観測しました。
