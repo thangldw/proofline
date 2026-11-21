@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded that the OpenAI plugin 2.11.0 was approved and published from the portal, and the 2.11.1 PyPI and GitHub release evidence.
+
 ## [2.11.1] - 2026-11-21
 
 - Moved the Claude Code plugin into `plugins/proofline/` (manifest, hooks, a copy of the skill, icon, README, LICENSE) so the plugin directory can scan a small folder; the marketplace now points there and the manifest declares an icon. `/plugin marketplace add thangldw/proofline` is unchanged.
